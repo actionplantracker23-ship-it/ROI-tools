@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>DermaSuivi</title>
+  <meta name="description" content="Suivi photo de la cicatrisation des patients, dossier par patient, photos côte à côte.">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="DermaSuivi">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app" aria-live="polite"></main>
+
+  <input type="file" id="in-camera" accept="image/*" capture="environment" hidden>
+  <input type="file" id="in-gallery" accept="image/*" multiple hidden>
+  <input type="file" id="in-backup" accept="application/json,.json" hidden>
+
+  <dialog id="dlg"></dialog>
+  <div id="toast" role="status"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

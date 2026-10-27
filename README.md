@@ -30,6 +30,11 @@ Pays, monnaie, PIB, seuil et nombre d'activités sont libres.
 Méthode : Drummond et al. (2015), guide OMS-CHOICE (2003), iDSI Reference Case (2016),
 Stinnett & Mullahy (1998). Détails et références dans l'onglet « Méthode et sources ».
 
+## DermaSuivi
+
+Le dossier `dermasuivi/` contient une application distincte de suivi photo de la cicatrisation
+(voir `dermasuivi/README.md`), publiée sur GitHub Pages dans `/dermasuivi/`.
+
 ## Structure
 
 ```

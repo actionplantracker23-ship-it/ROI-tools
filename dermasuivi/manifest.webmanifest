@@ -1,0 +1,17 @@
+{
+  "name": "DermaSuivi – suivi de cicatrisation",
+  "short_name": "DermaSuivi",
+  "description": "Dossier photo par patient pour suivre la cicatrisation, photos côte à côte.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f6f8f8",
+  "theme_color": "#0f766e",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

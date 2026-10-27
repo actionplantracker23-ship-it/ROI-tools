@@ -29,6 +29,8 @@ jobs:
         run: Rscript tests/run.R
       - name: Exporter l'application avec Shinylive
         run: Rscript -e 'shinylive::export("app", "site")'
+      - name: Ajouter DermaSuivi (application photo, publiée dans /dermasuivi/)
+        run: cp -r dermasuivi site/dermasuivi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
