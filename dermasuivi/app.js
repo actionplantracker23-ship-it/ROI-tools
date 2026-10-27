@@ -18,6 +18,8 @@ const ICON = {
   gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
   share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M16 6l-4-4-4 4M12 2v13"/></svg>',
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
   download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>',
 };
 
@@ -41,10 +43,56 @@ const byDate = (a, b) => a.date.localeCompare(b.date) || a.createdAt - b.created
 
 /* ================= Base de données (IndexedDB) ================= */
 
+/* ================= Espaces médecin =================
+   Chaque médecin a son espace : ses propres patients et photos, dans une base séparée,
+   protégée s'il le souhaite par un code personnel. */
+
+const SPACES_KEY = 'ds-spaces';
+const loadSpaces = () => { try { return JSON.parse(localStorage.getItem(SPACES_KEY)) || []; } catch { return []; } };
+const saveSpaces = list => localStorage.setItem(SPACES_KEY, JSON.stringify(list));
+let space = null; // espace ouvert
+let autoOpen = true; // au démarrage seulement : rouvrir le dernier espace s'il n'a pas de code
+
+async function hashPin(pin, salt) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(salt + ':' + pin));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function makePin(pin) {
+  if (!pin) return null;
+  const salt = uid();
+  return { salt, hash: await hashPin(pin, salt) };
+}
+
+function enterSpace(sp) {
+  if (dbPromise) dbPromise.then(d => d.close()).catch(() => {});
+  dbPromise = null;
+  space = sp;
+  currentPid = null;
+  sessionStorage.setItem('ds-space', sp.id);
+  localStorage.setItem('ds-last-space', sp.id);
+}
+function leaveSpace() {
+  if (dbPromise) dbPromise.then(d => d.close()).catch(() => {});
+  dbPromise = null;
+  space = null;
+  autoOpen = false;
+  sessionStorage.removeItem('ds-space');
+}
+const backupKey = () => `ds-last-backup-${space.id}`;
+
+// Verrouillage automatique d'un espace protégé après 5 minutes hors de l'application.
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  if (space?.pin && hiddenAt && Date.now() - hiddenAt > 5 * 60e3) { leaveSpace(); route(); }
+});
+
+/* ================= Base de données (IndexedDB) ================= */
+
 let dbPromise;
 function db() {
   return dbPromise ||= new Promise((resolve, reject) => {
-    const r = indexedDB.open('dermasuivi', 1);
+    const r = indexedDB.open(space.db, 1);
     r.onupgradeneeded = () => {
       const d = r.result;
       d.createObjectStore('patients', { keyPath: 'id' });
@@ -186,7 +234,9 @@ function openDialog(html, { cls = '', onOpen } = {}) {
     onOpen?.(dlg);
   });
 }
-const closeBtn = '<button class="btn icon ghost" value="" formnovalidate aria-label="Fermer">✕</button>';
+// Boutons « fermer / annuler » hors soumission : la touche Entrée valide ainsi le bouton principal.
+const closeBtn = '<button type="button" class="btn icon ghost" data-close aria-label="Fermer">✕</button>';
+dlg.addEventListener('click', e => { if (e.target.closest('[data-close]')) dlg.close(''); });
 
 async function confirmBox(title, text, okLabel = 'Supprimer') {
   const r = await openDialog(`
@@ -194,7 +244,7 @@ async function confirmBox(title, text, okLabel = 'Supprimer') {
       <div class="dhead"><h2>${esc(title)}</h2></div>
       <div class="dbody"><p>${esc(text)}</p></div>
       <div class="dfoot">
-        <button class="btn" value="">Annuler</button>
+        <button type="button" class="btn" data-close>Annuler</button>
         <button class="btn primary" value="ok">${esc(okLabel)}</button>
       </div>
     </form>`);
@@ -234,6 +284,13 @@ async function route() {
   const parts = path.split('/').filter(Boolean);
   const q = new URLSearchParams(query || '');
   try {
+    if (!space) {
+      const spaces = loadSpaces();
+      const open = spaces.find(x => x.id === sessionStorage.getItem('ds-space'))
+        || (autoOpen && spaces.find(x => x.id === localStorage.getItem('ds-last-space') && !x.pin));
+      if (open) enterSpace(open);
+      else return viewSpaces(spaces);
+    }
     if (parts[0] === 'p' && parts[1] && parts[2] === 'compare') return await viewCompare(parts[1], (q.get('ids') || '').split(',').filter(Boolean));
     if (parts[0] === 'p' && parts[1]) return await viewPatient(parts[1]);
     if (parts[0] === 'reglages') return await viewSettings();
@@ -253,13 +310,14 @@ async function viewHome() {
     : (a, b) => b.updatedAt - a.updatedAt);
   const totalPhotos = patients.reduce((n, p) => n + (p.count || 0), 0);
 
-  const last = Number(localStorage.getItem('ds-last-backup') || 0);
+  const last = Number(localStorage.getItem(backupKey()) || 0);
   const needBackup = totalPhotos > 0 && Date.now() - last > 30 * 864e5;
 
   app.innerHTML = `
     <header class="topbar">
-      <h1>DermaSuivi<span class="sub">${patients.length} patient${patients.length > 1 ? 's' : ''} · ${totalPhotos} photo${totalPhotos > 1 ? 's' : ''}</span></h1>
+      <h1>${esc(space.name)}<span class="sub">${patients.length} patient${patients.length > 1 ? 's' : ''} · ${totalPhotos} photo${totalPhotos > 1 ? 's' : ''}</span></h1>
       <button class="btn install-btn" data-act="install">${ICON.download} Installer</button>
+      <button class="btn icon ghost" data-act="switch" aria-label="${space.pin ? 'Verrouiller / changer d\'espace' : 'Changer d\'espace'}">${space.pin ? ICON.lock : ICON.user}</button>
       <a class="btn icon ghost" href="#/reglages" aria-label="Réglages et sauvegarde">${ICON.gear}</a>
     </header>
     ${needBackup ? `<div class="banner">💾 ${last ? 'Dernière sauvegarde il y a plus de 30 jours.' : 'Aucune sauvegarde faite pour l\'instant.'}<a class="btn" href="#/reglages">Sauvegarder</a></div>` : ''}
@@ -294,6 +352,7 @@ async function viewHome() {
   $('#sort').onchange = e => { state.sort = e.target.value; localStorage.setItem('ds-sort', state.sort); route(); };
   app.querySelectorAll('[data-act=new]').forEach(b => (b.onclick = () => editPatient()));
   app.querySelector('[data-act=install]').onclick = install;
+  app.querySelector('[data-act=switch]').onclick = () => { leaveSpace(); location.hash = '#/'; route(); };
 }
 
 async function editPatient(p) {
@@ -307,7 +366,7 @@ async function editPatient(p) {
         <div class="field"><label for="f-notes">Notes (diagnostic, traitement…)</label><textarea id="f-notes">${esc(p?.notes)}</textarea></div>
       </div>
       <div class="dfoot">
-        <button class="btn" value="" formnovalidate>Annuler</button>
+        <button type="button" class="btn" data-close>Annuler</button>
         <button class="btn primary" value="ok">${isNew ? 'Créer le dossier' : 'Enregistrer'}</button>
       </div>
     </form>`, { onOpen: d => $('#f-name', d).focus() });
@@ -460,7 +519,7 @@ async function addPhotos(p, files, zones) {
         <div class="field"><label for="n-note">Note (facultatif)</label><textarea id="n-note" placeholder="ex. après 2 semaines de traitement"></textarea></div>
       </div>
       <div class="dfoot">
-        <button class="btn" value="">Annuler</button>
+        <button type="button" class="btn" data-close>Annuler</button>
         <button class="btn primary" value="ok">Enregistrer</button>
       </div>
     </form>`);
@@ -598,6 +657,7 @@ async function viewCompare(pid, ids) {
 // Assemble les photos comparées en une seule image JPEG (avec dates), à partager ou enregistrer.
 async function exportCompare(p, photos) {
   toast('Création de l\'image…');
+  await document.fonts?.load('700 44px "EB Garamond"').catch(() => {});
   const imgs = await Promise.all(photos.map(ph => decode(ph.blob)));
   const first = photos[0].date;
   const cellW = 1000, gap = 24, head = 110, foot = 120;
@@ -609,7 +669,7 @@ async function exportCompare(p, photos) {
   g.fillStyle = '#ffffff';
   g.fillRect(0, 0, c.width, c.height);
   g.fillStyle = '#15201f';
-  g.font = '600 46px system-ui, sans-serif';
+  g.font = '600 50px "EB Garamond", Garamond, serif';
   g.textBaseline = 'middle';
   g.fillText(`${p.name} — suivi de cicatrisation`, gap, head / 2);
   imgs.forEach((im, k) => {
@@ -621,10 +681,10 @@ async function exportCompare(p, photos) {
     g.drawImage(im, x0 + (cellW - w) / 2, head + (cellH - h) / 2, w, h);
     const ph = photos[k];
     g.fillStyle = '#0f766e';
-    g.font = '700 44px system-ui, sans-serif';
+    g.font = '700 48px "EB Garamond", Garamond, serif';
     g.fillText(dayLabel(daysBetween(first, ph.date)), x0, head + cellH + 40);
     g.fillStyle = '#15201f';
-    g.font = '400 38px system-ui, sans-serif';
+    g.font = '400 42px "EB Garamond", Garamond, serif';
     g.fillText(fmtLong(ph.date) + (ph.zone ? ' · ' + ph.zone : ''), x0, head + cellH + 90);
   });
   const blob = await toBlob(c, 0.9);
@@ -646,7 +706,7 @@ const fmtMB = n => (n / 1048576).toLocaleString('fr-FR', { maximumFractionDigits
 async function viewSettings() {
   const est = await navigator.storage?.estimate?.().catch(() => null);
   const persisted = await navigator.storage?.persisted?.().catch(() => false);
-  const last = Number(localStorage.getItem('ds-last-backup') || 0);
+  const last = Number(localStorage.getItem(backupKey()) || 0);
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
@@ -665,8 +725,19 @@ async function viewSettings() {
     </section>`}
 
     <section class="card">
+      <h2>Mon espace : ${esc(space.name)}</h2>
+      <p>Les patients et photos de cet espace ne sont visibles que depuis cet espace.
+      ${space.pin ? 'Il est protégé par un code et se verrouille après 5 minutes hors de l\'application.' : 'Il n\'est pas protégé par un code.'}</p>
+      <div class="row">
+        <button class="btn" data-act="rename">Renommer</button>
+        <button class="btn" data-act="pin">${space.pin ? 'Changer ou retirer le code' : 'Ajouter un code'}</button>
+        <button class="btn danger ghost" data-act="delspace">Supprimer l'espace</button>
+      </div>
+    </section>
+
+    <section class="card">
       <h2>Sauvegarde</h2>
-      <p>Les photos sont enregistrées <b>uniquement sur cet appareil</b>. Faites une sauvegarde régulièrement (clé USB, disque, cloud sécurisé)
+      <p>Les photos de cet espace sont enregistrées <b>uniquement sur cet appareil</b>. Faites une sauvegarde régulièrement (clé USB, disque, cloud sécurisé)
       pour ne rien perdre et pour transférer les dossiers vers un autre appareil.</p>
       <p>Dernière sauvegarde : <b>${last ? new Date(last).toLocaleDateString('fr-FR') : 'jamais'}</b></p>
       <div class="row">
@@ -690,6 +761,9 @@ async function viewSettings() {
     </section>
   `;
   app.querySelector('[data-act=install]')?.addEventListener('click', install);
+  app.querySelector('[data-act=rename]').onclick = () => editSpace(space);
+  app.querySelector('[data-act=pin]').onclick = () => editSpace(space, true);
+  app.querySelector('[data-act=delspace]').onclick = deleteSpace;
   app.querySelector('[data-act=export]').onclick = exportBackup;
   app.querySelector('[data-act=import]').onclick = async () => {
     const [file] = await pickFiles($('#in-backup'));
@@ -708,8 +782,8 @@ async function exportBackup() {
     parts.push((k ? ',' : '') + JSON.stringify({ ...meta, image: await blobToDataURL(blob), thumb: await blobToDataURL(thumb) }));
   }
   parts.push(']}');
-  download(new Blob(parts, { type: 'application/json' }), `dermasuivi_sauvegarde_${today()}.json`);
-  localStorage.setItem('ds-last-backup', String(Date.now()));
+  download(new Blob(parts, { type: 'application/json' }), `dermasuivi_${safeName(space.name)}_sauvegarde_${today()}.json`);
+  localStorage.setItem(backupKey(), String(Date.now()));
   toast(`Sauvegarde de ${patients.length} dossier(s) et ${photos.length} photo(s)`);
   setTimeout(route, 600);
 }
@@ -735,6 +809,121 @@ async function importBackup(file) {
     console.error(e);
     alert('La restauration a échoué : ' + e.message);
   }
+}
+
+/* ================= Choix de l'espace ================= */
+
+function viewSpaces(spaces) {
+  app.innerHTML = `
+    <div class="welcome">
+      <img src="icons/icon.svg" alt="">
+      <h1>DermaSuivi</h1>
+      <p>${spaces.length ? 'Choisissez votre espace' : 'Bienvenue. Créez votre espace pour commencer.'}</p>
+    </div>
+    <div class="spaces">
+      ${spaces.map(sp => `
+        <button class="space" data-id="${sp.id}">
+          <span class="avatar">${esc(initials(sp.name.replace(/^dr\.?\s+/i, '')))}</span>
+          <span><strong>${esc(sp.name)}</strong><small>${sp.pin ? '🔒 Protégé par un code' : 'Sans code'}</small></span>
+        </button>`).join('')}
+      <button class="space" data-act="newspace">
+        <span class="avatar">${ICON.plus}</span>
+        <span><strong>Nouvel espace médecin</strong><small>Ses propres patients et photos</small></span>
+      </button>
+    </div>`;
+  app.querySelectorAll('.space[data-id]').forEach(b => (b.onclick = () => unlockSpace(spaces.find(x => x.id === b.dataset.id))));
+  app.querySelector('[data-act=newspace]').onclick = () => editSpace();
+}
+
+async function unlockSpace(sp) {
+  if (sp.pin) {
+    const r = await openDialog(`
+      <form method="dialog" id="uf">
+        <div class="dhead"><h2>${esc(sp.name)}</h2>${closeBtn}</div>
+        <div class="dbody">
+          <div class="field"><label for="u-pin">Code de l'espace</label>
+            <input type="password" id="u-pin" class="pin" inputmode="numeric" autocomplete="off" required></div>
+          <p class="err" id="u-err"></p>
+        </div>
+        <div class="dfoot"><button type="button" class="btn" data-close>Annuler</button><button class="btn primary" value="ok">Ouvrir</button></div>
+      </form>`, {
+      onOpen: d => {
+        $('#u-pin', d).focus();
+        // Vérifie le code avant de fermer la boîte, pour pouvoir réessayer.
+        $('#uf', d).addEventListener('submit', async e => {
+          if (e.submitter?.value !== 'ok') return;
+          e.preventDefault();
+          if (await hashPin($('#u-pin', d).value, sp.pin.salt) === sp.pin.hash) d.close('ok');
+          else { $('#u-err', d).textContent = 'Code incorrect.'; $('#u-pin', d).select(); }
+        });
+      },
+    });
+    if (r !== 'ok') return;
+  }
+  enterSpace(sp);
+  location.hash = '#/';
+  route();
+}
+
+async function editSpace(sp, pinOnly = false) {
+  const isNew = !sp;
+  const spaces = loadSpaces();
+  const r = await openDialog(`
+    <form method="dialog" id="sf">
+      <div class="dhead"><h2>${isNew ? 'Nouvel espace médecin' : pinOnly ? 'Code de l\'espace' : 'Renommer l\'espace'}</h2>${closeBtn}</div>
+      <div class="dbody">
+        ${pinOnly ? '' : `<div class="field"><label for="s-name">Nom affiché *</label>
+          <input type="text" id="s-name" required placeholder="ex. Dr Martin" value="${esc(sp?.name)}" autocomplete="off"></div>`}
+        ${isNew || pinOnly ? `<div class="field"><label for="s-pin">${isNew ? 'Code personnel (facultatif, conseillé)' : 'Nouveau code (laisser vide pour retirer le code)'}</label>
+          <input type="password" id="s-pin" class="pin" inputmode="numeric" autocomplete="new-password" minlength="4" placeholder="4 chiffres ou plus"></div>
+          <div class="field"><label for="s-pin2">Confirmer le code</label>
+          <input type="password" id="s-pin2" class="pin" inputmode="numeric" autocomplete="new-password"></div>
+          <p class="err" id="s-err"></p>` : ''}
+      </div>
+      <div class="dfoot"><button type="button" class="btn" data-close>Annuler</button><button class="btn primary" value="ok">${isNew ? 'Créer l\'espace' : 'Enregistrer'}</button></div>
+    </form>`, {
+    onOpen: d => {
+      ($('#s-name', d) || $('#s-pin', d)).focus();
+      $('#sf', d).addEventListener('submit', e => {
+        const p1 = $('#s-pin', d), p2 = $('#s-pin2', d);
+        if (e.submitter?.value === 'ok' && p1 && p1.value !== p2.value) {
+          e.preventDefault();
+          $('#s-err', d).textContent = 'Les deux codes ne sont pas identiques.';
+        }
+      });
+    },
+  });
+  if (r !== 'ok') return;
+  const pinInput = $('#s-pin', dlg);
+  if (isNew) {
+    // Le tout premier espace reprend la base d'origine : les données déjà saisies y restent.
+    const rec = { id: uid(), name: $('#s-name', dlg).value.trim(), pin: await makePin(pinInput.value), createdAt: Date.now() };
+    rec.db = spaces.some(x => x.db === 'dermasuivi') ? `dermasuivi-${rec.id}` : 'dermasuivi';
+    saveSpaces([...spaces, rec]);
+    enterSpace(rec);
+    location.hash = '#/';
+  } else {
+    const rec = spaces.find(x => x.id === sp.id);
+    if (pinOnly) rec.pin = await makePin(pinInput.value);
+    else rec.name = $('#s-name', dlg).value.trim() || rec.name;
+    saveSpaces(spaces);
+    Object.assign(space, rec);
+    toast(pinOnly ? (rec.pin ? 'Code enregistré' : 'Code retiré') : 'Espace renommé');
+  }
+  route();
+}
+
+async function deleteSpace() {
+  const sp = space;
+  if (!await confirmBox('Supprimer cet espace ?',
+    `L'espace « ${sp.name} », tous ses patients et toutes ses photos seront définitivement effacés de cet appareil. Pensez à exporter une sauvegarde avant.`)) return;
+  leaveSpace();
+  await new Promise(res => { const r = indexedDB.deleteDatabase(sp.db); r.onsuccess = r.onerror = r.onblocked = res; });
+  saveSpaces(loadSpaces().filter(x => x.id !== sp.id));
+  localStorage.removeItem(`ds-last-backup-${sp.id}`);
+  toast('Espace supprimé');
+  location.hash = '#/';
+  route();
 }
 
 /* ================= Installation (PWA) ================= */

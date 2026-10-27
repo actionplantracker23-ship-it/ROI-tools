@@ -1,6 +1,6 @@
 // Service worker : met l'application en cache pour qu'elle marche hors ligne.
 // Les photos ne passent jamais par ici : elles restent dans IndexedDB sur l'appareil.
-const CACHE = 'dermasuivi-v1';
+const CACHE = 'dermasuivi-v2';
 const SHELL = [
   './',
   'index.html',
@@ -11,6 +11,8 @@ const SHELL = [
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/apple-touch-icon.png',
+  'fonts/eb-garamond.woff2',
+  'fonts/eb-garamond-italic.woff2',
 ];
 
 self.addEventListener('install', e => {
