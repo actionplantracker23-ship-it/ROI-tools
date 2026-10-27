@@ -274,7 +274,7 @@ const initials = name => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toU
 
 /* ================= Routage ================= */
 
-const state = { sort: localStorage.getItem('ds-sort') || 'recent', zone: null, selecting: false, sel: [] };
+const state = { ep: null, sort: localStorage.getItem('ds-sort') || 'recent', zone: null, selecting: false, sel: [] };
 
 window.addEventListener('hashchange', route);
 async function route() {
@@ -322,7 +322,7 @@ async function viewHome() {
     </header>
     ${needBackup ? `<div class="banner">💾 ${last ? 'Dernière sauvegarde il y a plus de 30 jours.' : 'Aucune sauvegarde faite pour l\'instant.'}<a class="btn" href="#/reglages">Sauvegarder</a></div>` : ''}
     <div class="search">
-      <input type="search" id="q" placeholder="Rechercher un patient…" autocomplete="off" aria-label="Rechercher un patient">
+      <input type="search" id="q" placeholder="Rechercher un patient ou un motif…" autocomplete="off" aria-label="Rechercher un patient ou un motif">
       <select id="sort" aria-label="Trier">
         <option value="recent"${state.sort === 'recent' ? ' selected' : ''}>Récents</option>
         <option value="az"${state.sort === 'az' ? ' selected' : ''}>A → Z</option>
@@ -330,11 +330,11 @@ async function viewHome() {
       <button class="btn primary" data-act="new">${ICON.plus}<span>Patient</span></button>
     </div>
     ${sorted.length ? `<div class="patients">${sorted.map(p => `
-      <a class="pcard" href="#/p/${p.id}" data-name="${esc((p.name + ' ' + (p.ref || '')).toLowerCase())}">
+      <a class="pcard" href="#/p/${p.id}" data-name="${esc([p.name, p.ref, ...(p.episodes || []).map(e => e.title)].join(' ').toLowerCase())}">
         ${p.cover ? `<img class="cover" src="${objUrl(p.cover)}" alt="">` : `<span class="avatar">${esc(initials(p.name))}</span>`}
         <span class="meta">
           <strong>${esc(p.name)}</strong>
-          <small>${p.ref ? esc(p.ref) + ' · ' : ''}${p.count || 0} photo${(p.count || 0) > 1 ? 's' : ''}${p.lastDate ? ' · dernière le ' + fmtShort(p.lastDate) : ''}</small>
+          <small>${p.ref ? esc(p.ref) + ' · ' : ''}${(p.episodes?.length || 0) > 1 ? p.episodes.length + ' motifs · ' : ''}${p.count || 0} photo${(p.count || 0) > 1 ? 's' : ''}${p.lastDate ? ' · dernière le ' + fmtShort(p.lastDate) : ''}</small>
         </span>
       </a>`).join('')}</div>
       <p class="empty" id="nores" hidden>Aucun patient ne correspond.</p>`
@@ -363,7 +363,8 @@ async function editPatient(p) {
       <div class="dbody">
         <div class="field"><label for="f-name">Nom et prénom *</label><input type="text" id="f-name" required value="${esc(p?.name)}" autocomplete="off"></div>
         <div class="field"><label for="f-ref">N° de dossier / date de naissance</label><input type="text" id="f-ref" value="${esc(p?.ref)}" autocomplete="off"></div>
-        <div class="field"><label for="f-notes">Notes (diagnostic, traitement…)</label><textarea id="f-notes">${esc(p?.notes)}</textarea></div>
+        ${isNew ? `<div class="field"><label for="f-motif">Motif de consultation</label><input type="text" id="f-motif" placeholder="ex. ulcère jambe droite" autocomplete="off"></div>` : ''}
+        <div class="field"><label for="f-notes">Notes générales (antécédents, allergies…)</label><textarea id="f-notes">${esc(p?.notes)}</textarea></div>
       </div>
       <div class="dfoot">
         <button type="button" class="btn" data-close>Annuler</button>
@@ -373,7 +374,7 @@ async function editPatient(p) {
   if (r !== 'ok') return;
   const name = $('#f-name', dlg).value.trim();
   if (!name) return;
-  const rec = p || { id: uid(), createdAt: Date.now(), count: 0 };
+  const rec = p || { id: uid(), createdAt: Date.now(), count: 0, episodes: [newEpisode($('#f-motif', dlg).value)] };
   Object.assign(rec, { name, ref: $('#f-ref', dlg).value.trim(), notes: $('#f-notes', dlg).value.trim(), updatedAt: Date.now() });
   await putOne('patients', rec);
   if (isNew) location.hash = `#/p/${rec.id}`;
@@ -381,15 +382,50 @@ async function editPatient(p) {
 }
 
 /* ================= Dossier d'un patient ================= */
+/* Un patient peut consulter pour plusieurs motifs (ex. un ulcère, puis un eczéma) sans changer de dossier.
+   Chaque motif a ses propres photos, son J0 et son statut. */
 
 let currentPid = null;
+
+const newEpisode = title => ({ id: uid(), title: (title || '').trim() || 'Premier motif', status: 'open', notes: '', createdAt: Date.now() });
+const STATUS = { open: 'En cours', healed: 'Guéri / terminé' };
+
+// Dossiers créés avant les motifs : on crée un premier motif et on y range les photos existantes.
+async function ensureEpisodes(p, photos) {
+  if (!p.episodes?.length) {
+    p.episodes = [newEpisode('')];
+    await putOne('patients', p);
+  }
+  const ids = new Set(p.episodes.map(e => e.id));
+  for (const ph of photos.filter(x => !ids.has(x.episodeId))) {
+    ph.episodeId = p.episodes[0].id;
+    await putOne('photos', ph);
+  }
+}
+
+// Motifs en cours d'abord, puis par activité la plus récente.
+function sortEpisodes(p, photos) {
+  const last = {};
+  for (const ph of photos) if (!last[ph.episodeId] || ph.date > last[ph.episodeId]) last[ph.episodeId] = ph.date;
+  return p.episodes.slice().sort((a, b) =>
+    (a.status === 'open' ? 0 : 1) - (b.status === 'open' ? 0 : 1)
+    || (last[b.id] || '').localeCompare(last[a.id] || '')
+    || b.createdAt - a.createdAt);
+}
 
 async function viewPatient(pid) {
   const p = await getOne('patients', pid);
   if (!p) { location.hash = '#/'; return; }
-  if (currentPid !== pid) { currentPid = pid; state.zone = null; state.selecting = false; state.sel = []; }
+  if (currentPid !== pid) { currentPid = pid; state.ep = null; state.zone = null; state.selecting = false; state.sel = []; }
 
-  const all = (await photosOf(pid)).sort(byDate);
+  const everything = (await photosOf(pid)).sort(byDate);
+  await ensureEpisodes(p, everything);
+  const eps = sortEpisodes(p, everything);
+  if (!eps.some(e => e.id === state.ep)) { state.ep = eps[0].id; state.zone = null; }
+  const ep = eps.find(e => e.id === state.ep);
+  const countOf = id => everything.filter(x => x.episodeId === id).length;
+
+  const all = everything.filter(x => x.episodeId === ep.id);
   const zones = [...new Set(all.map(x => x.zone).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
   if (state.zone && !zones.includes(state.zone)) state.zone = null;
   const list = state.zone ? all.filter(x => x.zone === state.zone) : all;
@@ -405,17 +441,35 @@ async function viewPatient(pid) {
   app.innerHTML = `
     <header class="topbar">
       <a class="btn icon ghost" href="#/" aria-label="Retour">${ICON.back}</a>
-      <h1>${esc(p.name)}<span class="sub">${p.ref ? esc(p.ref) + ' · ' : ''}${all.length} photo${all.length > 1 ? 's' : ''}${all.length ? ` · suivi depuis le ${fmtShort(all[0].date)}` : ''}</span></h1>
+      <h1>${esc(p.name)}<span class="sub">${p.ref ? esc(p.ref) + ' · ' : ''}${eps.length} motif${eps.length > 1 ? 's' : ''} · ${everything.length} photo${everything.length > 1 ? 's' : ''}</span></h1>
       <button class="btn icon ghost" data-act="edit" aria-label="Modifier le dossier">${ICON.edit}</button>
     </header>
     ${p.notes ? `<div class="pinfo">${esc(p.notes)}</div>` : ''}
+
+    <h2 class="section">Motifs de consultation</h2>
+    <div class="chips wrap" role="tablist" aria-label="Motifs de consultation">
+      ${eps.map(e => `<button class="chip ep${e.id === ep.id ? ' on' : ''}${e.status === 'healed' ? ' healed' : ''}" data-ep="${e.id}">${e.status === 'healed' ? '✓ ' : ''}${esc(e.title)} <span class="cnt">${countOf(e.id)}</span></button>`).join('')}
+      <button class="chip add" data-act="newep">${ICON.plus} Nouveau motif</button>
+    </div>
+    <section class="epcard">
+      <div class="ephead">
+        <div>
+          <strong>${esc(ep.title)}</strong>
+          <span class="status ${ep.status}">${STATUS[ep.status]}</span>
+          <small>${all.length ? `Du ${fmtShort(all[0].date)} au ${fmtShort(all[all.length - 1].date)} · ${durationLabel(daysBetween(all[0].date, all[all.length - 1].date))}` : 'Aucune photo pour ce motif'}</small>
+        </div>
+        <button class="btn icon ghost" data-act="editep" aria-label="Modifier le motif">${ICON.edit}</button>
+      </div>
+      ${ep.notes ? `<div class="pinfo">${esc(ep.notes)}</div>` : ''}
+    </section>
+
     <div class="actions">
       <button class="btn primary" data-act="camera">${ICON.camera}Prendre une photo</button>
       <button class="btn" data-act="gallery">${ICON.image}Importer</button>
       <button class="btn" data-act="select" ${list.length < 2 ? 'disabled' : ''}>${ICON.compare}Comparer</button>
     </div>
     ${zones.length ? `<div class="chips" role="tablist" aria-label="Zones">
-      <button class="chip${state.zone ? '' : ' on'}" data-zone="">Toutes</button>
+      <button class="chip${state.zone ? '' : ' on'}" data-zone="">Toutes les zones</button>
       ${zones.map(z => `<button class="chip${state.zone === z ? ' on' : ''}" data-zone="${esc(z)}">${esc(z)}</button>`).join('')}
     </div>` : ''}
     ${list.length >= 2 && !state.selecting ? `<div class="row"><button class="btn" data-act="beforeafter">⇆ Première / dernière photo${state.zone ? ' (' + esc(state.zone) + ')' : ''}</button></div>` : ''}
@@ -431,7 +485,7 @@ async function viewPatient(pid) {
             </button>`).join('')}
           </div>
         </section>`).join('')
-      : `<div class="empty"><div class="big">📷</div><p>Aucune photo dans ce dossier.<br>Prenez une photo ou importez-les depuis la galerie.</p></div>`}
+      : `<div class="empty"><div class="big">📷</div><p>Aucune photo pour ce motif.<br>Prenez une photo ou importez-les depuis la galerie.</p></div>`}
     </div>
     ${state.selecting ? `<div class="selbar">
       <span id="selinfo"></span>
@@ -445,19 +499,22 @@ async function viewPatient(pid) {
 
   const on = (act, fn) => { const b = app.querySelector(`[data-act=${act}]`); if (b) b.onclick = fn; };
   on('edit', () => editPatient(p));
-  on('camera', async () => addPhotos(p, await pickFiles($('#in-camera')), zones));
-  on('gallery', async () => addPhotos(p, await pickFiles($('#in-gallery')), zones));
+  on('newep', () => editEpisode(p));
+  on('editep', () => editEpisode(p, ep, countOf(ep.id)));
+  on('camera', async () => addPhotos(p, await pickFiles($('#in-camera')), zones, ep.id));
+  on('gallery', async () => addPhotos(p, await pickFiles($('#in-gallery')), zones, ep.id));
   on('select', () => { state.selecting = true; state.sel = []; route(); });
   on('cancelsel', () => { state.selecting = false; state.sel = []; route(); });
   on('docompare', () => { const ids = state.sel.slice(); state.selecting = false; state.sel = []; location.hash = `#/p/${pid}/compare?ids=${ids.join(',')}`; });
   on('beforeafter', () => { location.hash = `#/p/${pid}/compare?ids=${list[0].id},${list[list.length - 1].id}`; });
   on('delete', async () => {
-    if (await confirmBox('Supprimer le dossier ?', `Le dossier de ${p.name} et ses ${all.length} photo(s) seront définitivement supprimés de cet appareil.`)) {
+    if (await confirmBox('Supprimer le dossier ?', `Le dossier de ${p.name}, ses ${eps.length} motif(s) et ses ${everything.length} photo(s) seront définitivement supprimés de cet appareil.`)) {
       await deletePatient(pid);
       toast('Dossier supprimé');
       location.hash = '#/';
     }
   });
+  app.querySelectorAll('[data-ep]').forEach(b => (b.onclick = () => { state.ep = b.dataset.ep; state.zone = null; state.selecting = false; state.sel = []; route(); }));
   app.querySelectorAll('[data-zone]').forEach(b => (b.onclick = () => { state.zone = b.dataset.zone || null; route(); }));
   // Met à jour la sélection sur place (sans redessiner la page, pour garder le défilement).
   const paintSel = () => {
@@ -486,7 +543,66 @@ async function viewPatient(pid) {
   }));
 }
 
-async function addPhotos(p, files, zones) {
+async function editEpisode(p, ep, count = 0) {
+  const isNew = !ep;
+  const r = await openDialog(`
+    <form method="dialog">
+      <div class="dhead"><h2>${isNew ? 'Nouveau motif de consultation' : 'Modifier le motif'}</h2>${closeBtn}</div>
+      <div class="dbody">
+        <div class="field"><label for="e-title">Motif *</label>
+          <input type="text" id="e-title" required value="${esc(ep?.title)}" placeholder="ex. eczéma des mains, cicatrice post-opératoire" autocomplete="off"></div>
+        ${isNew ? '' : `<div class="field"><label for="e-status">Statut</label>
+          <select id="e-status">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}"${ep.status === k ? ' selected' : ''}>${v}</option>`).join('')}</select></div>`}
+        <div class="field"><label for="e-notes">Notes (diagnostic, traitement…)</label><textarea id="e-notes">${esc(ep?.notes)}</textarea></div>
+      </div>
+      <div class="dfoot">
+        ${!isNew && p.episodes.length > 1 ? '<button type="button" class="btn danger ghost" data-act="delep" style="margin-right:auto">Supprimer</button>' : ''}
+        <button type="button" class="btn" data-close>Annuler</button>
+        <button class="btn primary" value="ok">${isNew ? 'Créer le motif' : 'Enregistrer'}</button>
+      </div>
+    </form>`, {
+    onOpen: d => {
+      $('#e-title', d).focus();
+      const del = d.querySelector('[data-act=delep]');
+      if (del) del.onclick = () => d.close('delete');
+    },
+  });
+  if (r === 'delete') {
+    if (!await confirmBox('Supprimer ce motif ?', `Le motif « ${ep.title} » et ses ${count} photo(s) seront définitivement supprimés. Le reste du dossier est conservé.`)) return;
+    await run('photos', 'readwrite', t => {
+      const st = t.objectStore('photos');
+      st.index('patientId').openCursor(IDBKeyRange.only(p.id)).onsuccess = e => {
+        const c = e.target.result;
+        if (!c) return;
+        if (c.value.episodeId === ep.id) c.delete();
+        c.continue();
+      };
+    });
+    p.episodes = p.episodes.filter(e => e.id !== ep.id);
+    await putOne('patients', p);
+    await refreshSummary(p.id);
+    toast('Motif supprimé');
+    return route();
+  }
+  if (r !== 'ok') return;
+  const title = $('#e-title', dlg).value.trim();
+  if (!title) return;
+  if (isNew) {
+    const e = newEpisode(title);
+    e.notes = $('#e-notes', dlg).value.trim();
+    p.episodes.push(e);
+    state.ep = e.id;
+    state.zone = null;
+  } else {
+    Object.assign(p.episodes.find(e => e.id === ep.id), { title, status: $('#e-status', dlg).value, notes: $('#e-notes', dlg).value.trim() });
+  }
+  p.updatedAt = Date.now();
+  await putOne('patients', p);
+  toast(isNew ? 'Motif créé : ajoutez ses photos' : 'Motif enregistré');
+  route();
+}
+
+async function addPhotos(p, files, zones, episodeId) {
   if (!files.length) return;
   dlg.className = '';
   dlg.innerHTML = `<div class="progress">Préparation des photos… <b id="prog">0/${files.length}</b></div>`;
@@ -530,7 +646,7 @@ async function addPhotos(p, files, zones) {
   dlg.querySelectorAll('input[type=date]').forEach(inp => { if (inp.value) items[inp.dataset.i].date = inp.value; });
   try {
     for (const it of items) {
-      await putOne('photos', { id: uid(), patientId: p.id, ...it, zone, note, createdAt: Date.now() });
+      await putOne('photos', { id: uid(), patientId: p.id, episodeId, ...it, zone, note, createdAt: Date.now() });
     }
     await refreshSummary(p.id);
     navigator.storage?.persist?.();
@@ -565,6 +681,8 @@ async function viewPhoto(p, list, index, zones) {
             <div class="field"><label for="v-zone">Zone / lésion</label><input type="text" id="v-zone" list="vzones" value="${esc(ph.zone)}" autocomplete="off">
               <datalist id="vzones">${zones.map(z => `<option value="${esc(z)}">`).join('')}</datalist></div>
           </div>
+          ${p.episodes.length > 1 ? `<div class="field"><label for="v-ep">Motif de consultation</label>
+            <select id="v-ep">${p.episodes.map(e => `<option value="${e.id}"${e.id === ph.episodeId ? ' selected' : ''}>${esc(e.title)}</option>`).join('')}</select></div>` : ''}
           <div class="field"><label for="v-note">Note</label><textarea id="v-note">${esc(ph.note)}</textarea></div>
         </div>
         <div class="dfoot">
@@ -576,6 +694,7 @@ async function viewPhoto(p, list, index, zones) {
     dlg.querySelectorAll('[data-nav]').forEach(b => (b.onclick = () => { i += Number(b.dataset.nav); render(); }));
     dlg.querySelector('[data-act=save]').onclick = async () => {
       Object.assign(ph, { date: $('#v-date', dlg).value || ph.date, zone: $('#v-zone', dlg).value.trim(), note: $('#v-note', dlg).value.trim() });
+      if ($('#v-ep', dlg)) ph.episodeId = $('#v-ep', dlg).value;
       await putOne('photos', ph);
       changed = true;
       toast('Modifications enregistrées');
@@ -606,6 +725,7 @@ async function viewCompare(pid, ids) {
   const p = await getOne('patients', pid);
   const photos = (await Promise.all(ids.map(id => getOne('photos', id)))).filter(Boolean).sort(byDate);
   if (!p || photos.length < 2) { location.hash = `#/p/${pid}`; return; }
+  const ep = p.episodes?.find(e => e.id === photos[0].episodeId);
   const n = photos.length;
   const first = photos[0].date;
   const mode = n === 2 && sessionStorage.getItem('ds-mode') === 'slider' ? 'slider' : 'side';
@@ -616,7 +736,7 @@ async function viewCompare(pid, ids) {
   app.innerHTML = `
     <header class="topbar">
       <a class="btn icon ghost" href="#/p/${pid}" aria-label="Retour au dossier">${ICON.back}</a>
-      <h1>Comparaison<span class="sub">${esc(p.name)}</span></h1>
+      <h1>Comparaison<span class="sub">${esc(p.name)}${ep ? ' · ' + esc(ep.title) : ''}</span></h1>
       <button class="btn primary" data-act="export">${ICON.share}<span>Image</span></button>
     </header>
     ${n === 2 ? `<div class="row" style="margin-top:12px">
@@ -640,7 +760,7 @@ async function viewCompare(pid, ids) {
   `;
 
   app.querySelectorAll('[data-mode]').forEach(b => (b.onclick = () => { sessionStorage.setItem('ds-mode', b.dataset.mode); route(); }));
-  app.querySelector('[data-act=export]').onclick = () => exportCompare(p, photos);
+  app.querySelector('[data-act=export]').onclick = () => exportCompare(p, photos, ep?.title);
 
   const s = $('#slider');
   if (s) {
@@ -655,7 +775,7 @@ async function viewCompare(pid, ids) {
 }
 
 // Assemble les photos comparées en une seule image JPEG (avec dates), à partager ou enregistrer.
-async function exportCompare(p, photos) {
+async function exportCompare(p, photos, motif) {
   toast('Création de l\'image…');
   await document.fonts?.load('700 44px "EB Garamond"').catch(() => {});
   const imgs = await Promise.all(photos.map(ph => decode(ph.blob)));
@@ -671,7 +791,7 @@ async function exportCompare(p, photos) {
   g.fillStyle = '#15201f';
   g.font = '600 50px "EB Garamond", Garamond, serif';
   g.textBaseline = 'middle';
-  g.fillText(`${p.name} — suivi de cicatrisation`, gap, head / 2);
+  g.fillText(`${p.name} — ${motif || 'suivi de cicatrisation'}`, gap, head / 2);
   imgs.forEach((im, k) => {
     const x0 = gap + k * (cellW + gap);
     g.fillStyle = '#000000';

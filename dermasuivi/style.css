@@ -253,3 +253,19 @@ dialog.viewer { width: min(1000px, calc(100vw - 16px)); }
 .welcome p { color: var(--muted); margin: 6px 0 0; }
 .pin { font-size: 1.6rem; letter-spacing: .5em; text-align: center; }
 .err { color: var(--danger); font-size: .95rem; min-height: 1.2em; margin: 4px 0 0; }
+
+/* ---------- Motifs de consultation ---------- */
+h2.section { margin: 18px 0 8px; font-size: 1.05rem; }
+.chip.ep .cnt { font-size: .8rem; opacity: .7; margin-left: 2px; }
+.chip.healed:not(.on) { color: var(--muted); }
+.chip.add { display: inline-flex; align-items: center; gap: 4px; border-style: dashed; color: var(--accent); }
+.chip.add svg { width: 16px; height: 16px; }
+.epcard { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: var(--radius); padding: 10px 12px; box-shadow: var(--shadow); }
+.ephead { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; }
+.ephead strong { font-size: 1.15rem; margin-right: 6px; }
+.ephead small { display: block; color: var(--muted); }
+.epcard .pinfo { margin-top: 6px; }
+.status { font-size: .8rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+.status.open { background: var(--accent-soft); color: var(--accent); }
+.status.healed { background: var(--surface-2); color: var(--muted); }
+.chips.wrap { flex-wrap: wrap; overflow: visible; }
