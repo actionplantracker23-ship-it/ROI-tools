@@ -126,40 +126,67 @@ function photoContext(ep, ph, first) {
 const callAI = (content, schema) => (aiProvider() === 'gemini' ? callGemini(content, schema) : callClaude(content, schema));
 
 let geminiSdk = null;
+// Relances automatiques sur les erreurs temporaires (surcharge 503, 429…) : 4 essais, 2 s puis délai croissant.
+// Une erreur 500 passe directement au second essai sans schéma imposé (voir callGemini).
+const GEMINI_RETRY = { attempts: 4, initialDelay: 2, maxDelay: 20, httpStatusCodes: [408, 429, 502, 503, 504] };
+
 async function callGemini(content, schema) {
   const { geminiKey, geminiModel } = aiConfig();
   if (!geminiKey) throw new Error('Aucune clé API Gemini : ajoutez-la dans Réglages → Analyse IA.');
   geminiSdk ||= import(GEMINI_SDK_URL);
   const { GoogleGenAI, ApiError } = await geminiSdk;
-  const ai = new GoogleGenAI({ apiKey: geminiKey });
+  const ai = new GoogleGenAI({ apiKey: geminiKey, httpOptions: { retryOptions: GEMINI_RETRY } });
+  const model = geminiModel || GEMINI_DEFAULT_MODEL;
   const parts = content.map(b => (b.type === 'image'
     ? { inlineData: { mimeType: b.source.media_type, data: b.source.data } }
     : { text: b.text }));
+  const run = withSchema => ai.models.generateContent({
+    model,
+    contents: [{ role: 'user', parts: withSchema ? parts : [...parts, { text: `Réponds uniquement par un objet JSON conforme à ce schéma JSON :\n${JSON.stringify(schema)}` }] }],
+    config: { systemInstruction: SYSTEM, responseMimeType: 'application/json', ...(withSchema ? { responseJsonSchema: schema } : {}) },
+  });
   let res;
   try {
-    res = await ai.models.generateContent({
-      model: geminiModel || GEMINI_DEFAULT_MODEL,
-      contents: [{ role: 'user', parts }],
-      config: { systemInstruction: SYSTEM, responseMimeType: 'application/json', responseJsonSchema: schema },
-    });
+    res = await run(true);
   } catch (e) {
-    throw new Error(geminiErrorMessage(e, ApiError));
+    // Certaines versions de Gemini échouent (erreur 500) sur un schéma de réponse détaillé :
+    // nouvel essai avec le schéma décrit dans la consigne plutôt qu'imposé.
+    if (!(e instanceof ApiError && e.status === 500)) throw new Error(geminiErrorMessage(e, ApiError));
+    try { res = await run(false); } catch (e2) { throw new Error(geminiErrorMessage(e2, ApiError)); }
   }
   const cand = res.candidates?.[0];
   if (!cand) throw new Error(`L'IA n'a pas pu analyser cette image (demande bloquée${res.promptFeedback?.blockReason ? ' : ' + res.promptFeedback.blockReason : ''}).`);
   if (cand.finishReason === 'MAX_TOKENS') throw new Error('Réponse incomplète : relancez l\'analyse.');
   if (cand.finishReason && cand.finishReason !== 'STOP') throw new Error(`L'IA n'a pas pu analyser cette image (arrêt : ${cand.finishReason}).`);
-  return { result: JSON.parse(res.text), model: res.modelVersion || geminiModel || GEMINI_DEFAULT_MODEL };
+  let result;
+  try { result = JSON.parse(String(res.text).replace(/^```(?:json)?\s*|\s*```$/g, '')); }
+  catch { throw new Error('Réponse de Gemini illisible : relancez l\'analyse ou choisissez un autre modèle.'); }
+  return { result: normalizeResult(result, schema), model: res.modelVersion || model };
+}
+
+// Complète une réponse incomplète (champs manquants) pour que l'affichage ne casse pas.
+function normalizeResult(r, schema) {
+  const out = { ...(r && typeof r === 'object' ? r : {}) };
+  for (const [k, def] of Object.entries(schema.properties)) {
+    if (out[k] !== undefined && out[k] !== null) continue;
+    out[k] = def.type === 'array' ? [] : def.type === 'object' ? { note: 'moyenne', commentaire: '' } : def.enum ? def.enum[def.enum.length - 1] : '';
+  }
+  return out;
 }
 
 function geminiErrorMessage(e, ApiError) {
   if (e instanceof ApiError) {
-    if (e.status === 400 && /api key/i.test(e.message)) return 'Clé API Gemini refusée : vérifiez-la dans les réglages.';
-    if (e.status === 403) return 'Cette clé API Gemini n\'a pas accès à ce service ou à ce modèle.';
-    if (e.status === 404) return 'Modèle Gemini introuvable : choisissez-en un autre dans les réglages.';
-    if (e.status === 429) return 'Quota Gemini atteint ou trop de demandes : réessayez plus tard.';
-    if (e.status >= 500) return 'Le service Gemini est momentanément indisponible : réessayez plus tard.';
-    return `Erreur du service Gemini (${e.status}) : ${e.message}`;
+    // Message exact de Google (raccourci), utile pour comprendre une erreur persistante.
+    let detail = String(e.message || '');
+    try { detail = JSON.parse(detail.slice(detail.indexOf('{'))).error?.message || detail; } catch { /* message brut */ }
+    detail = detail.slice(0, 220);
+    if (e.status === 400 && /api key/i.test(detail)) return 'Clé API Gemini refusée : vérifiez-la dans les réglages.';
+    if (e.status === 403) return `Cette clé API Gemini n'a pas accès à ce service ou à ce modèle. (Google : ${detail})`;
+    if (e.status === 404) return `Modèle Gemini introuvable : choisissez-en un autre dans les réglages. (Google : ${detail})`;
+    if (e.status === 429) return `Quota Gemini atteint ou trop de demandes : réessayez plus tard, ou vérifiez les quotas de votre clé. (Google : ${detail})`;
+    if (e.status === 503) return `Gemini est surchargé en ce moment (4 essais faits) : réessayez dans quelques minutes, ou choisissez un autre modèle dans les réglages. (Google : ${detail})`;
+    if (e.status >= 500) return `Erreur du service Gemini (${e.status}) : réessayez plus tard ou choisissez un autre modèle dans les réglages. (Google : ${detail})`;
+    return `Erreur du service Gemini (${e.status}) : ${detail}`;
   }
   if (e instanceof TypeError) return 'Pas de connexion à internet : l\'analyse IA nécessite le réseau.';
   return e?.message || String(e);
@@ -210,7 +237,7 @@ async function callClaude(content, schema) {
   if (res.stop_reason === 'refusal') throw new Error('L\'IA n\'a pas pu analyser cette image (demande déclinée par le modèle).');
   if (res.stop_reason === 'max_tokens') throw new Error('Réponse incomplète : relancez l\'analyse.');
   const text = res.content.filter(b => b.type === 'text').map(b => b.text).join('');
-  return { result: JSON.parse(text), model: res.model };
+  return { result: normalizeResult(JSON.parse(text), schema), model: res.model };
 }
 
 function aiErrorMessage(e, A) {
