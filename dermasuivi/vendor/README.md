@@ -10,4 +10,13 @@
   ```
 
   Il n'est chargé qu'au moment d'une analyse IA. Intégré à l'application plutôt que chargé depuis un CDN :
-  aucun service tiers n'est contacté en dehors de l'API d'Anthropic.
+  aucun service tiers n'est contacté en dehors de l'API d'IA choisie (Anthropic ou Google).
+
+- `google-genai-2.30.0.mjs` : SDK officiel Google GenAI (`@google/genai` 2.30.0, licence Apache-2.0,
+  voir `google-genai-LICENSE.txt`), regroupé de la même façon :
+
+  ```sh
+  npm install @google/genai@2.30.0 esbuild@0.24.0
+  echo "export { GoogleGenAI, ApiError } from '@google/genai';" > gentry.mjs
+  npx esbuild gentry.mjs --bundle --format=esm --platform=browser --target=es2020 --minify --legal-comments=eof --outfile=google-genai-2.30.0.mjs
+  ```

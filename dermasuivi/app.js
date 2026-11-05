@@ -912,7 +912,7 @@ async function viewPhoto(p, ep, list, index, zones) {
     on('ai', async () => {
       if (aiBusy) return;
       if (!aiReady()) {
-        return alert('L\'analyse IA n\'est pas configurée.\nAjoutez votre clé API Anthropic dans Réglages → Analyse IA.');
+        return alert('L\'analyse IA n\'est pas configurée.\nAjoutez une clé API (Claude ou Gemini) dans Réglages → Analyse IA.');
       }
       if (!await ensureAiConsentInline(p)) return;
       aiBusy = true;
@@ -963,7 +963,7 @@ async function viewPhoto(p, ep, list, index, zones) {
   // Confirmation du consentement IA dans une petite fenêtre du navigateur, pour ne pas fermer la fiche.
   async function ensureAiConsentInline(pat) {
     if (pat.consent?.ai) return true;
-    if (!confirm(`Analyse IA : l'image (sans le nom du patient) va être envoyée au service d'IA d'Anthropic.\n\n${pat.name} a-t-il donné son accord ? L'accord sera enregistré dans le dossier.`)) return false;
+    if (!confirm(`Analyse IA : l'image (sans le nom du patient) va être envoyée au service d'IA de ${providerCompany()}.\n\n${pat.name} a-t-il donné son accord ? L'accord sera enregistré dans le dossier.`)) return false;
     pat.consent = { ...(pat.consent || {}), ai: today() };
     await putOne('patients', pat);
     return true;
@@ -1048,7 +1048,7 @@ async function viewCompare(pid, ids) {
   if (annotBtn) annotBtn.onclick = () => { sessionStorage.setItem('ds-cmp-annot', showAnnot ? '0' : '1'); route(); };
   app.querySelector('[data-act=export]').onclick = () => exportCompare(p, photos, ep?.title, showAnnot);
   app.querySelector('[data-act=aievol]').onclick = async e => {
-    if (!aiReady()) return alert('L\'analyse IA n\'est pas configurée.\nAjoutez votre clé API Anthropic dans Réglages → Analyse IA.');
+    if (!aiReady()) return alert('L\'analyse IA n\'est pas configurée.\nAjoutez une clé API (Claude ou Gemini) dans Réglages → Analyse IA.');
     if (!await ensureAiConsent(p)) return;
     const b = e.currentTarget;
     b.disabled = true;
@@ -1181,7 +1181,8 @@ async function viewSettings() {
 
     <section class="card">
       <h2>Confidentialité</h2>
-      <p>Aucune photo ni aucune donnée patient n'est envoyée sur internet : tout reste dans la mémoire de l'appareil.
+      <p>Les photos et les dossiers restent dans la mémoire de l'appareil. Rien n'est envoyé sur internet, sauf si vous lancez
+      une analyse IA : seule la photo analysée (sans le nom du patient) part alors vers le service choisi (Anthropic ou Google).
       Protégez l'appareil par un code ou une empreinte, et conservez les fichiers de sauvegarde dans un endroit sécurisé :
       ils contiennent des données de santé.</p>
     </section>
