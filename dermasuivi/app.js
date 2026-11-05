@@ -167,49 +167,14 @@ async function resized(img, max, q) {
   return { blob: await toBlob(c, q), w: c.width, h: c.height };
 }
 
-// Lit la date de prise de vue (EXIF DateTimeOriginal) d'un JPEG, pour dater correctement
-// les photos importées depuis la galerie.
-async function exifDate(file) {
-  try {
-    const v = new DataView(await file.slice(0, 256 * 1024).arrayBuffer());
-    if (v.getUint16(0) !== 0xFFD8) return null;
-    let o = 2;
-    while (o + 4 < v.byteLength) {
-      const marker = v.getUint16(o), len = v.getUint16(o + 2);
-      if (marker === 0xFFE1 && v.getUint32(o + 4) === 0x45786966) {
-        const t = o + 10, le = v.getUint16(t) === 0x4949;
-        const u16 = p => v.getUint16(t + p, le), u32 = p => v.getUint32(t + p, le);
-        const ifd = off => {
-          const out = {};
-          for (let i = 0, n = u16(off); i < n; i++) { const e = off + 2 + i * 12; out[u16(e)] = { count: u32(e + 4), at: e + 8 }; }
-          return out;
-        };
-        const str = ent => {
-          const p = ent.count > 4 ? u32(ent.at) : ent.at;
-          let s = '';
-          for (let i = 0; i < ent.count - 1; i++) s += String.fromCharCode(v.getUint8(t + p + i));
-          return s;
-        };
-        const ifd0 = ifd(u32(4));
-        let s = null;
-        if (ifd0[0x8769]) { const ex = ifd(u32(ifd0[0x8769].at)); const ent = ex[0x9003] || ex[0x9004]; if (ent) s = str(ent); }
-        if (!s && ifd0[0x0132]) s = str(ifd0[0x0132]);
-        const m = s && s.match(/^(\d{4}):(\d{2}):(\d{2})/);
-        return m && m[1] !== '0000' ? `${m[1]}-${m[2]}-${m[3]}` : null;
-      }
-      if ((marker & 0xFF00) !== 0xFF00 || marker === 0xFFDA) break;
-      o += 2 + len;
-    }
-  } catch { /* pas d'EXIF lisible */ }
-  return null;
-}
-
-async function prepareFile(file) {
-  const date = (await exifDate(file)) || isoDate(new Date(file.lastModified || Date.now()));
+// Prépare une photo : métadonnées (EXIF, fichier), image enregistrée (2000 px) et vignette.
+async function prepareFile(file, source = 'import', extra = {}) {
+  const exif = await readExif(file);
   const img = await decode(file);
+  const meta = { ...buildMeta(file, exif, img, source), ...extra };
   const full = await resized(img, 2000, 0.86);
   const thumb = await resized(img, 420, 0.8);
-  return { date, blob: full.blob, w: full.w, h: full.h, thumb: thumb.blob };
+  return { date: meta.takenAt.slice(0, 10), blob: full.blob, w: full.w, h: full.h, thumb: thumb.blob, meta };
 }
 
 /* ================= Petits utilitaires d'interface ================= */
@@ -292,7 +257,7 @@ async function route() {
       else return viewSpaces(spaces);
     }
     if (parts[0] === 'p' && parts[1] && parts[2] === 'compare') return await viewCompare(parts[1], (q.get('ids') || '').split(',').filter(Boolean));
-    if (parts[0] === 'p' && parts[1]) return await viewPatient(parts[1]);
+    if (parts[0] === 'p' && parts[1]) return await viewPatient(parts[1], q.get('ep'));
     if (parts[0] === 'reglages') return await viewSettings();
     return await viewHome();
   } catch (e) {
@@ -313,6 +278,15 @@ async function viewHome() {
   const last = Number(localStorage.getItem(backupKey()) || 0);
   const needBackup = totalPhotos > 0 && Date.now() - last > 30 * 864e5;
 
+  // Contrôles prévus dans les 7 jours ou en retard, sur les motifs en cours.
+  const due = [];
+  for (const p of patients) for (const e of p.episodes || []) {
+    if (e.status !== 'open' || !e.nextVisit) continue;
+    const d = daysBetween(today(), e.nextVisit);
+    if (d <= 7) due.push({ p, e, d });
+  }
+  due.sort((x, y) => x.d - y.d);
+
   app.innerHTML = `
     <header class="topbar">
       <h1>${esc(space.name)}<span class="sub">${patients.length} patient${patients.length > 1 ? 's' : ''} · ${totalPhotos} photo${totalPhotos > 1 ? 's' : ''}</span></h1>
@@ -321,6 +295,14 @@ async function viewHome() {
       <a class="btn icon ghost" href="#/reglages" aria-label="Réglages et sauvegarde">${ICON.gear}</a>
     </header>
     ${needBackup ? `<div class="banner">💾 ${last ? 'Dernière sauvegarde il y a plus de 30 jours.' : 'Aucune sauvegarde faite pour l\'instant.'}<a class="btn" href="#/reglages">Sauvegarder</a></div>` : ''}
+    ${due.length ? `<section class="card due">
+      <h2>À revoir</h2>
+      <ul class="duelist">${due.map(({ p, e, d }) => `
+        <li><a href="#/p/${p.id}?ep=${e.id}">
+          <span class="when ${d < 0 ? 'late' : d === 0 ? 'now' : ''}">${visitLabel(d)}</span>
+          <span><strong>${esc(p.name)}</strong> · ${esc(e.title)}<small>${fmtLong(e.nextVisit)}</small></span>
+        </a></li>`).join('')}</ul>
+    </section>` : ''}
     <div class="search">
       <input type="search" id="q" placeholder="Rechercher un patient ou un motif…" autocomplete="off" aria-label="Rechercher un patient ou un motif">
       <select id="sort" aria-label="Trier">
@@ -365,6 +347,10 @@ async function editPatient(p) {
         <div class="field"><label for="f-ref">N° de dossier / date de naissance</label><input type="text" id="f-ref" value="${esc(p?.ref)}" autocomplete="off"></div>
         ${isNew ? `<div class="field"><label for="f-motif">Motif de consultation</label><input type="text" id="f-motif" placeholder="ex. ulcère jambe droite" autocomplete="off"></div>` : ''}
         <div class="field"><label for="f-notes">Notes générales (antécédents, allergies…)</label><textarea id="f-notes">${esc(p?.notes)}</textarea></div>
+        <fieldset class="consents"><legend>Consentement du patient</legend>
+          ${CONSENTS.map(([k, label]) => `<label class="check"><input type="checkbox" data-consent="${k}" ${p?.consent?.[k] ? 'checked' : ''}>
+            <span>${label}${p?.consent?.[k] ? `<small>recueilli le ${fmtShort(p.consent[k])}</small>` : ''}</span></label>`).join('')}
+        </fieldset>
       </div>
       <div class="dfoot">
         <button type="button" class="btn" data-close>Annuler</button>
@@ -376,6 +362,10 @@ async function editPatient(p) {
   if (!name) return;
   const rec = p || { id: uid(), createdAt: Date.now(), count: 0, episodes: [newEpisode($('#f-motif', dlg).value)] };
   Object.assign(rec, { name, ref: $('#f-ref', dlg).value.trim(), notes: $('#f-notes', dlg).value.trim(), updatedAt: Date.now() });
+  // La date de recueil est conservée tant que la case reste cochée.
+  const consent = {};
+  dlg.querySelectorAll('[data-consent]').forEach(c => { if (c.checked) consent[c.dataset.consent] = rec.consent?.[c.dataset.consent] || today(); });
+  rec.consent = consent;
   await putOne('patients', rec);
   if (isNew) location.hash = `#/p/${rec.id}`;
   else route();
@@ -383,12 +373,25 @@ async function editPatient(p) {
 
 /* ================= Dossier d'un patient ================= */
 /* Un patient peut consulter pour plusieurs motifs (ex. un ulcère, puis un eczéma) sans changer de dossier.
-   Chaque motif a ses propres photos, son J0 et son statut. */
+   Chaque motif a ses propres photos, son J0, son statut et sa date de prochain contrôle. */
 
 let currentPid = null;
 
 const newEpisode = title => ({ id: uid(), title: (title || '').trim() || 'Premier motif', status: 'open', notes: '', createdAt: Date.now() });
 const STATUS = { open: 'En cours', healed: 'Guéri / terminé' };
+const CONSENTS = [
+  ['photos', 'Prise et conservation de photos pour le suivi médical'],
+  ['ai', 'Analyse des photos par une IA externe (envoi sans le nom)'],
+  ['teaching', 'Utilisation anonymisée pour l\'enseignement ou une publication'],
+];
+const KINDS = { clinique: 'Photo clinique', dermoscopie: 'Dermoscopie', ensemble: 'Vue d\'ensemble' };
+
+function visitLabel(d) {
+  if (d < 0) return `En retard de ${-d} j`;
+  if (d === 0) return 'Aujourd\'hui';
+  if (d === 1) return 'Demain';
+  return `Dans ${d} j`;
+}
 
 // Dossiers créés avant les motifs : on crée un premier motif et on y range les photos existantes.
 async function ensureEpisodes(p, photos) {
@@ -413,10 +416,66 @@ function sortEpisodes(p, photos) {
     || b.createdAt - a.createdAt);
 }
 
-async function viewPatient(pid) {
+// Courbe d'évolution d'une mesure (surface ou longueur) au fil des photos du motif.
+function measureChart(points, unit, title) {
+  const W = 320, H = 132, L = 34, R = 50, T = 14, B = 24;
+  const first = points[0].date, span = Math.max(1, daysBetween(first, points[points.length - 1].date));
+  const max = Math.max(...points.map(p => p.v)) || 1;
+  const step = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100].find(s => max / s <= 4) || 100;
+  const top = Math.ceil(max / step) * step;
+  const X = d => L + (daysBetween(first, d) / span) * (W - L - R);
+  const Y = v => T + (1 - v / top) * (H - T - B);
+  const ticks = Array.from({ length: Math.round(top / step) + 1 }, (_, i) => i * step);
+  const pts = points.map(p => [X(p.date), Y(p.v)]);
+  const path = pts.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)},${q[1].toFixed(1)}`).join('');
+  const area = `${path}L${pts[pts.length - 1][0].toFixed(1)},${Y(0)}L${pts[0][0].toFixed(1)},${Y(0)}Z`;
+  const a = points[0].v, z = points[points.length - 1].v;
+  const change = a ? Math.round((z - a) / a * 100) : 0;
+  return `<figure class="mchart">
+    <figcaption>${title} <span class="muted">· ${fr1(a)} → ${fr1(z)} ${unit} (${change > 0 ? '+' : ''}${change} %)</span></figcaption>
+    <div class="mchart-box">
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title} : de ${fr1(a)} à ${fr1(z)} ${unit}">
+        ${ticks.map(t => `<line class="grid" x1="${L}" x2="${W - R}" y1="${Y(t)}" y2="${Y(t)}"/><text class="tick" x="${L - 6}" y="${Y(t)}" text-anchor="end" dominant-baseline="middle">${step >= 1 ? t : fr1(t)}</text>`).join('')}
+        <path class="wash" d="${area}"/>
+        <path class="line" d="${path}"/>
+        ${pts.map((q, i) => `<circle class="dot" cx="${q[0]}" cy="${q[1]}" r="4"/><circle class="hit" cx="${q[0]}" cy="${q[1]}" r="14" data-i="${i}"/>`).join('')}
+        <text class="end" x="${pts[pts.length - 1][0] + 8}" y="${pts[pts.length - 1][1]}" dominant-baseline="middle">${fr1(z)} ${unit}</text>
+        <text class="tick" x="${L}" y="${H - 6}">${dayLabel(0)}</text>
+        <text class="tick" x="${W - R}" y="${H - 6}" text-anchor="end">${dayLabel(span)}</text>
+      </svg>
+      <div class="mtip" hidden></div>
+    </div>
+    <details class="mtable"><summary>Voir les valeurs</summary>
+      <table><thead><tr><th>Date</th><th>Jour</th><th>${unit}</th></tr></thead><tbody>
+      ${points.map(p => `<tr><td>${fmtShort(p.date)}</td><td>${dayLabel(daysBetween(first, p.date))}</td><td>${fr1(p.v)}</td></tr>`).join('')}
+      </tbody></table></details>
+  </figure>`;
+}
+function bindChart(root, points, unit) {
+  const box = root.querySelector('.mchart-box');
+  if (!box) return;
+  const tip = box.querySelector('.mtip');
+  const first = points[0].date;
+  box.querySelectorAll('.hit').forEach(h => {
+    const show = () => {
+      const p = points[h.dataset.i];
+      tip.innerHTML = `<b>${fr1(p.v)} ${unit}</b><br>${fmtShort(p.date)} · ${dayLabel(daysBetween(first, p.date))}`;
+      tip.hidden = false;
+      const r = h.getBoundingClientRect(), b = box.getBoundingClientRect();
+      tip.style.left = `${Math.min(b.width - 120, Math.max(0, r.left - b.left + r.width / 2 - 60))}px`;
+      tip.style.top = `${r.top - b.top - 46}px`;
+    };
+    h.addEventListener('pointerenter', show);
+    h.addEventListener('click', show);
+    h.addEventListener('pointerleave', () => { tip.hidden = true; });
+  });
+}
+
+async function viewPatient(pid, epHint) {
   const p = await getOne('patients', pid);
   if (!p) { location.hash = '#/'; return; }
   if (currentPid !== pid) { currentPid = pid; state.ep = null; state.zone = null; state.selecting = false; state.sel = []; }
+  if (epHint) { state.ep = epHint; state.zone = null; history.replaceState(null, '', `#/p/${pid}`); }
 
   const everything = (await photosOf(pid)).sort(byDate);
   await ensureEpisodes(p, everything);
@@ -438,6 +497,18 @@ async function viewPatient(pid) {
     if (g && g.date === ph.date) g.items.push(ph); else groups.push({ date: ph.date, items: [ph] });
   }
 
+  // Mesures étalonnées : courbe de surface (ou de longueur à défaut), une valeur par date.
+  const byDay = {};
+  for (const ph of list) { const m = photoMeasures(ph); if (m) byDay[ph.date] = { ...(byDay[ph.date] || {}), ...Object.fromEntries(Object.entries(m).filter(([, v]) => v != null)) }; }
+  const days = Object.keys(byDay).sort();
+  const areaPts = days.filter(d => byDay[d].area != null).map(d => ({ date: d, v: byDay[d].area }));
+  const lenPts = days.filter(d => byDay[d].length != null).map(d => ({ date: d, v: byDay[d].length }));
+  const chart = areaPts.length >= 2 ? { pts: areaPts, unit: 'cm²', title: 'Surface de la lésion' }
+    : lenPts.length >= 2 ? { pts: lenPts, unit: 'mm', title: 'Plus grande longueur' } : null;
+
+  const visitIn = ep.nextVisit ? daysBetween(today(), ep.nextVisit) : null;
+  const lastEvol = ep.aiEvol?.[0];
+
   app.innerHTML = `
     <header class="topbar">
       <a class="btn icon ghost" href="#/" aria-label="Retour">${ICON.back}</a>
@@ -445,6 +516,11 @@ async function viewPatient(pid) {
       <button class="btn icon ghost" data-act="edit" aria-label="Modifier le dossier">${ICON.edit}</button>
     </header>
     ${p.notes ? `<div class="pinfo">${esc(p.notes)}</div>` : ''}
+    <div class="consent-line">
+      ${p.consent?.photos
+        ? `<span class="ok">✓ Consentement photo du ${fmtShort(p.consent.photos)}</span>${p.consent.ai ? ' <span class="ok">✓ IA</span>' : ''}${p.consent.teaching ? ' <span class="ok">✓ Enseignement</span>' : ''}`
+        : `<span class="warn">⚠ Consentement photo non enregistré</span> <button class="btn small" data-act="edit">Enregistrer</button>`}
+    </div>
 
     <h2 class="section">Motifs de consultation</h2>
     <div class="chips wrap" role="tablist" aria-label="Motifs de consultation">
@@ -460,11 +536,16 @@ async function viewPatient(pid) {
         </div>
         <button class="btn icon ghost" data-act="editep" aria-label="Modifier le motif">${ICON.edit}</button>
       </div>
+      ${ep.status === 'open' ? `<p class="visit">📅 ${ep.nextVisit
+        ? `Prochain contrôle : <b>${fmtLong(ep.nextVisit)}</b> <span class="when ${visitIn < 0 ? 'late' : visitIn === 0 ? 'now' : ''}">${visitLabel(visitIn)}</span>`
+        : `Aucun contrôle prévu. <button class="btn small" data-act="editep">Planifier</button>`}</p>` : ''}
       ${ep.notes ? `<div class="pinfo">${esc(ep.notes)}</div>` : ''}
+      ${chart ? measureChart(chart.pts, chart.unit, chart.title) : ''}
+      ${lastEvol ? `<details class="ai-box"><summary>✦ Dernière analyse IA de l'évolution : <b>${esc(lastEvol.result.tendance)}</b></summary>${renderEvolution(lastEvol)}</details>` : ''}
     </section>
 
     <div class="actions">
-      <button class="btn primary" data-act="camera">${ICON.camera}Prendre une photo</button>
+      <button class="btn primary" data-act="camera">${ICON.camera}${list.length ? 'Photo guidée' : 'Prendre une photo'}</button>
       <button class="btn" data-act="gallery">${ICON.image}Importer</button>
       <button class="btn" data-act="select" ${list.length < 2 ? 'disabled' : ''}>${ICON.compare}Comparer</button>
     </div>
@@ -481,6 +562,7 @@ async function viewPatient(pid) {
             <button class="thumb" data-id="${ph.id}" aria-label="Photo du ${fmtShort(ph.date)}${ph.zone ? ', ' + esc(ph.zone) : ''}">
               <img src="${objUrl(ph.thumb)}" alt="" loading="lazy">
               ${ph.zone && !state.zone ? `<span class="zone">${esc(ph.zone)}</span>` : ''}
+              <span class="flags">${ph.kind === 'dermoscopie' ? '<i title="Dermoscopie">🔬</i>' : ''}${hasAnnot(ph) ? '<i title="Annotée / mesurée">📏</i>' : ''}${ph.ai ? '<i title="Analysée par IA">✦</i>' : ''}</span>
               <span class="num"></span>
             </button>`).join('')}
           </div>
@@ -497,12 +579,17 @@ async function viewPatient(pid) {
     </div>
   `;
 
-  const on = (act, fn) => { const b = app.querySelector(`[data-act=${act}]`); if (b) b.onclick = fn; };
+  if (chart) bindChart(app, chart.pts, chart.unit);
+  const on = (act, fn) => app.querySelectorAll(`[data-act=${act}]`).forEach(b => (b.onclick = fn));
   on('edit', () => editPatient(p));
   on('newep', () => editEpisode(p));
   on('editep', () => editEpisode(p, ep, countOf(ep.id)));
-  on('camera', async () => addPhotos(p, await pickFiles($('#in-camera')), zones, ep.id));
-  on('gallery', async () => addPhotos(p, await pickFiles($('#in-gallery')), zones, ep.id));
+  on('camera', async () => {
+    const r = await guidedCapture(list.filter(x => x.kind !== 'dermoscopie'));
+    if (r === 'fallback') return addPhotos(p, await pickFiles($('#in-camera')), zones, ep.id, 'camera');
+    if (r) addPhotos(p, [r.file], zones, ep.id, 'guided', { device: r.device });
+  });
+  on('gallery', async () => addPhotos(p, await pickFiles($('#in-gallery')), zones, ep.id, 'import'));
   on('select', () => { state.selecting = true; state.sel = []; route(); });
   on('cancelsel', () => { state.selecting = false; state.sel = []; route(); });
   on('docompare', () => { const ids = state.sel.slice(); state.selecting = false; state.sel = []; location.hash = `#/p/${pid}/compare?ids=${ids.join(',')}`; });
@@ -538,13 +625,14 @@ async function viewPatient(pid) {
       else return toast('4 photos maximum');
       paintSel();
     } else {
-      viewPhoto(p, list, list.findIndex(x => x.id === id), zones);
+      viewPhoto(p, ep, list, list.findIndex(x => x.id === id), zones);
     }
   }));
 }
 
 async function editEpisode(p, ep, count = 0) {
   const isNew = !ep;
+  const quick = [['+1 sem.', 7], ['+2 sem.', 14], ['+1 mois', 30], ['+3 mois', 91]];
   const r = await openDialog(`
     <form method="dialog">
       <div class="dhead"><h2>${isNew ? 'Nouveau motif de consultation' : 'Modifier le motif'}</h2>${closeBtn}</div>
@@ -553,6 +641,11 @@ async function editEpisode(p, ep, count = 0) {
           <input type="text" id="e-title" required value="${esc(ep?.title)}" placeholder="ex. eczéma des mains, cicatrice post-opératoire" autocomplete="off"></div>
         ${isNew ? '' : `<div class="field"><label for="e-status">Statut</label>
           <select id="e-status">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}"${ep.status === k ? ' selected' : ''}>${v}</option>`).join('')}</select></div>`}
+        <div class="field"><label for="e-visit">Prochain contrôle</label>
+          <input type="date" id="e-visit" value="${ep?.nextVisit || ''}">
+          <div class="row quick">${quick.map(([l, d]) => `<button type="button" class="btn small" data-days="${d}">${l}</button>`).join('')}
+            <button type="button" class="btn small ghost" data-days="">Aucun</button></div>
+        </div>
         <div class="field"><label for="e-notes">Notes (diagnostic, traitement…)</label><textarea id="e-notes">${esc(ep?.notes)}</textarea></div>
       </div>
       <div class="dfoot">
@@ -565,6 +658,12 @@ async function editEpisode(p, ep, count = 0) {
       $('#e-title', d).focus();
       const del = d.querySelector('[data-act=delep]');
       if (del) del.onclick = () => d.close('delete');
+      d.querySelectorAll('[data-days]').forEach(b => (b.onclick = () => {
+        const n = b.dataset.days;
+        const t = new Date();
+        t.setDate(t.getDate() + Number(n));
+        $('#e-visit', d).value = n ? isoDate(t) : '';
+      }));
     },
   });
   if (r === 'delete') {
@@ -587,14 +686,14 @@ async function editEpisode(p, ep, count = 0) {
   if (r !== 'ok') return;
   const title = $('#e-title', dlg).value.trim();
   if (!title) return;
+  const fields = { title, notes: $('#e-notes', dlg).value.trim(), nextVisit: $('#e-visit', dlg).value || null };
   if (isNew) {
-    const e = newEpisode(title);
-    e.notes = $('#e-notes', dlg).value.trim();
+    const e = { ...newEpisode(title), ...fields };
     p.episodes.push(e);
     state.ep = e.id;
     state.zone = null;
   } else {
-    Object.assign(p.episodes.find(e => e.id === ep.id), { title, status: $('#e-status', dlg).value, notes: $('#e-notes', dlg).value.trim() });
+    Object.assign(p.episodes.find(e => e.id === ep.id), fields, { status: $('#e-status', dlg).value });
   }
   p.updatedAt = Date.now();
   await putOne('patients', p);
@@ -602,15 +701,37 @@ async function editEpisode(p, ep, count = 0) {
   route();
 }
 
-async function addPhotos(p, files, zones, episodeId) {
+// Avant d'ajouter des photos : le consentement du patient est-il enregistré ?
+async function checkPhotoConsent(p) {
+  if (p.consent?.photos) return true;
+  const r = await openDialog(`
+    <form method="dialog">
+      <div class="dhead"><h2>Consentement aux photos</h2>${closeBtn}</div>
+      <div class="dbody"><p>Le consentement de ${esc(p.name)} à la prise et à la conservation de photos n'est pas enregistré dans son dossier.</p></div>
+      <div class="dfoot">
+        <button type="button" class="btn" data-close>Annuler</button>
+        <button class="btn" value="skip">Continuer sans l'enregistrer</button>
+        <button class="btn primary" value="ok">Le patient est d'accord</button>
+      </div>
+    </form>`);
+  if (r === 'ok') {
+    p.consent = { ...(p.consent || {}), photos: today() };
+    await putOne('patients', p);
+    toast('Consentement enregistré');
+  }
+  return r === 'ok' || r === 'skip';
+}
+
+async function addPhotos(p, files, zones, episodeId, source = 'import', extra = {}) {
   if (!files.length) return;
+  if (!await checkPhotoConsent(p)) return;
   dlg.className = '';
   dlg.innerHTML = `<div class="progress">Préparation des photos… <b id="prog">0/${files.length}</b></div>`;
   dlg.onclose = null;
   dlg.showModal();
   const items = [];
   for (const f of files) {
-    try { items.push(await prepareFile(f)); }
+    try { items.push(await prepareFile(f, source, extra)); }
     catch (e) { console.warn(e); }
     const pr = $('#prog');
     if (pr) pr.textContent = `${items.length}/${files.length}`;
@@ -619,17 +740,22 @@ async function addPhotos(p, files, zones, episodeId) {
   await new Promise(r => { dlg.addEventListener('close', r, { once: true }); dlg.close(); });
   if (!items.length) return toast('Format d\'image non pris en charge');
 
+  const metaLine = m => [m.takenAt && new Date(m.takenAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+    m.camera, m.dateSource === 'file' && 'sans date EXIF'].filter(Boolean).join(' · ');
   const r = await openDialog(`
     <form method="dialog">
       <div class="dhead"><h2>Ajouter ${items.length} photo${items.length > 1 ? 's' : ''}</h2>${closeBtn}</div>
       <div class="dbody">
         <div class="newlist">${items.map((it, i) => `
           <div class="newitem"><img src="${objUrl(it.thumb)}" alt="">
-            <input type="date" data-i="${i}" value="${it.date}" max="${today()}" aria-label="Date de la photo ${i + 1}">
+            <div class="nf"><input type="date" data-i="${i}" value="${it.date}" max="${today()}" aria-label="Date de la photo ${i + 1}">
+              <small>${esc(metaLine(it.meta))}</small></div>
           </div>`).join('')}
         </div>
-        <div class="field"><label for="n-zone">Zone / lésion (facultatif)</label>
-          <input type="text" id="n-zone" list="zones" placeholder="ex. joue gauche, ulcère jambe droite" value="${esc(state.zone || '')}" autocomplete="off">
+        <div class="field"><label for="n-kind">Type de photo</label>
+          <select id="n-kind">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+        <div class="field"><label for="n-zone">Zone / localisation (facultatif)</label>
+          <input type="text" id="n-zone" list="zones" placeholder="ex. joue gauche, face antérieure jambe droite" value="${esc(state.zone || '')}" autocomplete="off">
           <datalist id="zones">${zones.map(z => `<option value="${esc(z)}">`).join('')}</datalist>
         </div>
         <div class="field"><label for="n-note">Note (facultatif)</label><textarea id="n-note" placeholder="ex. après 2 semaines de traitement"></textarea></div>
@@ -643,10 +769,11 @@ async function addPhotos(p, files, zones, episodeId) {
 
   const zone = $('#n-zone', dlg).value.trim();
   const note = $('#n-note', dlg).value.trim();
+  const kind = $('#n-kind', dlg).value;
   dlg.querySelectorAll('input[type=date]').forEach(inp => { if (inp.value) items[inp.dataset.i].date = inp.value; });
   try {
     for (const it of items) {
-      await putOne('photos', { id: uid(), patientId: p.id, episodeId, ...it, zone, note, createdAt: Date.now() });
+      await putOne('photos', { id: uid(), patientId: p.id, episodeId, ...it, kind, zone, note, createdAt: Date.now() });
     }
     await refreshSummary(p.id);
     navigator.storage?.persist?.();
@@ -659,31 +786,64 @@ async function addPhotos(p, files, zones, episodeId) {
   route();
 }
 
-/* ================= Visionneuse d'une photo ================= */
+/* ================= Fiche d'une photo ================= */
+/* Visionneuse avec outils d'examen : loupe, luminosité / contraste / saturation, annotations et mesures,
+   métadonnées, analyse IA. Les réglages d'affichage ne modifient pas la photo enregistrée. */
 
-async function viewPhoto(p, list, index, zones) {
+async function viewPhoto(p, ep, list, index, zones) {
   let i = index;
   let changed = false;
+  let view = { zoom: 1, x: 0, y: 0, b: 100, c: 100, s: 100, annot: true };
+  let aiBusy = false;
+  const first = list[0].date;
+
   const render = () => {
     const ph = list[i];
-    const first = list[0].date;
+    const measures = (ph.annot?.shapes || []).map(s => measureOf(s, ph.annot)).filter(Boolean);
+    const rows = metaRows(ph);
     dlg.innerHTML = `
       <form method="dialog">
         <div class="dhead"><h2>${fmtLong(ph.date)} <span class="badge">${dayLabel(daysBetween(first, ph.date))}</span></h2>${closeBtn}</div>
-        <div class="stage">
-          <img src="${objUrl(ph.blob)}" alt="Photo du ${fmtShort(ph.date)}">
+        <div class="stage viewer-stage">
+          <div class="zoom" style="transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom}); filter: brightness(${view.b}%) contrast(${view.c}%) saturate(${view.s}%)">
+            <img src="${objUrl(ph.blob)}" alt="Photo du ${fmtShort(ph.date)}" draggable="false">
+            ${view.annot && hasAnnot(ph) ? annotSVG(ph) : ''}
+          </div>
           ${i > 0 ? `<button type="button" class="btn icon nav prev" data-nav="-1" aria-label="Photo précédente">‹</button>` : ''}
           ${i < list.length - 1 ? `<button type="button" class="btn icon nav next" data-nav="1" aria-label="Photo suivante">›</button>` : ''}
+          <div class="zoomctl">
+            <button type="button" class="btn icon" data-zoom="-1" aria-label="Dézoomer">−</button>
+            <span>${Math.round(view.zoom * 100)} %</span>
+            <button type="button" class="btn icon" data-zoom="1" aria-label="Zoomer">+</button>
+          </div>
+        </div>
+        <div class="vtools">
+          <button type="button" class="btn" data-act="annotate">📏 Annoter / mesurer</button>
+          ${hasAnnot(ph) ? `<button type="button" class="btn${view.annot ? ' on' : ''}" data-act="toggleannot" aria-pressed="${view.annot}">Calque ${view.annot ? 'visible' : 'masqué'}</button>` : ''}
+          <button type="button" class="btn" data-act="ai">✦ Analyse IA</button>
         </div>
         <div class="dbody">
+          <details class="tool-panel"><summary>Réglages d'affichage</summary>
+            ${[['b', 'Luminosité'], ['c', 'Contraste'], ['s', 'Saturation']].map(([k, l]) => `
+              <label class="slider-row">${l}<input type="range" min="${k === 's' ? 0 : 50}" max="${k === 's' ? 250 : 200}" value="${view[k]}" data-filter="${k}"><span>${view[k]} %</span></label>`).join('')}
+            <button type="button" class="btn small" data-act="resetview">Réinitialiser</button>
+            <p class="muted">Ces réglages aident à l'examen (érythème, pigmentation, relief) sans modifier la photo enregistrée.</p>
+          </details>
+          ${measures.length ? `<details class="tool-panel" open><summary>Mesures (${measures.length})</summary>
+            <ul class="mlist">${measures.map(m => `<li>${m.kind === 'area' ? 'Surface' : 'Longueur'} : <b>${m.label}</b></li>`).join('')}</ul></details>` : ''}
+          <div id="ai-panel">${ph.ai ? `<details class="tool-panel ai-box" open><summary>✦ Analyse IA</summary>${renderPhotoAnalysis(ph.ai)}</details>` : ''}</div>
           <div class="grid2">
             <div class="field"><label for="v-date">Date</label><input type="date" id="v-date" value="${ph.date}" max="${today()}"></div>
-            <div class="field"><label for="v-zone">Zone / lésion</label><input type="text" id="v-zone" list="vzones" value="${esc(ph.zone)}" autocomplete="off">
-              <datalist id="vzones">${zones.map(z => `<option value="${esc(z)}">`).join('')}</datalist></div>
+            <div class="field"><label for="v-kind">Type de photo</label>
+              <select id="v-kind">${Object.entries(KINDS).map(([k, v]) => `<option value="${k}"${(ph.kind || 'clinique') === k ? ' selected' : ''}>${v}</option>`).join('')}</select></div>
           </div>
+          <div class="field"><label for="v-zone">Zone / localisation</label><input type="text" id="v-zone" list="vzones" value="${esc(ph.zone)}" autocomplete="off">
+            <datalist id="vzones">${zones.map(z => `<option value="${esc(z)}">`).join('')}</datalist></div>
           ${p.episodes.length > 1 ? `<div class="field"><label for="v-ep">Motif de consultation</label>
             <select id="v-ep">${p.episodes.map(e => `<option value="${e.id}"${e.id === ph.episodeId ? ' selected' : ''}>${esc(e.title)}</option>`).join('')}</select></div>` : ''}
           <div class="field"><label for="v-note">Note</label><textarea id="v-note">${esc(ph.note)}</textarea></div>
+          ${rows.length ? `<details class="tool-panel"><summary>Informations de la photo</summary>
+            <dl class="meta">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></details>` : ''}
         </div>
         <div class="dfoot">
           <button type="button" class="btn danger ghost" data-act="del">Supprimer</button>
@@ -691,32 +851,139 @@ async function viewPhoto(p, list, index, zones) {
           <button type="button" class="btn primary" data-act="save">Enregistrer</button>
         </div>
       </form>`;
-    dlg.querySelectorAll('[data-nav]').forEach(b => (b.onclick = () => { i += Number(b.dataset.nav); render(); }));
-    dlg.querySelector('[data-act=save]').onclick = async () => {
-      Object.assign(ph, { date: $('#v-date', dlg).value || ph.date, zone: $('#v-zone', dlg).value.trim(), note: $('#v-note', dlg).value.trim() });
+    bind(ph);
+  };
+
+  const applyView = () => {
+    const z = dlg.querySelector('.zoom');
+    if (!z) return;
+    z.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`;
+    z.style.filter = `brightness(${view.b}%) contrast(${view.c}%) saturate(${view.s}%)`;
+    const lbl = dlg.querySelector('.zoomctl span');
+    if (lbl) lbl.textContent = `${Math.round(view.zoom * 100)} %`;
+  };
+  const setZoom = z => {
+    view.zoom = Math.max(1, Math.min(6, z));
+    if (view.zoom === 1) { view.x = 0; view.y = 0; }
+    applyView();
+  };
+
+  function bind(ph) {
+    const on = (act, fn) => { const b = dlg.querySelector(`[data-act=${act}]`); if (b) b.onclick = fn; };
+    dlg.querySelectorAll('[data-nav]').forEach(b => (b.onclick = () => { i += Number(b.dataset.nav); view = { ...view, zoom: 1, x: 0, y: 0 }; render(); }));
+    dlg.querySelectorAll('[data-zoom]').forEach(b => (b.onclick = () => setZoom(view.zoom * (b.dataset.zoom === '1' ? 1.5 : 1 / 1.5))));
+    dlg.querySelectorAll('[data-filter]').forEach(r => (r.oninput = () => {
+      view[r.dataset.filter] = Number(r.value);
+      r.nextElementSibling.textContent = `${r.value} %`;
+      applyView();
+    }));
+    on('resetview', () => { view = { ...view, zoom: 1, x: 0, y: 0, b: 100, c: 100, s: 100 }; render(); });
+    on('toggleannot', () => { view.annot = !view.annot; render(); });
+
+    // Loupe : molette ou double-clic pour zoomer, glisser pour se déplacer, pincer sur écran tactile.
+    const stage = dlg.querySelector('.viewer-stage');
+    const pointers = new Map();
+    let last = null, pinch = null;
+    stage.onwheel = e => { e.preventDefault(); setZoom(view.zoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2)); };
+    stage.ondblclick = e => { if (e.target.closest('button')) return; setZoom(view.zoom > 1 ? 1 : 2.5); };
+    stage.onpointerdown = e => {
+      if (e.target.closest('button')) return;
+      pointers.set(e.pointerId, [e.clientX, e.clientY]);
+      stage.setPointerCapture(e.pointerId);
+      last = [e.clientX, e.clientY];
+      if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = { d: dist(a, b), z: view.zoom }; }
+    };
+    stage.onpointermove = e => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, [e.clientX, e.clientY]);
+      if (pinch && pointers.size === 2) { const [a, b] = [...pointers.values()]; return setZoom(pinch.z * dist(a, b) / pinch.d); }
+      if (view.zoom > 1 && last) { view.x += e.clientX - last[0]; view.y += e.clientY - last[1]; applyView(); }
+      last = [e.clientX, e.clientY];
+    };
+    stage.onpointerup = stage.onpointercancel = e => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null; last = null; };
+
+    on('annotate', async () => {
+      // L'éditeur s'ouvre dans la même boîte : on revient ensuite à la fiche de la photo.
+      await new Promise(r => { dlg.addEventListener('close', r, { once: true }); dlg.close('annotate'); });
+      if (await editAnnotations(ph)) changed = true;
+      const again = await openDialog('', { cls: 'viewer', onOpen: render });
+      if (again !== 'annotate') finish();
+    });
+    on('ai', async () => {
+      if (aiBusy) return;
+      if (!aiReady()) {
+        return alert('L\'analyse IA n\'est pas configurée.\nAjoutez votre clé API Anthropic dans Réglages → Analyse IA.');
+      }
+      if (!await ensureAiConsentInline(p)) return;
+      aiBusy = true;
+      const panel = $('#ai-panel', dlg);
+      panel.innerHTML = '<div class="tool-panel ai-box"><p class="ai-wait">✦ Analyse en cours… (30 secondes à 2 minutes)</p></div>';
+      try {
+        await analyzePhoto(p, ep, ph, first);
+        changed = true;
+        if (list[i] === ph && dlg.open) render();
+      } catch (e) {
+        if (dlg.open) panel.innerHTML = `<div class="tool-panel ai-box"><p class="ai-alert">${esc(e.message)}</p></div>`;
+      }
+      aiBusy = false;
+    });
+    on('save', async () => {
+      Object.assign(ph, {
+        date: $('#v-date', dlg).value || ph.date,
+        kind: $('#v-kind', dlg).value,
+        zone: $('#v-zone', dlg).value.trim(),
+        note: $('#v-note', dlg).value.trim(),
+      });
       if ($('#v-ep', dlg)) ph.episodeId = $('#v-ep', dlg).value;
       await putOne('photos', ph);
       changed = true;
       toast('Modifications enregistrées');
       dlg.close();
-    };
-    dlg.querySelector('[data-act=dl]').onclick = () => download(ph.blob, `${safeName(p.name)}_${ph.date}.jpg`);
-    dlg.querySelector('[data-act=del]').onclick = async () => {
+    });
+    on('dl', async () => {
+      if (!hasAnnot(ph) || !view.annot) return download(ph.blob, `${safeName(p.name)}_${ph.date}.jpg`);
+      // Avec annotations visibles : image téléchargée avec le calque dessiné dessus.
+      const img = await decode(ph.blob);
+      const c = document.createElement('canvas');
+      c.width = ph.w; c.height = ph.h;
+      const g = c.getContext('2d');
+      g.drawImage(img, 0, 0);
+      await drawAnnotations(g, ph, 0, 0, ph.w, ph.h);
+      download(await toBlob(c, 0.9), `${safeName(p.name)}_${ph.date}_annotee.jpg`);
+    });
+    on('del', async () => {
       if (!confirm('Supprimer définitivement cette photo ?')) return;
       await delOne('photos', ph.id);
       changed = true;
       toast('Photo supprimée');
       dlg.close();
-    };
-  };
+    });
+  }
+
+  // Confirmation du consentement IA dans une petite fenêtre du navigateur, pour ne pas fermer la fiche.
+  async function ensureAiConsentInline(pat) {
+    if (pat.consent?.ai) return true;
+    if (!confirm(`Analyse IA : l'image (sans le nom du patient) va être envoyée au service d'IA d'Anthropic.\n\n${pat.name} a-t-il donné son accord ? L'accord sera enregistré dans le dossier.`)) return false;
+    pat.consent = { ...(pat.consent || {}), ai: today() };
+    await putOne('patients', pat);
+    return true;
+  }
+
   const keys = e => {
-    if (e.key === 'ArrowLeft' && i > 0 && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') { i--; render(); }
-    if (e.key === 'ArrowRight' && i < list.length - 1 && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') { i++; render(); }
+    if (!dlg.classList.contains('viewer') || ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+    if (e.key === 'ArrowLeft' && i > 0) { i--; view = { ...view, zoom: 1, x: 0, y: 0 }; render(); }
+    if (e.key === 'ArrowRight' && i < list.length - 1) { i++; view = { ...view, zoom: 1, x: 0, y: 0 }; render(); }
+  };
+  let done = false;
+  const finish = async () => {
+    if (done || dlg.open) return;
+    done = true;
+    document.removeEventListener('keydown', keys);
+    if (changed) { await refreshSummary(p.id); route(); }
   };
   document.addEventListener('keydown', keys);
-  await openDialog('', { cls: 'viewer', onOpen: render });
-  document.removeEventListener('keydown', keys);
-  if (changed) { await refreshSummary(p.id); route(); }
+  const r = await openDialog('', { cls: 'viewer', onOpen: render });
+  if (r !== 'annotate') finish();
 }
 
 /* ================= Comparaison côte à côte ================= */
@@ -729,9 +996,18 @@ async function viewCompare(pid, ids) {
   const n = photos.length;
   const first = photos[0].date;
   const mode = n === 2 && sessionStorage.getItem('ds-mode') === 'slider' ? 'slider' : 'side';
+  const showAnnot = sessionStorage.getItem('ds-cmp-annot') !== '0';
+  const anyAnnot = photos.some(hasAnnot);
   const total = daysBetween(first, photos[n - 1].date);
   const ar = `${photos[0].w || 4} / ${photos[0].h || 3}`;
   const caption = ph => `<b>${dayLabel(daysBetween(first, ph.date))}</b> · ${fmtLong(ph.date)}${ph.zone ? `<small>${esc(ph.zone)}</small>` : ''}${ph.note ? `<small>${esc(ph.note)}</small>` : ''}`;
+  const sameSet = a => a.ids.length === photos.length && photos.every(x => a.ids.includes(x.id));
+  const evol = ep?.aiEvol?.find(sameSet);
+
+  // Évolution chiffrée entre la première et la dernière photo mesurées.
+  const ma = photoMeasures(photos[0]), mz = photoMeasures(photos[n - 1]);
+  const delta = (a, z, unit, label) => (a != null && z != null
+    ? `<p class="interval">${label} : <b>${fr1(a)} → ${fr1(z)} ${unit}</b> (${z >= a ? '+' : ''}${Math.round((z - a) / a * 100)} %)</p>` : '');
 
   app.innerHTML = `
     <header class="topbar">
@@ -739,14 +1015,16 @@ async function viewCompare(pid, ids) {
       <h1>Comparaison<span class="sub">${esc(p.name)}${ep ? ' · ' + esc(ep.title) : ''}</span></h1>
       <button class="btn primary" data-act="export">${ICON.share}<span>Image</span></button>
     </header>
-    ${n === 2 ? `<div class="row" style="margin-top:12px">
-      <div class="seg" role="tablist">
+    <div class="row" style="margin-top:12px">
+      ${n === 2 ? `<div class="seg" role="tablist">
         <button data-mode="side" class="${mode === 'side' ? 'on' : ''}">Côte à côte</button>
         <button data-mode="slider" class="${mode === 'slider' ? 'on' : ''}">Curseur avant / après</button>
-      </div></div>` : ''}
+      </div>` : ''}
+      ${anyAnnot && mode === 'side' ? `<button class="btn${showAnnot ? ' on' : ''}" data-act="annot" aria-pressed="${showAnnot}">📏 Annotations ${showAnnot ? 'visibles' : 'masquées'}</button>` : ''}
+    </div>
     ${mode === 'side' ? `
       <div class="cmp n${n}" style="--n:${n};--ar:${ar}">
-        ${photos.map(ph => `<figure><img src="${objUrl(ph.blob)}" alt="Photo du ${fmtShort(ph.date)}"><figcaption>${caption(ph)}</figcaption></figure>`).join('')}
+        ${photos.map(ph => `<figure><div class="ph"><img src="${objUrl(ph.blob)}" alt="Photo du ${fmtShort(ph.date)}">${showAnnot && hasAnnot(ph) ? annotSVG(ph) : ''}</div><figcaption>${caption(ph)}</figcaption></figure>`).join('')}
       </div>` : `
       <div class="slider" id="slider" style="--x:50%;--ar:${ar}">
         <img src="${objUrl(photos[1].blob)}" alt="Après, ${fmtShort(photos[1].date)}">
@@ -757,10 +1035,33 @@ async function viewCompare(pid, ids) {
       </div>
       <p class="interval">Faites glisser pour comparer.</p>`}
     <p class="interval">Écart entre la première et la dernière photo : <b>${durationLabel(total)}</b></p>
+    ${delta(ma?.area, mz?.area, 'cm²', 'Surface')}${delta(ma?.length, mz?.length, 'mm', 'Plus grande longueur')}
+    <section class="card ai-box">
+      <div class="row between"><h2>✦ Analyse IA de l'évolution</h2>
+        <button class="btn" data-act="aievol">${evol ? 'Relancer' : 'Analyser'}</button></div>
+      <div id="evol">${evol ? renderEvolution(evol) : `<p class="muted">L'IA compare les photos (lit, berges, taille, couleur…) et signale les signes d'alerte. ${aiReady() ? '' : 'À activer dans Réglages → Analyse IA.'}</p>`}</div>
+    </section>
   `;
 
   app.querySelectorAll('[data-mode]').forEach(b => (b.onclick = () => { sessionStorage.setItem('ds-mode', b.dataset.mode); route(); }));
-  app.querySelector('[data-act=export]').onclick = () => exportCompare(p, photos, ep?.title);
+  const annotBtn = app.querySelector('[data-act=annot]');
+  if (annotBtn) annotBtn.onclick = () => { sessionStorage.setItem('ds-cmp-annot', showAnnot ? '0' : '1'); route(); };
+  app.querySelector('[data-act=export]').onclick = () => exportCompare(p, photos, ep?.title, showAnnot);
+  app.querySelector('[data-act=aievol]').onclick = async e => {
+    if (!aiReady()) return alert('L\'analyse IA n\'est pas configurée.\nAjoutez votre clé API Anthropic dans Réglages → Analyse IA.');
+    if (!await ensureAiConsent(p)) return;
+    const b = e.currentTarget;
+    b.disabled = true;
+    const box = $('#evol');
+    box.innerHTML = '<p class="ai-wait">✦ Analyse en cours… (30 secondes à 2 minutes)</p>';
+    try {
+      const entry = await analyzeEvolution(p, ep, photos);
+      if (box.isConnected) box.innerHTML = renderEvolution(entry);
+    } catch (err) {
+      if (box.isConnected) box.innerHTML = `<p class="ai-alert">${esc(err.message)}</p>`;
+    }
+    b.disabled = false;
+  };
 
   const s = $('#slider');
   if (s) {
@@ -774,8 +1075,8 @@ async function viewCompare(pid, ids) {
   }
 }
 
-// Assemble les photos comparées en une seule image JPEG (avec dates), à partager ou enregistrer.
-async function exportCompare(p, photos, motif) {
+// Assemble les photos comparées en une seule image JPEG (avec dates et annotations), à partager ou enregistrer.
+async function exportCompare(p, photos, motif, withAnnot = true) {
   toast('Création de l\'image…');
   await document.fonts?.load('700 44px "EB Garamond"').catch(() => {});
   const imgs = await Promise.all(photos.map(ph => decode(ph.blob)));
@@ -792,21 +1093,24 @@ async function exportCompare(p, photos, motif) {
   g.font = '600 50px "EB Garamond", Garamond, serif';
   g.textBaseline = 'middle';
   g.fillText(`${p.name} — ${motif || 'suivi de cicatrisation'}`, gap, head / 2);
-  imgs.forEach((im, k) => {
+  for (let k = 0; k < imgs.length; k++) {
+    const im = imgs[k], ph = photos[k];
     const x0 = gap + k * (cellW + gap);
     g.fillStyle = '#000000';
     g.fillRect(x0, head, cellW, cellH);
     const s = Math.min(cellW / im.naturalWidth, cellH / im.naturalHeight);
     const w = im.naturalWidth * s, h = im.naturalHeight * s;
-    g.drawImage(im, x0 + (cellW - w) / 2, head + (cellH - h) / 2, w, h);
-    const ph = photos[k];
+    const ix = x0 + (cellW - w) / 2, iy = head + (cellH - h) / 2;
+    g.drawImage(im, ix, iy, w, h);
+    if (withAnnot) await drawAnnotations(g, ph, ix, iy, w, h);
+    const m = photoMeasures(ph);
     g.fillStyle = '#0f766e';
     g.font = '700 48px "EB Garamond", Garamond, serif';
-    g.fillText(dayLabel(daysBetween(first, ph.date)), x0, head + cellH + 40);
+    g.fillText(dayLabel(daysBetween(first, ph.date)) + (m?.area != null ? `  ·  ${fr1(m.area)} cm²` : ''), x0, head + cellH + 40);
     g.fillStyle = '#15201f';
     g.font = '400 42px "EB Garamond", Garamond, serif';
     g.fillText(fmtLong(ph.date) + (ph.zone ? ' · ' + ph.zone : ''), x0, head + cellH + 90);
-  });
+  }
   const blob = await toBlob(c, 0.9);
   const name = `${safeName(p.name)}_comparaison_${photos[0].date}_${photos[photos.length - 1].date}.jpg`;
   const file = new File([blob], name, { type: 'image/jpeg' });
@@ -855,6 +1159,8 @@ async function viewSettings() {
       </div>
     </section>
 
+    ${aiSettingsCard()}
+
     <section class="card">
       <h2>Sauvegarde</h2>
       <p>Les photos de cet espace sont enregistrées <b>uniquement sur cet appareil</b>. Faites une sauvegarde régulièrement (clé USB, disque, cloud sécurisé)
@@ -885,6 +1191,7 @@ async function viewSettings() {
   app.querySelector('[data-act=pin]').onclick = () => editSpace(space, true);
   app.querySelector('[data-act=delspace]').onclick = deleteSpace;
   app.querySelector('[data-act=export]').onclick = exportBackup;
+  bindAiSettings();
   app.querySelector('[data-act=import]').onclick = async () => {
     const [file] = await pickFiles($('#in-backup'));
     if (file) importBackup(file);

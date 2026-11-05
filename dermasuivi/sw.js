@@ -1,11 +1,15 @@
 // Service worker : met l'application en cache pour qu'elle marche hors ligne.
 // Les photos ne passent jamais par ici : elles restent dans IndexedDB sur l'appareil.
-const CACHE = 'dermasuivi-v3';
+const CACHE = 'dermasuivi-v4';
 const SHELL = [
   './',
   'index.html',
   'style.css',
   'app.js',
+  'meta.js',
+  'annot.js',
+  'camera.js',
+  'ai.js',
   'manifest.webmanifest',
   'icons/icon.svg',
   'icons/icon-192.png',
