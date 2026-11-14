@@ -14,7 +14,7 @@ mettre à jour le formulaire dans Excel puis relancer la génération suffit.
 - **Score global en direct** dans l'en-tête, puis résultat par section à la finalisation.
 - **Hors ligne** : les fiches restent sur le téléphone et sont envoyées au retour du réseau
   (l'envoi est simulé dans le prototype).
-- **Activité des ASBC (eSanteCom)** : synthèse du jour (ou des 6 jours précédents) des six
+- **Activité daily eSanteCom** (onglet Daily) : synthèse du jour (ou des 6 jours précédents) des six
   activités des ASBC du CSPS :
   1. prise en charge des enfants (PCIME) ;
   2. enregistrement des grossesses ;
@@ -26,7 +26,7 @@ mettre à jour le formulaire dans Excel puis relancer la génération suffit.
   Alertes : signe de danger non référé (enfant, femme enceinte, nouveau-né), TDR positif sans
   CTA, téléphone non synchronisé depuis 3 jours. Détail par ASBC activité par activité, et bouton
   « Superviser » qui préremplit le lieu dans la fiche de supervision.
-- **Rapport mensuel (eSanteCom)** : complétude, promptitude, tendance sur 6 mois et indicateurs
+- **RMA eSanteCom** (onglet RMA, rapport mensuel d'activités) : complétude, promptitude, tendance sur 6 mois et indicateurs
   du CSPS rangés selon les six activités, avec comparaison « déclaré » (rapport de l'ASBC) /
   « eSanteCom » (somme des saisies quotidiennes), validation ou renvoi de chaque rapport, puis
   transmission au district.

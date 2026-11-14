@@ -210,8 +210,8 @@ pre.json { background: var(--surface-2); border-radius: 10px; padding: 12px; fon
   <nav class="nav" id="nav">
     <button data-onglet="accueil"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></span><span data-t="Accueil">Accueil</span></button>
     <button data-onglet="supervisions"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span data-t="Supervisions">Supervisions</span><span class="badge" id="badge-sync" hidden></span></button>
-    <button data-onglet="activite"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></span><span data-t="Activité">Activité</span></button>
-    <button data-onglet="rapport"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 20V10M12 20V4M19 20v-7"/></svg></span><span data-t="Rapport">Rapport</span></button>
+    <button data-onglet="activite"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></span><span data-t="Daily">Daily</span></button>
+    <button data-onglet="rapport"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 20V10M12 20V4M19 20v-7"/></svg></span><span data-t="RMA">RMA</span></button>
     <button data-onglet="plan"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l5 5L20 6"/></svg></span><span data-t="Plan">Plan</span></button>
 
   </nav>
@@ -475,7 +475,7 @@ const sauver = () => { ecrire("asbc_fiches", fiches); ecrire("asbc_enligne", enL
 let LANGUE = lire("asbc_langue", "fr");
 const TRAD_FORM = (FORM.i18n && FORM.i18n.en) || {};
 const UI_EN = {
-  "Accueil": "Home", "Supervisions": "Supervisions", "Plan d'action": "Action plan", "Formulaire": "Form", "Activité": "Activity", "Rapport": "Report", "Plan": "Plan",
+  "Accueil": "Home", "Supervisions": "Supervisions", "Plan d'action": "Action plan", "Formulaire": "Form", "Daily": "Daily", "RMA": "RMA", "Plan": "Plan",
   "Formulaire Kobo : contrôles et traduction": "Kobo form: checks and translation",
   "Simuler la perte de réseau": "Simulate network loss", "En ligne": "Online", "Hors ligne": "Offline",
   "Réseau retrouvé : vous pouvez envoyer les fiches.": "Back online: you can send the forms.",
@@ -1163,7 +1163,7 @@ function tuile(v, lab, attention) { return `<div class="chiffre ${attention ? "a
 function ecranActivite() {
   if (!jourChoisi) jourChoisi = jour();
   const d = jourChoisi;
-  barre(L("Activité des ASBC", "CHW activity"), `eSanteCom · ${esc(ZONE.nom)}`);
+  barre(L("Activité daily eSanteCom", "Daily eSanteCom activity"), L("Activités quotidiennes des ASBC", "CHWs' daily activities") + ` · ${esc(ZONE.nom)}`);
   const vis = ZONE.asbc.filter(a => visible(a, d));
   const s = sommer(vis.map(a => journee(a, d)));
   const alertes = alertesJour(d);
@@ -1270,15 +1270,15 @@ function ecranRapport() {
   const sansRapport = raps.filter(x => !x.r.recu), enfantsSans = sansRapport.reduce((n, x) => n + x.r.esc.enfants, 0);
   const pc = (a, b) => b ? Math.round(100 * a / b) : 0;
   const statut = etat.transmis ? `<span class="pastille p-ok">${L("Transmis au district le ", "Sent to the district on ")}${dateFr(etat.transmis)}</span>` : `<span class="pastille p-alerte">${L("En cours de validation", "Being validated")}</span>`;
-  barre(L("Rapport mensuel", "Monthly report"), `eSanteCom · ${esc(ZONE.nom)}`);
+  barre(L("RMA eSanteCom", "eSanteCom RMA"), L("Rapport mensuel d'activités", "Monthly activity report") + ` · ${esc(ZONE.nom)}`);
   $("#ecran").innerHTML = `
-    <div class="exemple">${L("Données simulées. Déclaré : rapports mensuels envoyés par les ASBC. eSanteCom : somme des activités saisies chaque jour.", "Simulated data. Reported: monthly reports sent by CHWs. eSanteCom: sum of activities recorded each day.")}</div>
+    <div class="exemple">${L("Données simulées. Déclaré : RMA envoyé par chaque ASBC. eSanteCom : somme des activités daily saisies chaque jour.", "Simulated data. Reported: RMA sent by each CHW. eSanteCom: sum of the daily activities recorded each day.")}</div>
     <div class="filtres">${mois.map(x => `<button data-mois="${x}" class="${x === m ? "sel" : ""}">${esc(nomMois(x))}</button>`).join("")}</div>
     <div>${statut}</div>
     <div class="chiffres">
       ${tuile(pc(recus.length, raps.length) + "<small>%</small>", L(`complétude (${recus.length}/${raps.length})`, `completeness (${recus.length}/${raps.length})`), recus.length < raps.length)}
       ${tuile(pc(aTemps.length, raps.length) + "<small>%</small>", L("promptitude (avant le 5)", "timeliness (by the 5th)"), aTemps.length < raps.length)}
-      ${tuile(`${nValid}<small>/${recus.length}</small>`, L("rapports validés", "reports validated"), nValid < recus.length)}
+      ${tuile(`${nValid}<small>/${recus.length}</small>`, L("RMA validés", "RMAs validated"), nValid < recus.length)}
     </div>
     ${graphique(indicGraph)}
     <h2>${L("Indicateurs du CSPS", "Health centre indicators")}</h2>
@@ -1293,21 +1293,21 @@ function ecranRapport() {
       <tr><td>${L("Grossesses enregistrées au 1er trimestre", "Pregnancies registered in the 1st trimester")}</td><td class="n">${pc(totD.fe1, totD.fe)} %</td><td class="n">${pc(totE.fe1, totE.fe)} %</td></tr>
     </tbody></table></div>
     <div class="indice">${L("Comparaison sur les ASBC qui ont envoyé leur rapport. Pastille orange : écart de plus de 10 %.", "Compared for CHWs who sent their report. Orange badge: difference over 10%.")}${sansRapport.length ? " " + L(`Les ${sansRapport.length} ASBC sans rapport ont pris en charge ${enfantsSans} enfant(s) d'après eSanteCom.`, `The ${sansRapport.length} CHW(s) without a report managed ${enfantsSans} child(ren) according to eSanteCom.`) : ""}</div>
-    <h2>${L("Rapports des ASBC", "CHW reports")}</h2>
+    <h2>${L("RMA des ASBC", "CHW RMAs")}</h2>
     <div class="liste">${raps.map(x => {
       const st = !x.r.recu ? `<span class="pastille p-critique">${L("Non reçu", "Not received")}</span>` : valid(x) ? `<span class="pastille p-ok">${L("Validé", "Validated")}</span>` : etat.asbc[x.a.id] === "renvoye" ? `<span class="pastille p-alerte">${L("Renvoyé", "Returned")}</span>` : `<span class="pastille p-neutre">${L("À valider", "To validate")}</span>`;
       const meta = x.r.recu ? L(`Reçu le ${dateFr(x.r.recu)} · ${x.r.aTemps ? "à temps" : "en retard"}`, `Received ${dateFr(x.r.recu)} · ${x.r.aTemps ? "on time" : "late"}`) : L("Pas de rapport pour ce mois", "No report for this month");
       return `<button class="ligne" data-rap="${x.a.id}"><div class="avatar">${x.a.num}</div><div class="corps"><div class="titre">${esc(nomAsbcEsc(x.a))}</div><div class="meta">${meta}</div><div style="margin-top:3px;display:flex;gap:6px;flex-wrap:wrap">${st}${x.r.ecarts.length ? `<span class="pastille p-alerte">${L("Écart avec eSanteCom", "Differs from eSanteCom")}</span>` : ""}</div></div></button>`;
     }).join("")}</div>
-    ${etat.transmis ? "" : `<button class="btn btn-plein btn-large" id="transmettre" ${nValid < recus.length ? "disabled" : ""}>${L("Transmettre le rapport au district", "Send the report to the district")}</button>
+    ${etat.transmis ? "" : `<button class="btn btn-plein btn-large" id="transmettre" ${nValid < recus.length ? "disabled" : ""}>${L("Transmettre le RMA au district", "Send the RMA to the district")}</button>
       <div class="indice">${nValid < recus.length ? L(`Validez d'abord les ${recus.length - nValid} rapport(s) reçu(s).`, `First validate the ${recus.length - nValid} report(s) received.`) : recus.length < raps.length ? L(`${raps.length - recus.length} rapport(s) manquant(s) seront signalés au district.`, `${raps.length - recus.length} missing report(s) will be flagged to the district.`) : L("Tous les rapports sont validés.", "All reports are validated.")}</div>`}`;
   document.querySelectorAll("[data-mois]").forEach(b => b.onclick = () => { moisChoisi = b.dataset.mois; rendre(); });
   document.querySelectorAll("[data-graph]").forEach(b => b.onclick = () => { indicGraph = b.dataset.graph; const y = $("#ecran").scrollTop; rendre(); $("#ecran").scrollTop = y; });
   document.querySelectorAll(".barre-g").forEach(g => { const f = () => { $("#g-info").textContent = g.dataset.info; }; g.onpointerenter = f; g.onclick = f; });
   document.querySelectorAll("[data-rap]").forEach(b => b.onclick = () => detailRapport(ZONE.asbc.find(a => a.id === b.dataset.rap), m));
-  if ($("#transmettre")) $("#transmettre").onclick = () => feuille(`<h3>${L("Transmettre au district ?", "Send to the district?")}</h3><div class="indice">${L(`Rapport de ${ZONE.nom}, ${nomMois(m)} : ${recus.length} rapport(s) d'ASBC sur ${raps.length}.`, `${ZONE.nom} report, ${nomMois(m)}: ${recus.length} of ${raps.length} CHW reports.`)}</div>
+  if ($("#transmettre")) $("#transmettre").onclick = () => feuille(`<h3>${L("Transmettre le RMA au district ?", "Send the RMA to the district?")}</h3><div class="indice">${L(`RMA de ${ZONE.nom}, ${nomMois(m)} : ${recus.length} rapport(s) d'ASBC sur ${raps.length}.`, `${ZONE.nom} report, ${nomMois(m)}: ${recus.length} of ${raps.length} CHW reports.`)}</div>
     <div class="actions"><button class="btn btn-contour" data-fermer>${t("Annuler")}</button><button class="btn btn-plein" id="ok-trans">${L("Transmettre", "Send")}</button></div>`, () => {
-    $("#ok-trans").onclick = () => { etat.transmis = jour(); etatRapports[m] = etat; ecrire("asbc_rapports", etatRapports); fermer(); toast(L("Rapport transmis au district (simulation).", "Report sent to the district (simulation).")); rendre(); };
+    $("#ok-trans").onclick = () => { etat.transmis = jour(); etatRapports[m] = etat; ecrire("asbc_rapports", etatRapports); fermer(); toast(L("RMA transmis au district (simulation).", "RMA sent to the district (simulation).")); rendre(); };
   });
 }
 
