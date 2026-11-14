@@ -184,6 +184,21 @@ pre.json { background: var(--surface-2); border-radius: 10px; padding: 12px; fon
 .graph .g-base { stroke: var(--ligne); stroke-width: 1; }
 .graph .barre-g { cursor: pointer; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
+.activites { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.activite { background: var(--surface); border-radius: 12px; box-shadow: var(--ombre); padding: 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.activite b { font-size: 28px; color: var(--bleu); line-height: 1.1; font-variant-numeric: lining-nums tabular-nums; }
+.act-titre { font-weight: 600; font-size: 15px; line-height: 1.2; }
+.act-detail { font-size: 13.5px; color: var(--texte-2); }
+.num-act { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; background: var(--jaune); color: #1b2620; font-size: 13px; font-weight: 700; align-items: center; justify-content: center; flex: none; }
+.activite .num-act { margin-bottom: 4px; }
+.carte.sync { display: flex; gap: 12px; align-items: center; padding: 12px 16px; }
+.carte.sync b { font-size: 24px; color: var(--ok); white-space: nowrap; }
+.carte.sync b.manque { color: var(--orange); }
+.carte.sync span { font-size: 14.5px; color: var(--texte-2); }
+.act-section { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+.act-entete { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.act-entete .pastille { margin-left: auto; }
+.act-liste { margin: 0; padding-left: 20px; font-size: 15px; display: flex; flex-direction: column; gap: 3px; }
 .anomalie { font-size: 14.5px; padding: 8px 0; border-top: 1px solid var(--ligne); overflow-wrap: anywhere; }
 .anomalie code { font-size: 13.5px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
 </style>
@@ -1031,6 +1046,8 @@ const ZONE = (() => {
 })();
 const nomAsbcEsc = a => L("ASBC", "CHW") + " " + a.num + " · " + a.village;
 
+const THEMES = [["Utilisation de la moustiquaire", "Use of bed nets"], ["Allaitement maternel exclusif", "Exclusive breastfeeding"], ["Hygiène et lavage des mains", "Hygiene and handwashing"],
+  ["Vaccination des enfants", "Child vaccination"], ["Nutrition du jeune enfant", "Young child nutrition"], ["Préparation à l'accouchement", "Birth preparedness"], ["Signes de danger chez la femme enceinte", "Danger signs in pregnancy"]];
 const CACHE_J = {};
 function journee(a, d) {
   const cle = a.id + d; if (CACHE_J[cle]) return CACHE_J[cle];
@@ -1053,10 +1070,15 @@ function journee(a, d) {
   }
   cas.sort((p, q) => p.heure.localeCompare(q.heure));
   const tdr5p = dimanche ? 0 : poisson(r, .5); let pos5p = 0; for (let i = 0; i < tdr5p; i++) if (r() < pPos) pos5p++;
+  const idF = i => "F" + (hash(cle + "f" + i) % 90000 + 10000), idN = i => "N" + (hash(cle + "n" + i) % 90000 + 10000);
+  const grossesses = Array.from({ length: !dimanche && r() < .14 ? 1 : 0 }, (_, i) => { const sa = 6 + Math.floor(r() * 26); return { id: idF("g" + i), sa, trim: sa <= 13 ? 1 : sa <= 27 ? 2 : 3 }; });
+  const visitesG = Array.from({ length: dimanche ? 0 : poisson(r, .3) }, (_, i) => { const num = 1 + Math.floor(r() * 3), danger = r() < .05; return { id: idF(i), num, sa: 10 + num * 8 + Math.floor(r() * 6), danger, ref: danger && r() < .8 }; });
+  const visitesNN = Array.from({ length: dimanche ? 0 : poisson(r, .25) }, (_, i) => { const supp = r() < .15, faible = supp || r() < .1, danger = r() < .05; return { id: idN(i), num: supp ? "supp" : 1 + Math.floor(r() * 3), faible, danger, ref: danger && r() < .8 }; });
+  const vads = Array.from({ length: dimanche ? 0 : poisson(r, .7) }, () => THEMES[Math.floor(r() * THEMES.length)]);
+  const causeries = Array.from({ length: !dimanche && r() < .14 ? 1 : 0 }, () => ({ theme: THEMES[Math.floor(r() * THEMES.length)], participants: 8 + poisson(r, 12) }));
   const rec = {
     cas, tdr5p, pos5p, cta5p: ruptureCta ? 0 : pos5p, ruptureCta,
-    vad: dimanche ? 0 : poisson(r, .7), causerie: !dimanche && r() < .14 ? 1 : 0,
-    fe: r() < .16 ? 1 : 0, pf: poisson(r, .5), sayana: poisson(r, .2),
+    grossesses, visitesG, visitesNN, vads, causeries, vad: vads.length, causerie: causeries.length,
     synchro: !(a.panne && d >= jour(-3)) && r() < a.fiab,
     heureSync: String(16 + Math.floor(r() * 5)).padStart(2, "0") + ":" + String(Math.floor(r() * 60)).padStart(2, "0")
   };
@@ -1068,9 +1090,11 @@ function derniereSync(a) { for (let i = 0; i < 60; i++) { const d = jour(-i); if
 const decaler = (d, n) => { const x = new Date(d + "T12:00"); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
 const ecartJours = (a, b) => Math.round((new Date(a + "T12:00") - new Date(b + "T12:00")) / 864e5);
 
+// Les six activités des ASBC suivies dans eSanteCom.
+const nVisite = (l, n) => l.filter(v => v.num === n).length;
 const INDICATEURS = [
-  { g: ["PCIME communautaire (2 à 59 mois)", "Community IMCI (2-59 months)"] },
-  { k: "enfants", fr: "Enfants pris en charge", en: "Children managed", f: j => j.cas.length },
+  { g: ["1. Prise en charge des enfants (PCIME)", "1. Child case management (IMCI)"] },
+  { k: "enfants", fr: "Enfants de 2 à 59 mois pris en charge", en: "Children aged 2-59 months managed", f: j => j.cas.length },
   { k: "pneumo", fr: "Pneumonies traitées (amoxicilline)", en: "Pneumonia treated (amoxicillin)", f: j => j.cas.filter(c => c.classif === "pneumo").length },
   { k: "diarrhee", fr: "Diarrhées traitées (SRO + zinc)", en: "Diarrhoea treated (ORS + zinc)", f: j => j.cas.filter(c => c.classif === "diarrhee").length },
   { k: "tdr", fr: "TDR réalisés", en: "RDTs performed", f: j => j.cas.filter(c => c.tdr).length },
@@ -1079,22 +1103,28 @@ const INDICATEURS = [
   { k: "ref", fr: "Enfants référés", en: "Children referred", f: j => j.cas.filter(c => c.ref).length },
   { k: "mam", fr: "MAM dépistées (PB jaune)", en: "MAM detected (yellow MUAC)", f: j => j.cas.filter(c => c.pb === "jaune").length },
   { k: "mas", fr: "MAS dépistées (PB rouge)", en: "SAM detected (red MUAC)", f: j => j.cas.filter(c => c.pb === "rouge").length },
-  { g: ["Paludisme, 5 ans et plus", "Malaria, 5 years and over"] },
-  { k: "tdr5p", fr: "TDR réalisés", en: "RDTs performed", f: j => j.tdr5p },
-  { k: "pos5p", fr: "TDR positifs", en: "Positive RDTs", f: j => j.pos5p },
-  { k: "cta5p", fr: "Traités par CTA", en: "Treated with ACT", f: j => j.cta5p },
-  { g: ["Santé de la mère et planification familiale", "Maternal health and family planning"] },
-  { k: "fe", fr: "Femmes enceintes identifiées", en: "Pregnant women identified", f: j => j.fe },
-  { k: "pf", fr: "Utilisatrices PF servies", en: "FP users served", f: j => j.pf },
-  { k: "sayana", fr: "Injections Sayana Press", en: "Sayana Press injections", f: j => j.sayana },
-  { g: ["Promotion de la santé", "Health promotion"] },
-  { k: "vad", fr: "Visites à domicile", en: "Home visits", f: j => j.vad },
-  { k: "causerie", fr: "Causeries éducatives", en: "Health talks", f: j => j.causerie },
-  { g: ["Gestion des intrants", "Supply management"] },
-  { k: "rupture", fr: "Jours de rupture de CTA", en: "ACT stock-out days", f: j => j.ruptureCta ? 1 : 0 }
+  { g: ["2. Enregistrement des grossesses", "2. Pregnancy registration"] },
+  { k: "fe", fr: "Grossesses enregistrées", en: "Pregnancies registered", f: j => j.grossesses.length },
+  { k: "fe1", fr: "dont au 1er trimestre", en: "of which in the 1st trimester", f: j => j.grossesses.filter(g => g.trim === 1).length },
+  { g: ["3. Visites de grossesse", "3. Pregnancy visits"] },
+  { k: "vg1", fr: "Femmes enceintes vues à la 1re visite", en: "Pregnant women seen at the 1st visit", f: j => nVisite(j.visitesG, 1) },
+  { k: "vg2", fr: "Femmes enceintes vues à la 2e visite", en: "Pregnant women seen at the 2nd visit", f: j => nVisite(j.visitesG, 2) },
+  { k: "vg3", fr: "Femmes enceintes vues à la 3e visite", en: "Pregnant women seen at the 3rd visit", f: j => nVisite(j.visitesG, 3) },
+  { k: "vgref", fr: "Femmes enceintes référées", en: "Pregnant women referred", f: j => j.visitesG.filter(v => v.ref).length },
+  { g: ["4. Suivi des nouveau-nés", "4. Newborn follow-up"] },
+  { k: "nn1", fr: "Nouveau-nés vus à la 1re visite", en: "Newborns seen at the 1st visit", f: j => nVisite(j.visitesNN, 1) },
+  { k: "nn2", fr: "Nouveau-nés vus à la 2e visite", en: "Newborns seen at the 2nd visit", f: j => nVisite(j.visitesNN, 2) },
+  { k: "nn3", fr: "Nouveau-nés vus à la 3e visite", en: "Newborns seen at the 3rd visit", f: j => nVisite(j.visitesNN, 3) },
+  { k: "nnsupp", fr: "Visites supplémentaires (faible poids)", en: "Additional visits (low birth weight)", f: j => nVisite(j.visitesNN, "supp") },
+  { k: "nnref", fr: "Nouveau-nés référés", en: "Newborns referred", f: j => j.visitesNN.filter(v => v.ref).length },
+  { g: ["5. Visites à domicile (VAD)", "5. Home visits"] },
+  { k: "vad", fr: "Visites à domicile réalisées", en: "Home visits made", f: j => j.vad },
+  { g: ["6. Causeries éducatives", "6. Health talks"] },
+  { k: "causerie", fr: "Causeries éducatives tenues", en: "Health talks held", f: j => j.causerie },
+  { k: "participants", fr: "Participants", en: "Participants", f: j => j.causeries.reduce((n, c) => n + c.participants, 0) }
 ];
 const IND_K = INDICATEURS.filter(i => i.k);
-const CLES_CONTROLE = ["enfants", "tdrpos", "cta", "ref"];
+const CLES_CONTROLE = ["enfants", "tdrpos", "cta", "ref", "fe", "vg1", "nn1", "vad"];
 function sommer(jours) { const s = {}; IND_K.forEach(i => s[i.k] = 0); jours.forEach(j => IND_K.forEach(i => s[i.k] += i.f(j))); return s; }
 
 const CLASSIF = { palu: ["Paludisme simple", "Uncomplicated malaria"], fievre: ["Fièvre, TDR négatif", "Fever, negative RDT"], pneumo: ["Pneumonie", "Pneumonia"], toux: ["Toux simple", "Simple cough"], diarrhee: ["Diarrhée", "Diarrhoea"] };
@@ -1110,10 +1140,23 @@ function alertesJour(d) {
     if (!visible(a, d)) return;
     const j = journee(a, d);
     j.cas.filter(c => c.danger && !c.ref).forEach(c => out.push({ niv: "critique", a, txt: L(`Signe de danger non référé (${c.heure}, ${c.age} mois)`, `Danger sign not referred (${c.heure}, ${c.age} months)`) }));
+    j.visitesG.filter(v => v.danger && !v.ref).forEach(v => out.push({ niv: "critique", a, txt: L(`Femme enceinte avec signe de danger non référée (${v.id})`, `Pregnant woman with danger sign not referred (${v.id})`) }));
+    j.visitesNN.filter(v => v.danger && !v.ref).forEach(v => out.push({ niv: "critique", a, txt: L(`Nouveau-né avec signe de danger non référé (${v.id})`, `Newborn with danger sign not referred (${v.id})`) }));
     const sansCta = j.cas.filter(c => c.trt === "rupture").length;
     if (sansCta) out.push({ niv: "alerte", a, txt: L(`${sansCta} TDR positif(s) sans CTA : rupture de stock`, `${sansCta} positive RDT(s) without ACT: stock-out`) });
   });
   return out;
+}
+function activiteTuile(n, v, titre, detail) { return `<div class="activite"><span class="num-act">${n}</span><div class="act-titre">${titre}</div><b>${v}</b><span class="act-detail">${detail}</span></div>`; }
+function resumeJour(j) {
+  const p = [];
+  if (j.cas.length) p.push(L(`${j.cas.length} enfant(s)`, `${j.cas.length} child(ren)`));
+  if (j.grossesses.length) p.push(L(`${j.grossesses.length} grossesse(s)`, `${j.grossesses.length} pregnanc(ies)`));
+  if (j.visitesG.length) p.push(L(`${j.visitesG.length} visite(s) de grossesse`, `${j.visitesG.length} pregnancy visit(s)`));
+  if (j.visitesNN.length) p.push(L(`${j.visitesNN.length} visite(s) NN`, `${j.visitesNN.length} newborn visit(s)`));
+  if (j.vad) p.push(`${j.vad} ${L("VAD", "HV")}`);
+  if (j.causerie) p.push(L(`${j.causerie} causerie`, `${j.causerie} talk`));
+  return p.join(" · ") || L("aucune activité", "no activity");
 }
 function tuile(v, lab, attention) { return `<div class="chiffre ${attention ? "attention" : ""}"><b>${v}</b><span>${lab}</span></div>`; }
 
@@ -1129,20 +1172,22 @@ function ecranActivite() {
   $("#ecran").innerHTML = `
     <div class="exemple">${L("Données simulées : l'application réelle lira les activités saisies par les ASBC dans eSanteCom.", "Simulated data: the real app will read the activities CHWs record in eSanteCom.")}</div>
     <div class="filtres">${jours.map(x => `<button data-jour="${x}" class="${x === d ? "sel" : ""}">${lib(x)}</button>`).join("")}</div>
-    <div class="chiffres">
-      ${tuile(`${vis.length}<small>/${ZONE.asbc.length}</small>`, L("ASBC synchronisés", "CHWs synced"), vis.length < ZONE.asbc.length)}
-      ${tuile(s.enfants, L("enfants de 2 à 59 mois vus", "children 2-59 months seen"))}
-      ${tuile(`${s.tdrpos}<small>/${s.tdr}</small>`, L("TDR positifs / réalisés", "positive / performed RDTs"))}
-      ${tuile(s.ref, L("enfants référés", "children referred"))}
-      ${tuile(s.vad, L("visites à domicile", "home visits"))}
-      ${tuile(s.causerie, L("causeries", "health talks"))}
+    <div class="carte sync"><b class="${vis.length < ZONE.asbc.length ? "manque" : ""}">${vis.length}/${ZONE.asbc.length}</b><span>${L("ASBC ont synchronisé leurs activités de ce jour dans eSanteCom", "CHWs have synced this day's activities to eSanteCom")}</span></div>
+    <h2>${L("Synthèse des activités", "Activity summary")}</h2>
+    <div class="activites">
+      ${activiteTuile(1, s.enfants, L("Prise en charge (PCIME)", "Case management (IMCI)"), L(`enfants · ${s.tdrpos}/${s.tdr} TDR+ · ${s.ref} référé(s)`, `children · ${s.tdrpos}/${s.tdr} RDT+ · ${s.ref} referred`))}
+      ${activiteTuile(2, s.fe, L("Enregistrement de grossesse", "Pregnancy registration"), L(`grossesse(s) · ${s.fe1} au 1er trimestre`, `pregnanc(ies) · ${s.fe1} in 1st trimester`))}
+      ${activiteTuile(3, s.vg1 + s.vg2 + s.vg3, L("Visites de grossesse", "Pregnancy visits"), L(`visite(s) · ${s.vgref} référée(s)`, `visit(s) · ${s.vgref} referred`))}
+      ${activiteTuile(4, s.nn1 + s.nn2 + s.nn3 + s.nnsupp, L("Suivi des nouveau-nés", "Newborn follow-up"), L(`visite(s) · ${s.nnsupp} faible poids`, `visit(s) · ${s.nnsupp} low birth weight`))}
+      ${activiteTuile(5, s.vad, L("Visites à domicile (VAD)", "Home visits"), L("visite(s)", "visit(s)"))}
+      ${activiteTuile(6, s.causerie, L("Causeries éducatives", "Health talks"), L(`causerie(s) · ${s.participants} participants`, `talk(s) · ${s.participants} participants`))}
     </div>
     ${alertes.length ? `<h2>${L("Alertes", "Alerts")} · ${alertes.length}</h2><div class="liste">${alertes.map(x => `<button class="ligne" data-esc="${x.a.id}"><span class="pastille p-${x.niv}">${x.niv === "critique" ? L("Urgent", "Urgent") : L("À suivre", "Follow up")}</span><div class="corps"><div class="titre" style="font-weight:500">${esc(x.txt)}</div><div class="meta">${esc(nomAsbcEsc(x.a))}</div></div></button>`).join("")}</div>` : ""}
     <h2>${L("ASBC du CSPS", "CHWs of the health centre")}</h2>
     <div class="liste">${ZONE.asbc.map(a => {
       const v = visible(a, d), j = journee(a, d), nAl = alertes.filter(x => x.a === a).length;
       const ds = derniereSync(a);
-      const meta = v ? L(`${j.cas.length} enfant(s) · ${j.vad} VAD${j.synchro ? " · synchro " + j.heureSync : ""}`, `${j.cas.length} child(ren) · ${j.vad} HV${j.synchro ? " · synced " + j.heureSync : ""}`)
+      const meta = v ? resumeJour(j) + (j.synchro ? " · " + L("synchro ", "synced ") + j.heureSync : "")
         : L(`Pas encore synchronisé${ds ? " · dernière synchro " + dateFr(ds) : ""}`, `Not synced yet${ds ? " · last sync " + dateFr(ds) : ""}`);
       return `<button class="ligne" data-esc="${a.id}"><div class="avatar">${a.num}</div><div class="corps"><div class="titre">${esc(nomAsbcEsc(a))}</div><div class="meta">${meta}</div></div>${nAl ? `<span class="pastille p-${alertes.some(x => x.a === a && x.niv === "critique") ? "critique" : "alerte"}">${nAl} ${L("alerte" + (nAl > 1 ? "s" : ""), "alert" + (nAl > 1 ? "s" : ""))}</span>` : v ? `<span class="pastille p-ok">OK</span>` : `<span class="pastille p-neutre">${L("Hors ligne", "Offline")}</span>`}</button>`;
     }).join("")}</div>`;
@@ -1152,11 +1197,21 @@ function ecranActivite() {
 
 function detailAsbc(a, d) {
   const v = visible(a, d), j = journee(a, d), ds = derniereSync(a);
-  const lignes = j.cas.map(c => `<tr><td>${c.heure}</td><td>${c.age} ${L("m", "mo")} · ${c.sexe === "F" ? L("F", "F") : L("M", "M")}</td><td>${esc(L(...CLASSIF[c.classif]))}${c.danger ? ` <span class="pastille p-critique">${L("danger", "danger")}</span>` : ""}${c.pb && c.pb !== "vert" ? ` <span class="pastille p-alerte">PB ${L(c.pb, c.pb === "rouge" ? "red" : "yellow")}</span>` : ""}</td><td>${esc(L(...TRAIT[c.trt]))}${c.ref ? ` · <b>${L("référé", "referred")}</b>` : ""}</td></tr>`).join("");
+  const ordinal = n => n === "supp" ? L("visite supplémentaire", "additional visit") : L(n === 1 ? "1re visite" : n + "e visite", n === 1 ? "1st visit" : n === 2 ? "2nd visit" : "3rd visit");
+  const section = (n, titre, nb, contenu) => `<div class="act-section"><div class="act-entete"><span class="num-act">${n}</span>${titre}<span class="pastille ${nb ? "p-ok" : "p-neutre"}">${nb}</span></div>${nb ? contenu : `<div class="indice">${L("Aucune ce jour-là.", "None that day.")}</div>`}</div>`;
+  const puces = l => `<ul class="act-liste">${l.join("")}</ul>`;
+  const ref = x => x ? ` · <b>${L("référé(e)", "referred")}</b>` : "";
+  const pcime = j.cas.map(c => `<tr><td>${c.heure}</td><td>${c.age} ${L("m", "mo")} · ${c.sexe}</td><td>${esc(L(...CLASSIF[c.classif]))}${c.danger ? ` <span class="pastille p-critique">${L("danger", "danger")}</span>` : ""}${c.pb && c.pb !== "vert" ? ` <span class="pastille p-alerte">PB ${L(c.pb, c.pb === "rouge" ? "red" : "yellow")}</span>` : ""}</td><td>${esc(L(...TRAIT[c.trt]))}${ref(c.ref)}</td></tr>`).join("");
+  const corps = v ? [
+    section(1, L("Prise en charge (PCIME)", "Case management (IMCI)"), j.cas.length, `<div class="tableau"><table><thead><tr><th>${L("Heure", "Time")}</th><th>${L("Enfant", "Child")}</th><th>${L("Classification", "Classification")}</th><th>${L("Conduite", "Action")}</th></tr></thead><tbody>${pcime}</tbody></table></div>`),
+    section(2, L("Enregistrement de grossesse", "Pregnancy registration"), j.grossesses.length, puces(j.grossesses.map(g => `<li>${g.id} · ${g.sa} ${L("SA", "weeks")} · ${L(g.trim === 1 ? "1er trimestre" : g.trim + "e trimestre", g.trim === 1 ? "1st trimester" : g.trim === 2 ? "2nd trimester" : "3rd trimester")}</li>`))),
+    section(3, L("Visites de grossesse", "Pregnancy visits"), j.visitesG.length, puces(j.visitesG.map(x => `<li>${x.id} · ${ordinal(x.num)} · ${x.sa} ${L("SA", "weeks")}${x.danger ? ` <span class="pastille p-critique">${L("signe de danger", "danger sign")}</span>` : ""}${ref(x.ref)}</li>`))),
+    section(4, L("Suivi des nouveau-nés", "Newborn follow-up"), j.visitesNN.length, puces(j.visitesNN.map(x => `<li>${x.id} · ${ordinal(x.num)}${x.faible ? ` <span class="pastille p-alerte">${L("faible poids", "low birth weight")}</span>` : ""}${x.danger ? ` <span class="pastille p-critique">${L("signe de danger", "danger sign")}</span>` : ""}${ref(x.ref)}</li>`))),
+    section(5, L("Visites à domicile (VAD)", "Home visits"), j.vad, puces(j.vads.map(th => `<li>${esc(L(...th))}</li>`))),
+    section(6, L("Causeries éducatives", "Health talks"), j.causerie, puces(j.causeries.map(c => `<li>${esc(L(...c.theme))} · ${c.participants} ${L("participants", "participants")}</li>`)))
+  ].join("") : `<div class="carte vide" style="margin-top:12px">${L("Les activités de ce jour sont sur le téléphone de l'ASBC et apparaîtront à la prochaine synchronisation.", "This day's activities are on the CHW's phone and will appear at the next sync.")}</div>`;
   feuille(`<h3>${esc(nomAsbcEsc(a))}</h3><div class="indice">${a.id} · ${dateFr(d)} · ${v ? (j.synchro ? L("synchronisé à ", "synced at ") + j.heureSync : L("synchronisé plus tard", "synced later")) : L("non synchronisé", "not synced")}${ds ? " · " + L("dernière synchro ", "last sync ") + dateFr(ds) : ""}</div>
-    ${v ? `<div class="chiffres" style="margin-top:12px">${tuile(j.cas.length, L("enfants vus", "children seen"))}${tuile(j.tdr5p, L("TDR 5 ans et +", "RDTs 5 years +"))}${tuile(j.vad, L("VAD", "home visits"))}</div>
-      ${j.cas.length ? `<div class="tableau" style="margin-top:12px"><table><thead><tr><th>${L("Heure", "Time")}</th><th>${L("Enfant", "Child")}</th><th>${L("Classification", "Classification")}</th><th>${L("Conduite", "Action")}</th></tr></thead><tbody>${lignes}</tbody></table></div>` : `<div class="vide">${L("Aucun enfant vu ce jour-là.", "No children seen that day.")}</div>`}`
-      : `<div class="carte vide" style="margin-top:12px">${L("Les activités de ce jour sont sur le téléphone de l'ASBC et apparaîtront à la prochaine synchronisation.", "This day's activities are on the CHW's phone and will appear at the next sync.")}</div>`}
+    ${corps}
     <div class="actions"><button class="btn btn-contour" data-fermer>${t("Fermer")}</button><button class="btn btn-plein" id="superviser">${L("Superviser", "Supervise")}</button></div>`, () => {
     $("#superviser").onclick = () => { fermer(); nouvelle({ ...ZONE.chaine, village: a.villageCode }); toast(L("Lieu prérempli : choisissez l'ASBC dans la liste.", "Location prefilled: choose the CHW from the list.")); };
   });
@@ -1173,7 +1228,7 @@ function rapportAsbc(a, m) {
   const esc_ = sommer(joursDuMois(m).filter(d => visible(a, d)).map(d => journee(a, d)));
   const declare = { ...esc_ };
   if (a.erreur) { declare.tdrpos = Math.round(esc_.tdrpos * 1.4 + 2); declare.cta = Math.round(esc_.cta * 1.3 + 1); }
-  if (a.oubli) { declare.enfants = Math.round(esc_.enfants * .7); declare.pneumo = Math.round(esc_.pneumo * .7); }
+  if (a.oubli) { declare.enfants = Math.round(esc_.enfants * .7); declare.pneumo = Math.round(esc_.pneumo * .7); declare.vad = Math.round(esc_.vad * .6); }
   const recentMois = m === listeMois()[0];
   const nonRecu = (a.panne && recentMois) || r() < .05;
   const jourRecu = 1 + Math.floor(Math.pow(r(), 1.8) * 9);
@@ -1196,7 +1251,7 @@ function graphique(cle) {
       <text x="${i * pas + pas / 2}" y="${H - 6}" text-anchor="middle" class="g-axe">${esc(nomMois(m, true))}</text></g>`;
   }).join("");
   return `<div class="carte">
-    <div class="filtres" style="margin-bottom:8px">${["enfants", "tdrpos", "ref", "vad"].map(k => { const i = IND_K.find(x => x.k === k); return `<button data-graph="${k}" class="${k === cle ? "sel" : ""}">${esc(L(i.fr, i.en))}</button>`; }).join("")}</div>
+    <div class="filtres" style="margin-bottom:8px">${["enfants", "fe", "vg1", "nn1", "vad", "causerie"].map(k => { const i = IND_K.find(x => x.k === k); return `<button data-graph="${k}" class="${k === cle ? "sel" : ""}">${esc(L(i.fr, i.en))}</button>`; }).join("")}</div>
     <div class="indice" style="margin-bottom:4px">${esc(L(ind.fr, ind.en))} · ${L("tous les ASBC, d'après eSanteCom", "all CHWs, from eSanteCom")}</div>
     <svg viewBox="0 0 ${W} ${H}" class="graph" role="img" aria-label="${esc(L(ind.fr, ind.en))}"><line x1="0" x2="${W}" y1="${bas}" y2="${bas}" class="g-base"/>${barres}</svg>
     <div class="indice" id="g-info" style="min-height:1.4em">${L("Touchez une barre pour voir la valeur.", "Tap a bar to see its value.")}</div></div>`;
@@ -1235,6 +1290,7 @@ function ecranRapport() {
       <tr class="g"><td colspan="3">${L("Indicateurs calculés", "Calculated indicators")}</td></tr>
       <tr><td>${L("Taux de positivité TDR (< 5 ans)", "RDT positivity rate (< 5 years)")}</td><td class="n">${pc(totD.tdrpos, totD.tdr)} %</td><td class="n">${pc(totE.tdrpos, totE.tdr)} %</td></tr>
       <tr><td>${L("TDR positifs traités par CTA", "Positive RDTs treated with ACT")}</td><td class="n">${pc(totD.cta, totD.tdrpos)} %</td><td class="n">${pc(totE.cta, totE.tdrpos)} %</td></tr>
+      <tr><td>${L("Grossesses enregistrées au 1er trimestre", "Pregnancies registered in the 1st trimester")}</td><td class="n">${pc(totD.fe1, totD.fe)} %</td><td class="n">${pc(totE.fe1, totE.fe)} %</td></tr>
     </tbody></table></div>
     <div class="indice">${L("Comparaison sur les ASBC qui ont envoyé leur rapport. Pastille orange : écart de plus de 10 %.", "Compared for CHWs who sent their report. Orange badge: difference over 10%.")}${sansRapport.length ? " " + L(`Les ${sansRapport.length} ASBC sans rapport ont pris en charge ${enfantsSans} enfant(s) d'après eSanteCom.`, `The ${sansRapport.length} CHW(s) without a report managed ${enfantsSans} child(ren) according to eSanteCom.`) : ""}</div>
     <h2>${L("Rapports des ASBC", "CHW reports")}</h2>

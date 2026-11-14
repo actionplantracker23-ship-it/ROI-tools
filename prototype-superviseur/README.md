@@ -14,14 +14,22 @@ mettre à jour le formulaire dans Excel puis relancer la génération suffit.
 - **Score global en direct** dans l'en-tête, puis résultat par section à la finalisation.
 - **Hors ligne** : les fiches restent sur le téléphone et sont envoyées au retour du réseau
   (l'envoi est simulé dans le prototype).
-- **Activité des ASBC (eSanteCom)** : activité du jour (ou des 6 jours précédents) de chaque ASBC
-  du CSPS : synchronisation, enfants vus, TDR, références, VAD, causeries ; alertes (signe de
-  danger non référé, TDR positif sans CTA, téléphone non synchronisé depuis 3 jours) ; détail des
-  cas par ASBC et bouton « Superviser » qui préremplit le lieu dans la fiche de supervision.
-- **Rapport mensuel (eSanteCom)** : complétude, promptitude, tendance sur 6 mois, indicateurs du
-  CSPS (PCIME-c, paludisme 5 ans et plus, santé de la mère et PF, promotion, ruptures) avec
-  comparaison « déclaré » (rapport de l'ASBC) / « eSanteCom » (somme des saisies quotidiennes),
-  validation ou renvoi de chaque rapport, puis transmission au district.
+- **Activité des ASBC (eSanteCom)** : synthèse du jour (ou des 6 jours précédents) des six
+  activités des ASBC du CSPS :
+  1. prise en charge des enfants (PCIME) ;
+  2. enregistrement des grossesses ;
+  3. visites de grossesse (1re, 2e, 3e visite) ;
+  4. suivi des nouveau-nés (1re, 2e, 3e visite et visites supplémentaires faible poids) ;
+  5. visites à domicile (VAD) ;
+  6. causeries éducatives (thème, participants).
+
+  Alertes : signe de danger non référé (enfant, femme enceinte, nouveau-né), TDR positif sans
+  CTA, téléphone non synchronisé depuis 3 jours. Détail par ASBC activité par activité, et bouton
+  « Superviser » qui préremplit le lieu dans la fiche de supervision.
+- **Rapport mensuel (eSanteCom)** : complétude, promptitude, tendance sur 6 mois et indicateurs
+  du CSPS rangés selon les six activités, avec comparaison « déclaré » (rapport de l'ASBC) /
+  « eSanteCom » (somme des saisies quotidiennes), validation ou renvoi de chaque rapport, puis
+  transmission au district.
   **Ces deux écrans utilisent des données simulées** (générateur déterministe, ASBC anonymisés
   « ASBC n · village ») : l'application réelle lira l'API eSanteCom.
 - **Plan d'action** : les lignes du « Plan de résolution des problèmes » de chaque fiche,
