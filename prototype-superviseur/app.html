@@ -64,6 +64,7 @@ button { cursor: pointer; }
 .puce-score b { display: block; font-family: var(--f-titre); font-size: 17px; font-variant-numeric: tabular-nums; }
 
 .ecran { flex: 1; overflow-y: auto; padding-block: 16px 28px; display: flex; flex-direction: column; gap: 12px; }
+.ecran > * { flex-shrink: 0; }
 h2 { font-family: var(--f-titre); font-size: 14.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--texte-2); margin: 12px 0 0; font-weight: 600; }
 .carte { background: var(--surface); border-radius: 14px; box-shadow: var(--ombre); padding: 14px 16px; }
 .exemple { font-size: 13.5px; color: var(--alerte); background: var(--alerte-fond); border-radius: 8px; padding: 6px 10px; }
@@ -97,7 +98,7 @@ button.ligne:hover { background: var(--surface-2); }
 .score { font-family: var(--f-titre); font-weight: 700; font-variant-numeric: tabular-nums; font-size: 16px; min-width: 50px; text-align: right; }
 .score.ok { color: var(--ok); } .score.alerte { color: var(--alerte); } .score.critique { color: var(--critique); } .score.neutre { color: var(--texte-2); }
 
-.nav { flex: none; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border-top: 1px solid var(--ligne); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.nav { flex: none; display: grid; grid-template-columns: repeat(5, 1fr); background: var(--surface); border-top: 1px solid var(--ligne); padding-bottom: env(safe-area-inset-bottom, 0px); }
 .nav button { background: transparent; border: 0; padding: 8px 2px 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 13px; color: var(--texte-2); position: relative; }
 .nav button svg { width: 22px; height: 22px; }
 .nav button.actif { color: var(--bleu); font-weight: 600; }
@@ -169,6 +170,20 @@ pre.json { background: var(--surface-2); border-radius: 10px; padding: 12px; fon
 .filtres button.sel { background: var(--bleu); color: var(--sur-bleu); border-color: var(--bleu); font-weight: 600; }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 15.5px; margin: 0; }
 .kv dt { color: var(--texte-2); } .kv dd { margin: 0; font-weight: 500; text-align: right; overflow-wrap: anywhere; }
+.chiffre small { font-size: .55em; color: var(--texte-2); font-weight: 500; }
+.tableau { overflow-x: auto; background: var(--surface); border-radius: 14px; box-shadow: var(--ombre); }
+.tableau table { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: lining-nums tabular-nums; }
+.tableau th { text-align: left; font-weight: 600; color: var(--texte-2); font-size: 13.5px; padding: 10px 12px; border-bottom: 1px solid var(--ligne); }
+.tableau td { padding: 8px 12px; border-top: 1px solid var(--ligne); vertical-align: top; }
+.tableau .n { text-align: right; white-space: nowrap; }
+.tableau tr.g td { background: var(--surface-2); font-weight: 600; color: var(--bleu); font-size: 14px; }
+.feuille .tableau { box-shadow: none; border: 1px solid var(--ligne); }
+.graph { width: 100%; height: auto; display: block; }
+.graph .g-axe { fill: var(--texte-2); font-size: 12px; font-family: var(--f-texte); }
+.graph .g-val { fill: var(--texte); font-size: 14px; font-weight: 600; font-family: var(--f-texte); }
+.graph .g-base { stroke: var(--ligne); stroke-width: 1; }
+.graph .barre-g { cursor: pointer; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
 .anomalie { font-size: 14.5px; padding: 8px 0; border-top: 1px solid var(--ligne); overflow-wrap: anywhere; }
 .anomalie code { font-size: 13.5px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
 </style>
@@ -180,8 +195,10 @@ pre.json { background: var(--surface-2); border-radius: 10px; padding: 12px; fon
   <nav class="nav" id="nav">
     <button data-onglet="accueil"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></span><span data-t="Accueil">Accueil</span></button>
     <button data-onglet="supervisions"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span data-t="Supervisions">Supervisions</span><span class="badge" id="badge-sync" hidden></span></button>
-    <button data-onglet="plan"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l5 5L20 6"/></svg></span><span data-t="Plan d'action">Plan d'action</span></button>
-    <button data-onglet="formulaire"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></span><span data-t="Formulaire">Formulaire</span></button>
+    <button data-onglet="activite"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></span><span data-t="Activité">Activité</span></button>
+    <button data-onglet="rapport"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 20V10M12 20V4M19 20v-7"/></svg></span><span data-t="Rapport">Rapport</span></button>
+    <button data-onglet="plan"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l5 5L20 6"/></svg></span><span data-t="Plan">Plan</span></button>
+
   </nav>
   <div id="couche"></div>
 </div>
@@ -443,7 +460,8 @@ const sauver = () => { ecrire("asbc_fiches", fiches); ecrire("asbc_enligne", enL
 let LANGUE = lire("asbc_langue", "fr");
 const TRAD_FORM = (FORM.i18n && FORM.i18n.en) || {};
 const UI_EN = {
-  "Accueil": "Home", "Supervisions": "Supervisions", "Plan d'action": "Action plan", "Formulaire": "Form",
+  "Accueil": "Home", "Supervisions": "Supervisions", "Plan d'action": "Action plan", "Formulaire": "Form", "Activité": "Activity", "Rapport": "Report", "Plan": "Plan",
+  "Formulaire Kobo : contrôles et traduction": "Kobo form: checks and translation",
   "Simuler la perte de réseau": "Simulate network loss", "En ligne": "Online", "Hors ligne": "Offline",
   "Réseau retrouvé : vous pouvez envoyer les fiches.": "Back online: you can send the forms.",
   "Hors ligne : les fiches restent sur le téléphone.": "Offline: forms stay on the phone.",
@@ -540,7 +558,7 @@ function rendre() {
   const n = fiches.filter(f => f.statut === "attente").length;
   $("#badge-sync").hidden = !n; $("#badge-sync").textContent = n;
   $("#pied").innerHTML = "";
-  ({ accueil: ecranAccueil, supervisions: ecranSupervisions, plan: ecranPlan, formulaire: ecranFormulaire, form: ecranForm })[onglet]();
+  ({ accueil: ecranAccueil, supervisions: ecranSupervisions, activite: ecranActivite, rapport: ecranRapport, plan: ecranPlan, formulaire: ecranFormulaire, form: ecranForm })[onglet]();
 }
 
 function barre(titre, sous, opts = {}) {
@@ -576,8 +594,10 @@ function ecranAccueil() {
     ${attente ? `<button class="btn btn-bleu btn-large" id="envoyer">${tn(attente, "Envoyer {n} fiche au serveur", "Envoyer {n} fiches au serveur")}</button>` : ""}
     ${brouillons.length ? `<h2>${t("À terminer")}</h2><div class="liste">${brouillons.map(ligneFiche).join("")}</div>` : ""}
     <h2>${t("Dernières supervisions")}</h2>
-    ${finies.length ? `<div class="liste">${finies.slice(0, 4).map(ligneFiche).join("")}</div>` : `<div class="carte vide">${t("Aucune fiche terminée.")}</div>`}`;
-  $("#nouvelle").onclick = nouvelle;
+    ${finies.length ? `<div class="liste">${finies.slice(0, 4).map(ligneFiche).join("")}</div>` : `<div class="carte vide">${t("Aucune fiche terminée.")}</div>`}
+    <div class="liste"><button class="ligne" id="lien-form"><div class="avatar">i</div><div class="corps"><div class="titre">${t("Formulaire Kobo : contrôles et traduction")}</div><div class="meta">${esc((FORM.settings || {}).id_string || "")}</div></div><span aria-hidden="true">›</span></button></div>`;
+  $("#nouvelle").onclick = () => nouvelle();
+  $("#lien-form").onclick = () => { onglet = "formulaire"; rendre(); };
   if ($("#envoyer")) $("#envoyer").onclick = envoyer;
   brancherFiches();
 }
@@ -632,7 +652,8 @@ function ecranFormulaire() {
   const ctr = FORM.controles || [];
   const asbc = (FORM.choices.asbc || []).length;
   const cv = couverture(), pctTrad = cv.total ? Math.round(100 * cv.faits / cv.total) : 0;
-  barre(t("Formulaire"), esc(s.id_string || "") + (s.version ? " · " + t("version") + " " + esc(s.version) : ""));
+  barre(t("Formulaire"), esc(s.id_string || "") + (s.version ? " · " + t("version") + " " + esc(s.version) : ""), { gauche: `<button class="icone-btn" id="retour-form" aria-label="${t("Accueil")}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg></button>` });
+  $("#retour-form").onclick = () => { onglet = "accueil"; rendre(); };
   $("#ecran").innerHTML = `
     <div class="carte"><dl class="kv">
       <dt>${t("Questions")}</dt><dd>${questions}</dd><dt>${t("Calculs de score")}</dt><dd>${types.calculate || 0}</dd>
@@ -696,8 +717,8 @@ function soumission(i) {
 }
 
 /* ---------- Saisie ---------- */
-function nouvelle() {
-  inst = { id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())), valeurs: { start: new Date().toISOString() }, repets: {} };
+function nouvelle(prerempli) {
+  inst = { id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())), valeurs: { start: new Date().toISOString(), ...(prerempli || {}) }, repets: {} };
   page = 0; erreurs = {}; onglet = "form"; recalculer(); rendre();
 }
 // Les données restent en français (codes et libellés du XLSForm) ; seule l'affichage est traduit.
@@ -970,6 +991,285 @@ function envoyer() {
   feuille(`<h3>${t("Envoi au serveur")}</h3><div class="indice">${tn(n, "Envoi de {n} fiche…", "Envoi de {n} fiches…")}</div><div style="height:8px;background:var(--surface-2);border-radius:4px;margin-top:14px;overflow:hidden"><i id="pb" style="display:block;height:100%;width:0;background:var(--jaune);transition:width .25s"></i></div>`, null, false);
   let p = 0; const tm = setInterval(() => { p += 20; const el = $("#pb"); if (el) el.style.width = p + "%";
     if (p >= 100) { clearInterval(tm); fiches.forEach(f => { if (f.statut === "attente") f.statut = "envoyee"; }); sauver(); fermer(); toast(tn(n, "{n} fiche envoyée.", "{n} fiches envoyées.")); rendre(); } }, 250);
+}
+
+/* =======================================================================
+   8. eSanteCom : activité quotidienne des ASBC et rapport mensuel
+   DONNÉES SIMULÉES. L'application réelle lira l'API eSanteCom ; ici un
+   générateur déterministe (même date = mêmes chiffres) produit des données
+   plausibles pour les ASBC des villages d'un CSPS de la liste du XLSForm.
+   Les ASBC sont anonymisés (« ASBC 1 · village ») : aucun nom réel n'est
+   associé à une activité inventée.
+   ======================================================================= */
+const L = (fr, en) => LANGUE === "en" ? en : fr;
+function hash(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function alea(graine) { let s = graine || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+const poisson = (r, l) => { const seuil = Math.exp(-l); let k = 0, p = 1; do { k++; p *= r(); } while (p > seuil && k < 40); return k - 1; };
+const nomPropre = s => String(s || "").toLowerCase().replace(/(^|[\s'’-])(\S)/g, (m, a, b) => a + b.toUpperCase());
+
+const ZONE = (() => {
+  const ch = FORM.choices, chercher = (liste, code) => (ch[liste] || []).find(c => c[0] === code);
+  const cs = (ch.csps || []).find(c => /BAGASSI/i.test(c[1])) || (ch.csps || [])[0];
+  if (!cs) return { asbc: [], chaine: {}, nom: "" };
+  const commune = chercher("commune", cs[2]), district = commune && chercher("district", commune[2]);
+  const province = district && chercher("province", district[2]), region = province && chercher("region", province[2]);
+  const asbc = [];
+  (ch.village || []).filter(v => v[2] === cs[0]).forEach(v => {
+    const n = Math.min(2, Math.max(1, (ch.asbc || []).filter(a => a[2] === v[0]).length));
+    for (let i = 1; i <= n; i++) asbc.push({ id: "ESC-" + (hash(v[0] + i) % 9000 + 1000), village: nomPropre(v[1]), villageCode: v[0] });
+  });
+  asbc.forEach((a, i) => {
+    const r = alea(hash(a.id));
+    a.num = i + 1; a.lambda = .9 + r() * 1.1; a.fiab = .88 + r() * .12;
+    a.panne = i === 3;          // téléphone en panne : plus de synchronisation depuis 4 jours
+    a.erreur = i === 5;         // rapport mensuel surestimé par rapport à eSanteCom
+    a.oubli = i === 8;          // rapport mensuel incomplet (jours oubliés)
+    a.rupture = i === 2 ? .45 : .02;
+  });
+  return { asbc, nom: nomPropre(cs[1]).replace(/^Csps\b/, "CSPS"), district: district ? nomPropre(district[1]) : "",
+    chaine: { region: region?.[0], province: province?.[0], district: district?.[0], commune: commune?.[0], csps: cs[0] } };
+})();
+const nomAsbcEsc = a => L("ASBC", "CHW") + " " + a.num + " · " + a.village;
+
+const CACHE_J = {};
+function journee(a, d) {
+  const cle = a.id + d; if (CACHE_J[cle]) return CACHE_J[cle];
+  const r = alea(hash(cle)), date = new Date(d + "T12:00"), dimanche = date.getDay() === 0;
+  const pluies = [6, 7, 8, 9].includes(date.getMonth()), pPos = pluies ? .62 : .38;
+  const ruptureCta = r() < a.rupture;
+  const cas = [], n = poisson(r, a.lambda * (dimanche ? .4 : 1) * (pluies ? 1.3 : 1));
+  for (let i = 0; i < n; i++) {
+    const age = 2 + Math.floor(r() * 58), sexe = r() < .5 ? "F" : "M";
+    const heure = String(7 + Math.floor(r() * 11)).padStart(2, "0") + ":" + String(Math.floor(r() * 60)).padStart(2, "0");
+    const x = r(); let classif, trt, tdr = null, ref = false;
+    if (x < .48) { tdr = r() < pPos ? "pos" : "neg"; classif = tdr === "pos" ? "palu" : "fievre"; trt = tdr === "pos" ? (ruptureCta ? "rupture" : "cta") : "para"; }
+    else if (x < .76) { const pn = r() < .6; classif = pn ? "pneumo" : "toux"; trt = pn ? "amox" : "conseils"; }
+    else { classif = "diarrhee"; trt = "sro"; }
+    const pb = age >= 6 ? (r() < .015 ? "rouge" : r() < .05 ? "jaune" : "vert") : null;
+    const danger = r() < .05;
+    if (danger) { ref = r() < .75; if (ref) trt = "pretransfert"; }
+    if (pb === "rouge" || pb === "jaune" && r() < .5) ref = true;
+    cas.push({ id: "C" + (hash(cle + i) % 90000 + 10000), heure, age, sexe, classif, trt, tdr, ref, danger, pb });
+  }
+  cas.sort((p, q) => p.heure.localeCompare(q.heure));
+  const tdr5p = dimanche ? 0 : poisson(r, .5); let pos5p = 0; for (let i = 0; i < tdr5p; i++) if (r() < pPos) pos5p++;
+  const rec = {
+    cas, tdr5p, pos5p, cta5p: ruptureCta ? 0 : pos5p, ruptureCta,
+    vad: dimanche ? 0 : poisson(r, .7), causerie: !dimanche && r() < .14 ? 1 : 0,
+    fe: r() < .16 ? 1 : 0, pf: poisson(r, .5), sayana: poisson(r, .2),
+    synchro: !(a.panne && d >= jour(-3)) && r() < a.fiab,
+    heureSync: String(16 + Math.floor(r() * 5)).padStart(2, "0") + ":" + String(Math.floor(r() * 60)).padStart(2, "0")
+  };
+  return CACHE_J[cle] = rec;
+}
+// Une journée est visible dans eSanteCom si le téléphone s'est synchronisé ce jour-là ou après.
+function visible(a, d) { for (let k = d; k <= jour(); k = decaler(k, 1)) if (journee(a, k).synchro) return true; return false; }
+function derniereSync(a) { for (let i = 0; i < 60; i++) { const d = jour(-i); if (journee(a, d).synchro) return d; } return null; }
+const decaler = (d, n) => { const x = new Date(d + "T12:00"); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+const ecartJours = (a, b) => Math.round((new Date(a + "T12:00") - new Date(b + "T12:00")) / 864e5);
+
+const INDICATEURS = [
+  { g: ["PCIME communautaire (2 à 59 mois)", "Community IMCI (2-59 months)"] },
+  { k: "enfants", fr: "Enfants pris en charge", en: "Children managed", f: j => j.cas.length },
+  { k: "pneumo", fr: "Pneumonies traitées (amoxicilline)", en: "Pneumonia treated (amoxicillin)", f: j => j.cas.filter(c => c.classif === "pneumo").length },
+  { k: "diarrhee", fr: "Diarrhées traitées (SRO + zinc)", en: "Diarrhoea treated (ORS + zinc)", f: j => j.cas.filter(c => c.classif === "diarrhee").length },
+  { k: "tdr", fr: "TDR réalisés", en: "RDTs performed", f: j => j.cas.filter(c => c.tdr).length },
+  { k: "tdrpos", fr: "TDR positifs", en: "Positive RDTs", f: j => j.cas.filter(c => c.tdr === "pos").length },
+  { k: "cta", fr: "Paludismes traités par CTA", en: "Malaria treated with ACT", f: j => j.cas.filter(c => c.trt === "cta").length },
+  { k: "ref", fr: "Enfants référés", en: "Children referred", f: j => j.cas.filter(c => c.ref).length },
+  { k: "mam", fr: "MAM dépistées (PB jaune)", en: "MAM detected (yellow MUAC)", f: j => j.cas.filter(c => c.pb === "jaune").length },
+  { k: "mas", fr: "MAS dépistées (PB rouge)", en: "SAM detected (red MUAC)", f: j => j.cas.filter(c => c.pb === "rouge").length },
+  { g: ["Paludisme, 5 ans et plus", "Malaria, 5 years and over"] },
+  { k: "tdr5p", fr: "TDR réalisés", en: "RDTs performed", f: j => j.tdr5p },
+  { k: "pos5p", fr: "TDR positifs", en: "Positive RDTs", f: j => j.pos5p },
+  { k: "cta5p", fr: "Traités par CTA", en: "Treated with ACT", f: j => j.cta5p },
+  { g: ["Santé de la mère et planification familiale", "Maternal health and family planning"] },
+  { k: "fe", fr: "Femmes enceintes identifiées", en: "Pregnant women identified", f: j => j.fe },
+  { k: "pf", fr: "Utilisatrices PF servies", en: "FP users served", f: j => j.pf },
+  { k: "sayana", fr: "Injections Sayana Press", en: "Sayana Press injections", f: j => j.sayana },
+  { g: ["Promotion de la santé", "Health promotion"] },
+  { k: "vad", fr: "Visites à domicile", en: "Home visits", f: j => j.vad },
+  { k: "causerie", fr: "Causeries éducatives", en: "Health talks", f: j => j.causerie },
+  { g: ["Gestion des intrants", "Supply management"] },
+  { k: "rupture", fr: "Jours de rupture de CTA", en: "ACT stock-out days", f: j => j.ruptureCta ? 1 : 0 }
+];
+const IND_K = INDICATEURS.filter(i => i.k);
+const CLES_CONTROLE = ["enfants", "tdrpos", "cta", "ref"];
+function sommer(jours) { const s = {}; IND_K.forEach(i => s[i.k] = 0); jours.forEach(j => IND_K.forEach(i => s[i.k] += i.f(j))); return s; }
+
+const CLASSIF = { palu: ["Paludisme simple", "Uncomplicated malaria"], fievre: ["Fièvre, TDR négatif", "Fever, negative RDT"], pneumo: ["Pneumonie", "Pneumonia"], toux: ["Toux simple", "Simple cough"], diarrhee: ["Diarrhée", "Diarrhoea"] };
+const TRAIT = { cta: ["CTA", "ACT"], rupture: ["Pas de CTA (rupture)", "No ACT (stock-out)"], para: ["Paracétamol", "Paracetamol"], amox: ["Amoxicilline", "Amoxicillin"], conseils: ["Conseils", "Advice"], sro: ["SRO + zinc", "ORS + zinc"], pretransfert: ["Traitement pré-transfert", "Pre-referral treatment"] };
+
+/* ---------- Écran : activité du jour ---------- */
+let jourChoisi = null, moisChoisi = null, indicGraph = "enfants";
+function alertesJour(d) {
+  const out = [];
+  ZONE.asbc.forEach(a => {
+    const ds = derniereSync(a);
+    if (d === jour() && (!ds || ecartJours(jour(), ds) >= 3)) out.push({ niv: "critique", a, txt: L(`Pas de synchronisation depuis ${ds ? ecartJours(jour(), ds) : "60"} jours`, `No sync for ${ds ? ecartJours(jour(), ds) : "60"} days`) });
+    if (!visible(a, d)) return;
+    const j = journee(a, d);
+    j.cas.filter(c => c.danger && !c.ref).forEach(c => out.push({ niv: "critique", a, txt: L(`Signe de danger non référé (${c.heure}, ${c.age} mois)`, `Danger sign not referred (${c.heure}, ${c.age} months)`) }));
+    const sansCta = j.cas.filter(c => c.trt === "rupture").length;
+    if (sansCta) out.push({ niv: "alerte", a, txt: L(`${sansCta} TDR positif(s) sans CTA : rupture de stock`, `${sansCta} positive RDT(s) without ACT: stock-out`) });
+  });
+  return out;
+}
+function tuile(v, lab, attention) { return `<div class="chiffre ${attention ? "attention" : ""}"><b>${v}</b><span>${lab}</span></div>`; }
+
+function ecranActivite() {
+  if (!jourChoisi) jourChoisi = jour();
+  const d = jourChoisi;
+  barre(L("Activité des ASBC", "CHW activity"), `eSanteCom · ${esc(ZONE.nom)}`);
+  const vis = ZONE.asbc.filter(a => visible(a, d));
+  const s = sommer(vis.map(a => journee(a, d)));
+  const alertes = alertesJour(d);
+  const jours = Array.from({ length: 7 }, (_, i) => jour(-i));
+  const lib = x => x === jour() ? L("Aujourd'hui", "Today") : x === jour(-1) ? L("Hier", "Yesterday") : new Date(x + "T12:00").toLocaleDateString(locale(), { weekday: "short", day: "numeric" });
+  $("#ecran").innerHTML = `
+    <div class="exemple">${L("Données simulées : l'application réelle lira les activités saisies par les ASBC dans eSanteCom.", "Simulated data: the real app will read the activities CHWs record in eSanteCom.")}</div>
+    <div class="filtres">${jours.map(x => `<button data-jour="${x}" class="${x === d ? "sel" : ""}">${lib(x)}</button>`).join("")}</div>
+    <div class="chiffres">
+      ${tuile(`${vis.length}<small>/${ZONE.asbc.length}</small>`, L("ASBC synchronisés", "CHWs synced"), vis.length < ZONE.asbc.length)}
+      ${tuile(s.enfants, L("enfants de 2 à 59 mois vus", "children 2-59 months seen"))}
+      ${tuile(`${s.tdrpos}<small>/${s.tdr}</small>`, L("TDR positifs / réalisés", "positive / performed RDTs"))}
+      ${tuile(s.ref, L("enfants référés", "children referred"))}
+      ${tuile(s.vad, L("visites à domicile", "home visits"))}
+      ${tuile(s.causerie, L("causeries", "health talks"))}
+    </div>
+    ${alertes.length ? `<h2>${L("Alertes", "Alerts")} · ${alertes.length}</h2><div class="liste">${alertes.map(x => `<button class="ligne" data-esc="${x.a.id}"><span class="pastille p-${x.niv}">${x.niv === "critique" ? L("Urgent", "Urgent") : L("À suivre", "Follow up")}</span><div class="corps"><div class="titre" style="font-weight:500">${esc(x.txt)}</div><div class="meta">${esc(nomAsbcEsc(x.a))}</div></div></button>`).join("")}</div>` : ""}
+    <h2>${L("ASBC du CSPS", "CHWs of the health centre")}</h2>
+    <div class="liste">${ZONE.asbc.map(a => {
+      const v = visible(a, d), j = journee(a, d), nAl = alertes.filter(x => x.a === a).length;
+      const ds = derniereSync(a);
+      const meta = v ? L(`${j.cas.length} enfant(s) · ${j.vad} VAD${j.synchro ? " · synchro " + j.heureSync : ""}`, `${j.cas.length} child(ren) · ${j.vad} HV${j.synchro ? " · synced " + j.heureSync : ""}`)
+        : L(`Pas encore synchronisé${ds ? " · dernière synchro " + dateFr(ds) : ""}`, `Not synced yet${ds ? " · last sync " + dateFr(ds) : ""}`);
+      return `<button class="ligne" data-esc="${a.id}"><div class="avatar">${a.num}</div><div class="corps"><div class="titre">${esc(nomAsbcEsc(a))}</div><div class="meta">${meta}</div></div>${nAl ? `<span class="pastille p-${alertes.some(x => x.a === a && x.niv === "critique") ? "critique" : "alerte"}">${nAl} ${L("alerte" + (nAl > 1 ? "s" : ""), "alert" + (nAl > 1 ? "s" : ""))}</span>` : v ? `<span class="pastille p-ok">OK</span>` : `<span class="pastille p-neutre">${L("Hors ligne", "Offline")}</span>`}</button>`;
+    }).join("")}</div>`;
+  document.querySelectorAll("[data-jour]").forEach(b => b.onclick = () => { jourChoisi = b.dataset.jour; rendre(); });
+  document.querySelectorAll("[data-esc]").forEach(b => b.onclick = () => detailAsbc(ZONE.asbc.find(a => a.id === b.dataset.esc), d));
+}
+
+function detailAsbc(a, d) {
+  const v = visible(a, d), j = journee(a, d), ds = derniereSync(a);
+  const lignes = j.cas.map(c => `<tr><td>${c.heure}</td><td>${c.age} ${L("m", "mo")} · ${c.sexe === "F" ? L("F", "F") : L("M", "M")}</td><td>${esc(L(...CLASSIF[c.classif]))}${c.danger ? ` <span class="pastille p-critique">${L("danger", "danger")}</span>` : ""}${c.pb && c.pb !== "vert" ? ` <span class="pastille p-alerte">PB ${L(c.pb, c.pb === "rouge" ? "red" : "yellow")}</span>` : ""}</td><td>${esc(L(...TRAIT[c.trt]))}${c.ref ? ` · <b>${L("référé", "referred")}</b>` : ""}</td></tr>`).join("");
+  feuille(`<h3>${esc(nomAsbcEsc(a))}</h3><div class="indice">${a.id} · ${dateFr(d)} · ${v ? (j.synchro ? L("synchronisé à ", "synced at ") + j.heureSync : L("synchronisé plus tard", "synced later")) : L("non synchronisé", "not synced")}${ds ? " · " + L("dernière synchro ", "last sync ") + dateFr(ds) : ""}</div>
+    ${v ? `<div class="chiffres" style="margin-top:12px">${tuile(j.cas.length, L("enfants vus", "children seen"))}${tuile(j.tdr5p, L("TDR 5 ans et +", "RDTs 5 years +"))}${tuile(j.vad, L("VAD", "home visits"))}</div>
+      ${j.cas.length ? `<div class="tableau" style="margin-top:12px"><table><thead><tr><th>${L("Heure", "Time")}</th><th>${L("Enfant", "Child")}</th><th>${L("Classification", "Classification")}</th><th>${L("Conduite", "Action")}</th></tr></thead><tbody>${lignes}</tbody></table></div>` : `<div class="vide">${L("Aucun enfant vu ce jour-là.", "No children seen that day.")}</div>`}`
+      : `<div class="carte vide" style="margin-top:12px">${L("Les activités de ce jour sont sur le téléphone de l'ASBC et apparaîtront à la prochaine synchronisation.", "This day's activities are on the CHW's phone and will appear at the next sync.")}</div>`}
+    <div class="actions"><button class="btn btn-contour" data-fermer>${t("Fermer")}</button><button class="btn btn-plein" id="superviser">${L("Superviser", "Supervise")}</button></div>`, () => {
+    $("#superviser").onclick = () => { fermer(); nouvelle({ ...ZONE.chaine, village: a.villageCode }); toast(L("Lieu prérempli : choisissez l'ASBC dans la liste.", "Location prefilled: choose the CHW from the list.")); };
+  });
+}
+
+/* ---------- Écran : rapport mensuel ---------- */
+const listeMois = () => Array.from({ length: 6 }, (_, i) => { const x = new Date(); x.setDate(1); x.setMonth(x.getMonth() - 1 - i); return x.toISOString().slice(0, 7); });
+const joursDuMois = m => { const out = []; let d = m + "-01"; while (d.slice(0, 7) === m) { if (d <= jour()) out.push(d); d = decaler(d, 1); } return out; };
+const nomMois = (m, court) => new Date(m + "-15T12:00").toLocaleDateString(locale(), court ? { month: "short" } : { month: "long", year: "numeric" });
+const CACHE_M = {};
+function rapportAsbc(a, m) {
+  const cle = a.id + m; if (CACHE_M[cle]) return CACHE_M[cle];
+  const r = alea(hash(cle + "rapport"));
+  const esc_ = sommer(joursDuMois(m).filter(d => visible(a, d)).map(d => journee(a, d)));
+  const declare = { ...esc_ };
+  if (a.erreur) { declare.tdrpos = Math.round(esc_.tdrpos * 1.4 + 2); declare.cta = Math.round(esc_.cta * 1.3 + 1); }
+  if (a.oubli) { declare.enfants = Math.round(esc_.enfants * .7); declare.pneumo = Math.round(esc_.pneumo * .7); }
+  const recentMois = m === listeMois()[0];
+  const nonRecu = (a.panne && recentMois) || r() < .05;
+  const jourRecu = 1 + Math.floor(Math.pow(r(), 1.8) * 9);
+  const ecarts = CLES_CONTROLE.filter(k => Math.abs(declare[k] - esc_[k]) > Math.max(2, .1 * esc_[k]));
+  return CACHE_M[cle] = { esc: esc_, declare, recu: nonRecu ? null : `${m}-${String(jourRecu).padStart(2, "0")}`, aTemps: !nonRecu && jourRecu <= 5, ecarts };
+}
+let etatRapports = lire("asbc_rapports", {});
+const etatMois = m => etatRapports[m] || (m === listeMois()[0] ? (etatRapports[m] = { asbc: {} }) : { asbc: {}, transmis: (() => { const x = new Date(m + "-01T12:00"); x.setMonth(x.getMonth() + 1); x.setDate(8); return x.toISOString().slice(0, 10); })(), historique: true });
+
+function graphique(cle) {
+  const mois = listeMois().slice().reverse();
+  const vals = mois.map(m => ZONE.asbc.reduce((s, a) => s + rapportAsbc(a, m).esc[cle], 0));
+  const max = Math.max(1, ...vals), W = 340, H = 150, bas = 124, haut = 18, pas = W / mois.length, larg = Math.min(34, pas - 14);
+  const ind = IND_K.find(i => i.k === cle);
+  const barres = mois.map((m, i) => {
+    const h = Math.max(2, (bas - haut) * vals[i] / max), x = i * pas + (pas - larg) / 2, y = bas - h, sel = m === moisChoisi;
+    return `<g class="barre-g" data-info="${esc(nomMois(m) + " : " + vals[i])}"><rect x="${i * pas}" y="0" width="${pas}" height="${H}" fill="transparent"/>
+      <path d="M${x},${bas} V${y + 4} Q${x},${y} ${x + 4},${y} H${x + larg - 4} Q${x + larg},${y} ${x + larg},${y + 4} V${bas} Z" fill="var(--bleu)" opacity="${sel ? 1 : .45}"/>
+      ${sel ? `<text x="${x + larg / 2}" y="${y - 6}" text-anchor="middle" class="g-val">${vals[i]}</text>` : ""}
+      <text x="${i * pas + pas / 2}" y="${H - 6}" text-anchor="middle" class="g-axe">${esc(nomMois(m, true))}</text></g>`;
+  }).join("");
+  return `<div class="carte">
+    <div class="filtres" style="margin-bottom:8px">${["enfants", "tdrpos", "ref", "vad"].map(k => { const i = IND_K.find(x => x.k === k); return `<button data-graph="${k}" class="${k === cle ? "sel" : ""}">${esc(L(i.fr, i.en))}</button>`; }).join("")}</div>
+    <div class="indice" style="margin-bottom:4px">${esc(L(ind.fr, ind.en))} · ${L("tous les ASBC, d'après eSanteCom", "all CHWs, from eSanteCom")}</div>
+    <svg viewBox="0 0 ${W} ${H}" class="graph" role="img" aria-label="${esc(L(ind.fr, ind.en))}"><line x1="0" x2="${W}" y1="${bas}" y2="${bas}" class="g-base"/>${barres}</svg>
+    <div class="indice" id="g-info" style="min-height:1.4em">${L("Touchez une barre pour voir la valeur.", "Tap a bar to see its value.")}</div></div>`;
+}
+
+function ecranRapport() {
+  const mois = listeMois(); if (!moisChoisi || !mois.includes(moisChoisi)) moisChoisi = mois[0];
+  const m = moisChoisi, etat = etatMois(m);
+  const raps = ZONE.asbc.map(a => ({ a, r: rapportAsbc(a, m) }));
+  const recus = raps.filter(x => x.r.recu), aTemps = raps.filter(x => x.r.aTemps);
+  const valid = x => etat.historique || etat.asbc[x.a.id] === "valide";
+  const nValid = recus.filter(valid).length;
+  const totD = sommer([]), totE = sommer([]);
+  // Comparaison sur les mêmes ASBC (rapport reçu) ; l'activité des autres est indiquée à part.
+  raps.forEach(x => IND_K.forEach(i => { if (x.r.recu) { totD[i.k] += x.r.declare[i.k]; totE[i.k] += x.r.esc[i.k]; } }));
+  const sansRapport = raps.filter(x => !x.r.recu), enfantsSans = sansRapport.reduce((n, x) => n + x.r.esc.enfants, 0);
+  const pc = (a, b) => b ? Math.round(100 * a / b) : 0;
+  const statut = etat.transmis ? `<span class="pastille p-ok">${L("Transmis au district le ", "Sent to the district on ")}${dateFr(etat.transmis)}</span>` : `<span class="pastille p-alerte">${L("En cours de validation", "Being validated")}</span>`;
+  barre(L("Rapport mensuel", "Monthly report"), `eSanteCom · ${esc(ZONE.nom)}`);
+  $("#ecran").innerHTML = `
+    <div class="exemple">${L("Données simulées. Déclaré : rapports mensuels envoyés par les ASBC. eSanteCom : somme des activités saisies chaque jour.", "Simulated data. Reported: monthly reports sent by CHWs. eSanteCom: sum of activities recorded each day.")}</div>
+    <div class="filtres">${mois.map(x => `<button data-mois="${x}" class="${x === m ? "sel" : ""}">${esc(nomMois(x))}</button>`).join("")}</div>
+    <div>${statut}</div>
+    <div class="chiffres">
+      ${tuile(pc(recus.length, raps.length) + "<small>%</small>", L(`complétude (${recus.length}/${raps.length})`, `completeness (${recus.length}/${raps.length})`), recus.length < raps.length)}
+      ${tuile(pc(aTemps.length, raps.length) + "<small>%</small>", L("promptitude (avant le 5)", "timeliness (by the 5th)"), aTemps.length < raps.length)}
+      ${tuile(`${nValid}<small>/${recus.length}</small>`, L("rapports validés", "reports validated"), nValid < recus.length)}
+    </div>
+    ${graphique(indicGraph)}
+    <h2>${L("Indicateurs du CSPS", "Health centre indicators")}</h2>
+    <div class="tableau"><table><thead><tr><th>${L("Indicateur", "Indicator")}</th><th class="n">${L("Déclaré", "Reported")}</th><th class="n">eSanteCom</th></tr></thead><tbody>
+      ${INDICATEURS.map(i => i.g ? `<tr class="g"><td colspan="3">${esc(L(...i.g))}</td></tr>` : (() => {
+        const e = Math.abs(totD[i.k] - totE[i.k]) > Math.max(3, .1 * totE[i.k]);
+        return `<tr><td>${esc(L(i.fr, i.en))}</td><td class="n">${e ? `<span class="pastille p-alerte">${totD[i.k]}</span>` : totD[i.k]}</td><td class="n">${totE[i.k]}</td></tr>`;
+      })()).join("")}
+      <tr class="g"><td colspan="3">${L("Indicateurs calculés", "Calculated indicators")}</td></tr>
+      <tr><td>${L("Taux de positivité TDR (< 5 ans)", "RDT positivity rate (< 5 years)")}</td><td class="n">${pc(totD.tdrpos, totD.tdr)} %</td><td class="n">${pc(totE.tdrpos, totE.tdr)} %</td></tr>
+      <tr><td>${L("TDR positifs traités par CTA", "Positive RDTs treated with ACT")}</td><td class="n">${pc(totD.cta, totD.tdrpos)} %</td><td class="n">${pc(totE.cta, totE.tdrpos)} %</td></tr>
+    </tbody></table></div>
+    <div class="indice">${L("Comparaison sur les ASBC qui ont envoyé leur rapport. Pastille orange : écart de plus de 10 %.", "Compared for CHWs who sent their report. Orange badge: difference over 10%.")}${sansRapport.length ? " " + L(`Les ${sansRapport.length} ASBC sans rapport ont pris en charge ${enfantsSans} enfant(s) d'après eSanteCom.`, `The ${sansRapport.length} CHW(s) without a report managed ${enfantsSans} child(ren) according to eSanteCom.`) : ""}</div>
+    <h2>${L("Rapports des ASBC", "CHW reports")}</h2>
+    <div class="liste">${raps.map(x => {
+      const st = !x.r.recu ? `<span class="pastille p-critique">${L("Non reçu", "Not received")}</span>` : valid(x) ? `<span class="pastille p-ok">${L("Validé", "Validated")}</span>` : etat.asbc[x.a.id] === "renvoye" ? `<span class="pastille p-alerte">${L("Renvoyé", "Returned")}</span>` : `<span class="pastille p-neutre">${L("À valider", "To validate")}</span>`;
+      const meta = x.r.recu ? L(`Reçu le ${dateFr(x.r.recu)} · ${x.r.aTemps ? "à temps" : "en retard"}`, `Received ${dateFr(x.r.recu)} · ${x.r.aTemps ? "on time" : "late"}`) : L("Pas de rapport pour ce mois", "No report for this month");
+      return `<button class="ligne" data-rap="${x.a.id}"><div class="avatar">${x.a.num}</div><div class="corps"><div class="titre">${esc(nomAsbcEsc(x.a))}</div><div class="meta">${meta}</div><div style="margin-top:3px;display:flex;gap:6px;flex-wrap:wrap">${st}${x.r.ecarts.length ? `<span class="pastille p-alerte">${L("Écart avec eSanteCom", "Differs from eSanteCom")}</span>` : ""}</div></div></button>`;
+    }).join("")}</div>
+    ${etat.transmis ? "" : `<button class="btn btn-plein btn-large" id="transmettre" ${nValid < recus.length ? "disabled" : ""}>${L("Transmettre le rapport au district", "Send the report to the district")}</button>
+      <div class="indice">${nValid < recus.length ? L(`Validez d'abord les ${recus.length - nValid} rapport(s) reçu(s).`, `First validate the ${recus.length - nValid} report(s) received.`) : recus.length < raps.length ? L(`${raps.length - recus.length} rapport(s) manquant(s) seront signalés au district.`, `${raps.length - recus.length} missing report(s) will be flagged to the district.`) : L("Tous les rapports sont validés.", "All reports are validated.")}</div>`}`;
+  document.querySelectorAll("[data-mois]").forEach(b => b.onclick = () => { moisChoisi = b.dataset.mois; rendre(); });
+  document.querySelectorAll("[data-graph]").forEach(b => b.onclick = () => { indicGraph = b.dataset.graph; const y = $("#ecran").scrollTop; rendre(); $("#ecran").scrollTop = y; });
+  document.querySelectorAll(".barre-g").forEach(g => { const f = () => { $("#g-info").textContent = g.dataset.info; }; g.onpointerenter = f; g.onclick = f; });
+  document.querySelectorAll("[data-rap]").forEach(b => b.onclick = () => detailRapport(ZONE.asbc.find(a => a.id === b.dataset.rap), m));
+  if ($("#transmettre")) $("#transmettre").onclick = () => feuille(`<h3>${L("Transmettre au district ?", "Send to the district?")}</h3><div class="indice">${L(`Rapport de ${ZONE.nom}, ${nomMois(m)} : ${recus.length} rapport(s) d'ASBC sur ${raps.length}.`, `${ZONE.nom} report, ${nomMois(m)}: ${recus.length} of ${raps.length} CHW reports.`)}</div>
+    <div class="actions"><button class="btn btn-contour" data-fermer>${t("Annuler")}</button><button class="btn btn-plein" id="ok-trans">${L("Transmettre", "Send")}</button></div>`, () => {
+    $("#ok-trans").onclick = () => { etat.transmis = jour(); etatRapports[m] = etat; ecrire("asbc_rapports", etatRapports); fermer(); toast(L("Rapport transmis au district (simulation).", "Report sent to the district (simulation).")); rendre(); };
+  });
+}
+
+function detailRapport(a, m) {
+  const r = rapportAsbc(a, m), etat = etatMois(m);
+  const lignes = INDICATEURS.map(i => i.g ? `<tr class="g"><td colspan="3">${esc(L(...i.g))}</td></tr>` : (() => {
+    const e = r.recu && Math.abs(r.declare[i.k] - r.esc[i.k]) > Math.max(2, .1 * r.esc[i.k]);
+    return `<tr><td>${esc(L(i.fr, i.en))}</td><td class="n">${!r.recu ? "–" : e ? `<span class="pastille p-alerte">${r.declare[i.k]}</span>` : r.declare[i.k]}</td><td class="n">${r.esc[i.k]}</td></tr>`;
+  })()).join("");
+  const peutAgir = r.recu && !etat.transmis;
+  feuille(`<h3>${esc(nomAsbcEsc(a))}</h3><div class="indice">${esc(nomMois(m))} · ${r.recu ? L("reçu le ", "received ") + dateFr(r.recu) : L("rapport non reçu", "report not received")}</div>
+    ${r.ecarts.length ? `<div class="exemple" style="margin-top:10px">${L("Les chiffres déclarés diffèrent de plus de 10 % des activités saisies dans eSanteCom. Vérifiez le registre avec l'ASBC avant de valider.", "Reported figures differ by more than 10% from the activities recorded in eSanteCom. Check the register with the CHW before validating.")}</div>` : ""}
+    <div class="tableau" style="margin-top:12px"><table><thead><tr><th>${L("Indicateur", "Indicator")}</th><th class="n">${L("Déclaré", "Reported")}</th><th class="n">eSanteCom</th></tr></thead><tbody>${lignes}</tbody></table></div>
+    <div class="actions">${peutAgir ? `<button class="btn btn-contour" id="renvoyer">${L("Renvoyer", "Return")}</button><button class="btn btn-bleu" id="valider">${L("Valider", "Validate")}</button>` : `<button class="btn btn-bleu" data-fermer>${t("Fermer")}</button>`}</div>`, () => {
+    const poser_ = v => { etat.asbc[a.id] = v; etatRapports[m] = etat; ecrire("asbc_rapports", etatRapports); fermer(); toast(v === "valide" ? L("Rapport validé.", "Report validated.") : L("Rapport renvoyé à l'ASBC pour correction.", "Report returned to the CHW for correction.")); rendre(); };
+    if ($("#valider")) $("#valider").onclick = () => poser_("valide");
+    if ($("#renvoyer")) $("#renvoyer").onclick = () => poser_("renvoye");
+  });
 }
 
 /* ---------- Feuilles et messages ---------- */
