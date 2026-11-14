@@ -16,6 +16,9 @@ mettre à jour le formulaire dans Excel puis relancer la génération suffit.
   (l'envoi est simulé dans le prototype).
 - **Plan d'action** : les lignes du « Plan de résolution des problèmes » de chaque fiche,
   avec échéance et suivi.
+- **Français / anglais** : bouton FR | EN dans l'en-tête. L'interface et les 625 libellés du
+  formulaire (questions, choix, messages, notes de score) sont traduits. Les réponses restent
+  enregistrées avec les codes du XLSForm : le changement de langue ne modifie pas les données.
 - **Contrôle du XLSForm** (onglet Formulaire) : codes de choix cités dans les expressions
   mais absents des listes.
 
@@ -25,7 +28,20 @@ mettre à jour le formulaire dans Excel puis relancer la génération suffit.
 pip install openpyxl
 python3 build.py chemin/vers/supervision_asbc_v2.xlsx            # -> index.html autonome
 python3 build.py formulaire.xlsx sortie.html --sans-corrections   # sans corriger les codes
+python3 build.py formulaire.xlsx --xlsform-bilingue bilingue.xlsx  # XLSForm Kobo FR + EN
 ```
+
+## Traduction
+
+- `traduction_en.json` : dictionnaire « libellé français → anglais » pour le formulaire
+  (questions, choix, messages de contrainte, notes et valeurs de performance calculées).
+  Une question ajoutée ou modifiée dans le XLSForm apparaît en français tant qu'elle n'est pas
+  ajoutée au fichier ; l'onglet Formulaire affiche le taux de couverture.
+- Interface : dictionnaire `UI_EN` dans `app.html` (fonctions `t()`, `tf()`, `tv()`).
+- `--xlsform-bilingue` écrit une copie du XLSForm avec les colonnes `label::English` et
+  `constraint_message::English` : la même traduction sert dans Kobo / ODK Collect.
+- Pour ajouter une langue (mooré, dioula, fulfuldé…) : un fichier `traduction_xx.json`, un
+  dictionnaire d'interface et un bouton de plus. Les noms de lieux et d'ASBC ne se traduisent pas.
 
 `index.html` est autonome (aucune connexion nécessaire après chargement des polices) :
 il s'ouvre dans un navigateur ou dans une WebView Android (`file:///android_asset/index.html`).
@@ -47,4 +63,5 @@ Il contient la liste nominative des ASBC : il est exclu du dépôt (`.gitignore`
 ## Fichiers
 
 - `app.html` : l'application (gabarit, le formulaire y est injecté par `build.py`).
-- `build.py` : conversion XLSForm → JSON, contrôle des codes, génération de `index.html`.
+- `build.py` : conversion XLSForm → JSON, contrôle des codes, génération de `index.html`, XLSForm bilingue.
+- `traduction_en.json` : traduction anglaise du formulaire.

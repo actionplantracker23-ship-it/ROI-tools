@@ -1,6 +1,11 @@
 """Convertit le XLSForm Kobo en JSON et l'intègre dans le prototype.
 
 Usage : python3 build.py chemin/vers/formulaire.xlsx [sortie.html] [--artifact] [--sans-corrections]
+        python3 build.py chemin/vers/formulaire.xlsx --xlsform-bilingue sortie.xlsx
+
+La traduction anglaise est lue dans traduction_en.json (clé = libellé français).
+--xlsform-bilingue écrit une copie du XLSForm avec les colonnes label::English
+et constraint_message::English, prête à importer dans Kobo.
 Le fichier produit (par défaut index.html) est autonome : il fonctionne hors ligne
 dans un navigateur ou dans une WebView Android.
 """
@@ -22,11 +27,19 @@ def lignes(ws):
             yield d
 
 
-def label(d):
+def texte(d, base):
+    """Valeur d'une colonne traduisible : base, base::Français, sinon la première langue."""
+    for k in (base, base + "::Français", base + "::French (fr)"):
+        if d.get(k):
+            return d[k]
     for k in d:
-        if k.startswith("label"):
+        if k.startswith(base + "::") and d[k]:
             return d[k]
     return ""
+
+
+def label(d):
+    return texte(d, "label")
 
 
 def convertir(xlsx):
@@ -40,7 +53,7 @@ def convertir(xlsx):
                          ("appearance", "appearance"), ("choice_filter", "choice_filter"),
                          ("calculation", "calculation"), ("constraint", "constraint"),
                          ("constraint_message", "constraint_message"), ("hint", "hint")]:
-            v = label(d) if cle == "label" else d.get(src, "")
+            v = texte(d, cle) if cle in ("label", "hint", "constraint_message") else d.get(src, "")
             if cle == "required":
                 v = v.lower() in ("true", "yes", "1")
             if v:
@@ -105,13 +118,58 @@ def controler(form, corriger=True):
     return notes
 
 
+def charger_traduction():
+    f = ICI / "traduction_en.json"
+    return json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+
+
+def xlsform_bilingue(xlsx, sortie, trad):
+    """Copie du XLSForm avec une colonne anglaise à côté de chaque colonne française."""
+    wb = openpyxl.load_workbook(xlsx)
+    manquants = set()
+    for feuille in ("survey", "choices"):
+        ws = wb[feuille]
+        entetes = [c.value for c in ws[1]]
+        for i, h in enumerate(list(entetes)):
+            h = str(h or "")
+            base = h.split("::")[0]
+            if base not in ("label", "hint", "constraint_message") or h.endswith("::English"):
+                continue
+            if h == base:  # colonne sans langue : la marquer comme française
+                ws.cell(row=1, column=i + 1, value=base + "::Français")
+            col = ws.max_column + 1
+            ws.cell(row=1, column=col, value=base + "::English")
+            for r in range(2, ws.max_row + 1):
+                v = ws.cell(row=r, column=i + 1).value
+                if v in (None, ""):
+                    continue
+                en = trad.get(str(v).strip())
+                if en is None and not (feuille == "choices" and ws.cell(row=r, column=1).value in
+                                       ("region", "province", "district", "commune", "csps", "village", "asbc")):
+                    manquants.add(str(v).strip())
+                ws.cell(row=r, column=col, value=en if en is not None else v)
+    if "settings" in wb.sheetnames:
+        ws = wb["settings"]
+        entetes = [c.value for c in ws[1]]
+        if "default_language" not in entetes:
+            ws.cell(row=1, column=ws.max_column + 1, value="default_language")
+            ws.cell(row=2, column=ws.max_column, value="Français")
+    wb.save(sortie)
+    print(f"{sortie} : XLSForm bilingue, {len(manquants)} texte(s) sans traduction (gardés en français)")
+
+
 def main():
+    if "--xlsform-bilingue" in sys.argv:
+        i = sys.argv.index("--xlsform-bilingue")
+        xlsform_bilingue(sys.argv[1], sys.argv[i + 1], charger_traduction())
+        return
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if not args:
         sys.exit(__doc__)
     sortie = Path(args[1]) if len(args) > 1 else ICI / "index.html"
     form = convertir(args[0])
     form["controles"] = controler(form, corriger="--sans-corrections" not in sys.argv)
+    form["i18n"] = {"en": charger_traduction()}
     donnees = json.dumps(form, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     gabarit = (ICI / "app.html").read_text(encoding="utf-8")
     html = gabarit.replace("/*FORMULAIRE*/null", donnees)

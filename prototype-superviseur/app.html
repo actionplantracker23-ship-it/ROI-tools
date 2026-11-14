@@ -56,6 +56,10 @@ button { cursor: pointer; }
 .reseau { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; border: 1px solid rgba(255,255,255,.4); border-radius: 20px; padding: 4px 10px; background: transparent; color: #fff; flex: none; }
 .reseau .point { width: 8px; height: 8px; border-radius: 50%; background: #6ee7a8; }
 .reseau.hors .point { background: #f0b05e; }
+.barre-droite { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
+.langue { display: inline-flex; border: 1px solid rgba(255,255,255,.45); border-radius: 20px; background: transparent; padding: 2px; color: #fff; font-size: 13px; font-weight: 600; letter-spacing: .04em; }
+.langue span { padding: 2px 9px; border-radius: 16px; opacity: .75; }
+.langue span.on { background: var(--jaune); color: #1b2620; opacity: 1; }
 .puce-score { flex: none; background: rgba(255,255,255,.14); border-radius: 12px; padding: 4px 10px; text-align: right; font-size: 12.5px; line-height: 1.2; }
 .puce-score b { display: block; font-family: var(--f-titre); font-size: 17px; font-variant-numeric: tabular-nums; }
 
@@ -174,10 +178,10 @@ pre.json { background: var(--surface-2); border-radius: 10px; padding: 12px; fon
   <main class="ecran gouttiere" id="ecran"></main>
   <div id="pied"></div>
   <nav class="nav" id="nav">
-    <button data-onglet="accueil"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></span>Accueil</button>
-    <button data-onglet="supervisions"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span>Supervisions<span class="badge" id="badge-sync" hidden></span></button>
-    <button data-onglet="plan"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l5 5L20 6"/></svg></span>Plan d'action</button>
-    <button data-onglet="formulaire"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></span>Formulaire</button>
+    <button data-onglet="accueil"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></span><span data-t="Accueil">Accueil</span></button>
+    <button data-onglet="supervisions"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><span data-t="Supervisions">Supervisions</span><span class="badge" id="badge-sync" hidden></span></button>
+    <button data-onglet="plan"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l5 5L20 6"/></svg></span><span data-t="Plan d'action">Plan d'action</span></button>
+    <button data-onglet="formulaire"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></span><span data-t="Formulaire">Formulaire</span></button>
   </nav>
   <div id="couche"></div>
 </div>
@@ -369,12 +373,12 @@ function recalculer() {
   for (let passe = 0; passe < 3; passe++) parcourir(racine.children, true, null, null);
 }
 function interpoler(txt, idx) {
-  return (txt || "").replace(/\$\{(\w+)\}/g, (_, nom) => {
+  return (tf(txt) || "").replace(/\$\{(\w+)\}/g, (_, nom) => {
     const n = CHAMPS[nom]; if (!n) return "";
     const v = DANS_REPET[nom] ? brut(nom, idx) : inst.valeurs[nom];
     if (estVide(v)) return "…";
-    if (n.liste && CHOIX_INDEX[n.liste]) return String(v).split(" ").map(c => CHOIX_INDEX[n.liste][c] || c).join(", ");
-    return String(v);
+    if (n.liste && CHOIX_INDEX[n.liste]) return String(v).split(" ").map(c => tf(CHOIX_INDEX[n.liste][c] || c)).join(", ");
+    return tv(String(v));
   });
 }
 
@@ -431,18 +435,108 @@ let suivi = lire("asbc_suivi", {});    // plan d'action : clé -> fait
 const sauver = () => { ecrire("asbc_fiches", fiches); ecrire("asbc_enligne", enLigne); ecrire("asbc_suivi", suivi); };
 
 /* =======================================================================
-   6. Interface
+   6. Langues : français (langue du XLSForm) et anglais
+   - Formulaire : FORM.i18n.en (traduction_en.json), clé = libellé français.
+   - Interface : UI_EN ci-dessous, clé = texte français.
+   Ajouter une langue = ajouter un dictionnaire et un bouton.
+   ======================================================================= */
+let LANGUE = lire("asbc_langue", "fr");
+const TRAD_FORM = (FORM.i18n && FORM.i18n.en) || {};
+const UI_EN = {
+  "Accueil": "Home", "Supervisions": "Supervisions", "Plan d'action": "Action plan", "Formulaire": "Form",
+  "Simuler la perte de réseau": "Simulate network loss", "En ligne": "Online", "Hors ligne": "Offline",
+  "Réseau retrouvé : vous pouvez envoyer les fiches.": "Back online: you can send the forms.",
+  "Hors ligne : les fiches restent sur le téléphone.": "Offline: forms stay on the phone.",
+  "Brouillon": "Draft", "À envoyer": "To send", "Envoyée": "Sent", "ASBC non choisi": "No CHW selected",
+  "Supervision des ASBC": "CHW supervision", "Niveau formation sanitaire (PSC, CSPS, CM)": "Health facility level (PSC, CSPS, CM)",
+  "Les fiches marquées « Exemple » sont fictives. Les vôtres s'ajoutent à la liste.": "Forms marked “Example” are fictitious. Yours are added to the list.",
+  "fiches remplies": "forms completed", "score global moyen": "average overall score", "à envoyer": "to send",
+  "Nouvelle supervision": "New supervision",
+  "Envoyer {n} fiche au serveur": "Send {n} form to the server", "Envoyer {n} fiches au serveur": "Send {n} forms to the server",
+  "À terminer": "To finish", "Dernières supervisions": "Latest supervisions", "Aucune fiche terminée.": "No completed forms.",
+  "{n} fiche en attente d'envoi": "{n} form waiting to be sent", "{n} fiches en attente d'envoi": "{n} forms waiting to be sent",
+  "Tout est envoyé": "Everything has been sent", "Toutes": "All", "Brouillons": "Drafts", "Envoyées": "Sent",
+  "Envoyer maintenant": "Send now", "Aucune fiche dans ce filtre.": "No forms in this filter.",
+  "Plan de résolution": "Resolution plan", "{n} recommandation à suivre": "{n} recommendation to follow up", "{n} recommandations à suivre": "{n} recommendations to follow up",
+  "Insuffisance : ": "Shortcoming: ", "échéance": "due", "Réalisée": "Done", "En retard": "Overdue", "Ouverte": "Open",
+  "Les lignes viennent du « Plan de résolution des problèmes » de chaque fiche. Cochez une recommandation quand elle est réalisée : le taux de réalisation de la prochaine supervision s'en servira.":
+    "These lines come from the “Problem resolution plan” of each form. Tick a recommendation once it is done: the next supervision's implementation rate will use it.",
+  "À suivre": "To follow up", "Aucune recommandation ouverte.": "No open recommendations.", "Réalisées": "Done", "Rien pour le moment.": "Nothing yet.",
+  "Questions": "Questions", "Calculs de score": "Score calculations", "Écrans": "Screens", "Listes de choix": "Choice lists",
+  "ASBC dans la liste": "CHWs in the list", "Villages": "Villages", "version": "version",
+  "L'application lit le XLSForm tel quel : groupes, conditions d'affichage (relevant), calculs, contraintes, listes en cascade (choice_filter) et répétitions.":
+    "The app reads the XLSForm as it is: groups, display conditions (relevant), calculations, constraints, cascading lists (choice_filter) and repeats.",
+  "Traduction": "Translation", "Libellés traduits en anglais": "Labels translated into English",
+  "Les textes non traduits restent en français. Pour Kobo, build.py peut produire un XLSForm bilingue (colonnes label::English).":
+    "Untranslated text stays in French. For Kobo, build.py can produce a bilingual XLSForm (label::English columns).",
+  "Contrôle du XLSForm": "XLSForm check", "{a} code(s) corrigé(s) dans le prototype, {b} à corriger dans Kobo.": "{a} code(s) fixed in the prototype, {b} to fix in Kobo.",
+  "Corrigé ici": "Fixed here", "À corriger": "To fix", "Dans": "In", "la valeur": "the value", "n'existe pas pour": "does not exist for",
+  "remplacée par": "replaced by", "Aucune anomalie détectée.": "No issues found.", "Expression": "Expression",
+  "Données de démonstration": "Demo data", "Effacer mes fiches et remettre les exemples": "Delete my forms and restore the examples",
+  "Effacer les fiches ?": "Delete the forms?", "Les fiches saisies sur ce téléphone seront supprimées.": "Forms entered on this phone will be deleted.",
+  "Annuler": "Cancel", "Effacer": "Delete", "Fiches effacées.": "Forms deleted.",
+  "Modifier": "Edit", "Données": "Data", "Fermer": "Close", "Score global ASBC": "Overall CHW score",
+  "Données de la fiche": "Form data", "Format proche d'une soumission Kobo (chemins de groupes). Les questions non pertinentes sont exclues.":
+    "Close to a Kobo submission (group paths). Non-relevant questions are left out.",
+  "Copier": "Copy", "Données copiées.": "Data copied.", "Sélectionnées : copiez avec le menu du téléphone.": "Selected: copy with the phone menu.",
+  "Prise en charge (PCIME)": "Case management (IMCI)", "Promotion de la santé": "Health promotion", "Gestion des intrants": "Supply management",
+  "Démarrage": "Start", "Écran {a} sur {b}": "Screen {a} of {b}", "Fermer la fiche": "Close the form", "score global": "overall score",
+  "Quitter la fiche ?": "Leave the form?", "Vous pouvez la garder en brouillon et la reprendre plus tard.": "You can keep it as a draft and finish it later.",
+  "Abandonner": "Discard", "Garder en brouillon": "Keep as draft", "Brouillon enregistré.": "Draft saved.",
+  "Sommaire": "Contents", "Précédent": "Back", "Suivant": "Next", "Finaliser": "Finalise",
+  "Retirer": "Remove", "+ Ajouter un enfant": "+ Add a child", "+ Ajouter une ligne": "+ Add a line", "n°": "no.",
+  "Choisir…": "Choose…", "Choisissez d'abord la question précédente": "Answer the previous question first",
+  "Reprendre la position": "Capture again", "Capturer la position": "Capture location", "Signez avec le doigt.": "Sign with your finger.",
+  "Position simulée : le GPS n'est pas accessible dans cet aperçu.": "Simulated location: GPS is not available in this preview.",
+  "Réponse obligatoire.": "Answer required.", "Réponse non valide.": "Invalid answer.",
+  "{n} question demande une correction.": "{n} question needs correcting.", "{n} questions demandent une correction.": "{n} questions need correcting.",
+  "Sommaire de la fiche": "Form contents", "{n} à remplir": "{n} to fill", "OK": "OK",
+  "Écran « {t} » incomplet.": "Screen “{t}” is incomplete.", "Fiche finalisée": "Form finalised",
+  "prête à être envoyée.": "ready to send.", "gardée sur le téléphone jusqu'au retour du réseau.": "kept on the phone until the network is back.",
+  "Plus tard": "Later", "Envoyer": "Send",
+  "Pas de réseau : {n} fiche sera envoyée au retour du réseau.": "No network: {n} form will be sent when the network is back.",
+  "Pas de réseau : {n} fiches seront envoyées au retour du réseau.": "No network: {n} forms will be sent when the network is back.",
+  "Envoi au serveur": "Sending to the server", "Envoi de {n} fiche…": "Sending {n} form…", "Envoi de {n} fiches…": "Sending {n} forms…",
+  "{n} fiche envoyée.": "{n} form sent.", "{n} fiches envoyées.": "{n} forms sent.",
+  "Exemple : ASBC de ": "Example: CHW of ", "Changer de langue": "Change language",
+  "Peu satisfaisant": "Unsatisfactory", "Satisfaisant": "Satisfactory", "Très satisfaisant": "Very satisfactory"
+};
+function t(fr, vars) {
+  let s = LANGUE === "en" && UI_EN[fr] != null ? UI_EN[fr] : fr;
+  if (vars) s = s.replace(/\{(\w+)\}/g, (_, k) => vars[k]);
+  return s;
+}
+const tn = (n, un, plusieurs, vars = {}) => t(n > 1 ? plusieurs : un, { n, ...vars });
+// Texte venant du XLSForm (libellé, choix, message de contrainte)
+function tf(fr) {
+  if (LANGUE !== "en" || !fr) return fr;
+  return TRAD_FORM[fr] ?? UI_EN[fr] ?? fr;
+}
+// Valeur calculée affichée (ex. « Satisfaisant », « Score : 1 / 2 (Référence) »)
+function tv(v) {
+  if (LANGUE !== "en" || typeof v !== "string") return v;
+  if (TRAD_FORM[v] != null) return TRAD_FORM[v];
+  return v.replace("Score : ", "Score: ").replace(" / 2 (Référence)", TRAD_FORM[" / 2 (Référence)"] || " / 2 (referral)")
+    .replace(" / 4 (Conduite à tenir)", TRAD_FORM[" / 4 (Conduite à tenir)"] || " / 4 (course of action)");
+}
+const locale = () => LANGUE === "en" ? "en-GB" : "fr-FR";
+const nomAsbc = s => String(s || "").replace(/^Exemple : ASBC de /, t("Exemple : ASBC de "));
+
+/* =======================================================================
+   7. Interface
    ======================================================================= */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const dateFr = d => d ? new Date(d + "T12:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : "";
+const dateFr = d => d ? new Date(d + "T12:00").toLocaleDateString(locale(), { day: "numeric", month: "short", year: "numeric" }) : "";
 const classe = p => p === "" || p == null || isNaN(p) ? "neutre" : p >= 80 ? "ok" : p >= 50 ? "alerte" : "critique";
 let onglet = "accueil", page = 0, erreurs = {}, filtre = "toutes";
 
 function rendre() {
+  document.documentElement.lang = LANGUE;
   const enForm = onglet === "form";
   $("#nav").hidden = enForm;
   document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("actif", b.dataset.onglet === onglet));
+  document.querySelectorAll("[data-t]").forEach(el => { el.textContent = t(el.dataset.t); });
   const n = fiches.filter(f => f.statut === "attente").length;
   $("#badge-sync").hidden = !n; $("#badge-sync").textContent = n;
   $("#pied").innerHTML = "";
@@ -450,37 +544,39 @@ function rendre() {
 }
 
 function barre(titre, sous, opts = {}) {
+  const langue = `<button class="langue" id="btn-langue" aria-label="${t("Changer de langue")}"><span class="${LANGUE === "fr" ? "on" : ""}">FR</span><span class="${LANGUE === "en" ? "on" : ""}">EN</span></button>`;
   $("#barre").innerHTML = `<div class="barre-ligne">${opts.gauche || ""}<div style="flex:1;min-width:0">${opts.sourcil ? `<div class="sourcil">${esc(opts.sourcil)}</div>` : ""}<h1>${esc(titre)}</h1>${sous ? `<div class="sous">${sous}</div>` : ""}</div>
-    ${opts.droite || `<button class="reseau ${enLigne ? "" : "hors"}" id="btn-reseau" title="Simuler la perte de réseau"><span class="point"></span>${enLigne ? "En ligne" : "Hors ligne"}</button>`}</div>${opts.progression || ""}`;
+    <div class="barre-droite">${langue}${opts.droite || `<button class="reseau ${enLigne ? "" : "hors"}" id="btn-reseau" title="${t("Simuler la perte de réseau")}"><span class="point"></span>${t(enLigne ? "En ligne" : "Hors ligne")}</button>`}</div></div>${opts.progression || ""}`;
   const r = $("#btn-reseau");
-  if (r) r.onclick = () => { enLigne = !enLigne; sauver(); toast(enLigne ? "Réseau retrouvé : vous pouvez envoyer les fiches." : "Hors ligne : les fiches restent sur le téléphone."); rendre(); };
+  if (r) r.onclick = () => { enLigne = !enLigne; sauver(); toast(t(enLigne ? "Réseau retrouvé : vous pouvez envoyer les fiches." : "Hors ligne : les fiches restent sur le téléphone.")); rendre(); };
+  $("#btn-langue").onclick = () => { LANGUE = LANGUE === "fr" ? "en" : "fr"; ecrire("asbc_langue", LANGUE); const y = $("#ecran").scrollTop; rendre(); $("#ecran").scrollTop = y; };
 }
 
 function ligneFiche(f) {
   const r = f.resume;
-  const st = f.statut === "brouillon" ? `<span class="pastille p-neutre">Brouillon</span>` : f.statut === "attente" ? `<span class="pastille p-alerte">À envoyer</span>` : `<span class="pastille p-ok">Envoyée</span>`;
+  const st = f.statut === "brouillon" ? `<span class="pastille p-neutre">${t("Brouillon")}</span>` : f.statut === "attente" ? `<span class="pastille p-alerte">${t("À envoyer")}</span>` : `<span class="pastille p-ok">${t("Envoyée")}</span>`;
   const ini = (r.asbc || "?").replace(/^Exemple : /, "").split(/\s+/).filter(m => m.length > 2).map(m => m[0]).join("").slice(0, 2).toUpperCase();
-  return `<button class="ligne" data-fiche="${f.id}"><div class="avatar">${esc(ini || "?")}</div><div class="corps"><div class="titre">${esc(r.asbc || "ASBC non choisi")}</div><div class="meta">${esc(dateFr(r.date))}${r.lieu ? " · " + esc(r.lieu) : ""}</div><div style="margin-top:3px">${st}</div></div><span class="score ${classe(r.pct)}">${r.pct === "" || r.pct == null ? "–" : r.pct + "%"}</span></button>`;
+  return `<button class="ligne" data-fiche="${f.id}"><div class="avatar">${esc(ini || "?")}</div><div class="corps"><div class="titre">${esc(nomAsbc(r.asbc) || t("ASBC non choisi"))}</div><div class="meta">${esc(dateFr(r.date))}${r.lieu ? " · " + esc(r.lieu) : ""}</div><div style="margin-top:3px">${st}</div></div><span class="score ${classe(r.pct)}">${r.pct === "" || r.pct == null ? "–" : r.pct + "%"}</span></button>`;
 }
 
 function ecranAccueil() {
-  barre("Supervision des ASBC", "Niveau formation sanitaire (PSC, CSPS, CM)");
+  barre(t("Supervision des ASBC"), t("Niveau formation sanitaire (PSC, CSPS, CM)"));
   const finies = fiches.filter(f => f.statut !== "brouillon" && f.resume.pct !== "");
   const moy = finies.length ? Math.round(finies.reduce((s, f) => s + +f.resume.pct, 0) / finies.length) : "–";
   const attente = fiches.filter(f => f.statut === "attente").length;
   const brouillons = fiches.filter(f => f.statut === "brouillon");
   $("#ecran").innerHTML = `
-    ${fiches.some(f => f.exemple) ? `<div class="exemple">Les fiches marquées « Exemple » sont fictives. Les vôtres s'ajoutent à la liste.</div>` : ""}
+    ${fiches.some(f => f.exemple) ? `<div class="exemple">${t("Les fiches marquées « Exemple » sont fictives. Les vôtres s'ajoutent à la liste.")}</div>` : ""}
     <div class="chiffres">
-      <div class="chiffre"><b>${fiches.filter(f => f.statut !== "brouillon").length}</b><span>fiches remplies</span></div>
-      <div class="chiffre"><b>${moy}${moy === "–" ? "" : '<small style="font-size:14px">%</small>'}</b><span>score global moyen</span></div>
-      <div class="chiffre ${attente ? "attention" : ""}"><b>${attente}</b><span>à envoyer</span></div>
+      <div class="chiffre"><b>${fiches.filter(f => f.statut !== "brouillon").length}</b><span>${t("fiches remplies")}</span></div>
+      <div class="chiffre"><b>${moy}${moy === "–" ? "" : '<small style="font-size:15px">%</small>'}</b><span>${t("score global moyen")}</span></div>
+      <div class="chiffre ${attente ? "attention" : ""}"><b>${attente}</b><span>${t("à envoyer")}</span></div>
     </div>
-    <button class="btn btn-plein btn-large" id="nouvelle"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>Nouvelle supervision</button>
-    ${attente ? `<button class="btn btn-bleu btn-large" id="envoyer">Envoyer ${attente} fiche${attente > 1 ? "s" : ""} au serveur</button>` : ""}
-    ${brouillons.length ? `<h2>À terminer</h2><div class="liste">${brouillons.map(ligneFiche).join("")}</div>` : ""}
-    <h2>Dernières supervisions</h2>
-    ${finies.length ? `<div class="liste">${finies.slice(0, 4).map(ligneFiche).join("")}</div>` : `<div class="carte vide">Aucune fiche terminée.</div>`}`;
+    <button class="btn btn-plein btn-large" id="nouvelle"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>${t("Nouvelle supervision")}</button>
+    ${attente ? `<button class="btn btn-bleu btn-large" id="envoyer">${tn(attente, "Envoyer {n} fiche au serveur", "Envoyer {n} fiches au serveur")}</button>` : ""}
+    ${brouillons.length ? `<h2>${t("À terminer")}</h2><div class="liste">${brouillons.map(ligneFiche).join("")}</div>` : ""}
+    <h2>${t("Dernières supervisions")}</h2>
+    ${finies.length ? `<div class="liste">${finies.slice(0, 4).map(ligneFiche).join("")}</div>` : `<div class="carte vide">${t("Aucune fiche terminée.")}</div>`}`;
   $("#nouvelle").onclick = nouvelle;
   if ($("#envoyer")) $("#envoyer").onclick = envoyer;
   brancherFiches();
@@ -488,11 +584,11 @@ function ecranAccueil() {
 
 function ecranSupervisions() {
   const attente = fiches.filter(f => f.statut === "attente").length;
-  barre("Supervisions", attente ? `${attente} fiche${attente > 1 ? "s" : ""} en attente d'envoi` : "Tout est envoyé");
+  barre(t("Supervisions"), attente ? tn(attente, "{n} fiche en attente d'envoi", "{n} fiches en attente d'envoi") : t("Tout est envoyé"));
   const l = fiches.filter(f => filtre === "toutes" || f.statut === filtre);
-  $("#ecran").innerHTML = `<div class="filtres">${[["toutes", "Toutes"], ["brouillon", "Brouillons"], ["attente", "À envoyer"], ["envoyee", "Envoyées"]].map(([k, t]) => `<button data-f="${k}" class="${filtre === k ? "sel" : ""}">${t}</button>`).join("")}</div>
-    ${attente ? `<button class="btn btn-bleu btn-large" id="envoyer">Envoyer maintenant</button>` : ""}
-    ${l.length ? `<div class="liste">${l.map(ligneFiche).join("")}</div>` : `<div class="carte vide">Aucune fiche dans ce filtre.</div>`}`;
+  $("#ecran").innerHTML = `<div class="filtres">${[["toutes", "Toutes"], ["brouillon", "Brouillons"], ["attente", "À envoyer"], ["envoyee", "Envoyées"]].map(([k, x]) => `<button data-f="${k}" class="${filtre === k ? "sel" : ""}">${t(x)}</button>`).join("")}</div>
+    ${attente ? `<button class="btn btn-bleu btn-large" id="envoyer">${t("Envoyer maintenant")}</button>` : ""}
+    ${l.length ? `<div class="liste">${l.map(ligneFiche).join("")}</div>` : `<div class="carte vide">${t("Aucune fiche dans ce filtre.")}</div>`}`;
   document.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { filtre = b.dataset.f; rendre(); });
   if ($("#envoyer")) $("#envoyer").onclick = envoyer;
   brancherFiches();
@@ -504,19 +600,29 @@ function ecranPlan() {
   fiches.filter(f => f.statut !== "brouillon").forEach(f => (f.plan || []).forEach((p, i) => { if (p.Insuffisances || p.Recommandations_001) lignes.push({ f, p, k: f.id + ":" + i }); }));
   const ouvertes = lignes.filter(x => !suivi[x.k]).sort((a, b) => String(a.p._ch_ance || "9").localeCompare(String(b.p._ch_ance || "9")));
   const faites = lignes.filter(x => suivi[x.k]);
-  barre("Plan de résolution", ouvertes.length + " recommandation" + (ouvertes.length > 1 ? "s" : "") + " à suivre");
+  barre(t("Plan de résolution"), tn(ouvertes.length, "{n} recommandation à suivre", "{n} recommandations à suivre"));
   const l = x => {
     const retard = !suivi[x.k] && x.p._ch_ance && x.p._ch_ance < jour();
     return `<label class="ligne" style="cursor:pointer;align-items:flex-start"><input type="checkbox" data-k="${x.k}" ${suivi[x.k] ? "checked" : ""} style="width:20px;height:20px;accent-color:var(--ok);flex:none;margin-top:2px">
       <div class="corps"><div class="titre" style="font-weight:500;${suivi[x.k] ? "text-decoration:line-through;color:var(--texte-2)" : ""}">${esc(x.p.Recommandations_001 || x.p.Insuffisances)}</div>
-      ${x.p.Recommandations_001 && x.p.Insuffisances ? `<div class="meta">Insuffisance : ${esc(x.p.Insuffisances)}</div>` : ""}
-      <div class="meta">${esc(x.f.resume.asbc)}${x.p.Responsable ? " · " + esc(x.p.Responsable) : ""}${x.p._ch_ance ? " · échéance " + dateFr(x.p._ch_ance) : ""}</div></div>
-      ${suivi[x.k] ? `<span class="pastille p-ok">Réalisée</span>` : retard ? `<span class="pastille p-critique">En retard</span>` : `<span class="pastille p-neutre">Ouverte</span>`}</label>`;
+      ${x.p.Recommandations_001 && x.p.Insuffisances ? `<div class="meta">${t("Insuffisance : ")}${esc(x.p.Insuffisances)}</div>` : ""}
+      <div class="meta">${esc(nomAsbc(x.f.resume.asbc))}${x.p.Responsable ? " · " + esc(x.p.Responsable) : ""}${x.p._ch_ance ? " · " + t("échéance") + " " + dateFr(x.p._ch_ance) : ""}</div></div>
+      ${suivi[x.k] ? `<span class="pastille p-ok">${t("Réalisée")}</span>` : retard ? `<span class="pastille p-critique">${t("En retard")}</span>` : `<span class="pastille p-neutre">${t("Ouverte")}</span>`}</label>`;
   };
-  $("#ecran").innerHTML = `<div class="indice">Les lignes viennent du « Plan de résolution des problèmes » de chaque fiche. Cochez une recommandation quand elle est réalisée : le taux de réalisation de la prochaine supervision s'en servira.</div>
-    <h2>À suivre</h2>${ouvertes.length ? `<div class="liste">${ouvertes.map(l).join("")}</div>` : `<div class="carte vide">Aucune recommandation ouverte.</div>`}
-    <h2>Réalisées</h2>${faites.length ? `<div class="liste">${faites.map(l).join("")}</div>` : `<div class="carte vide">Rien pour le moment.</div>`}`;
+  $("#ecran").innerHTML = `<div class="indice">${t("Les lignes viennent du « Plan de résolution des problèmes » de chaque fiche. Cochez une recommandation quand elle est réalisée : le taux de réalisation de la prochaine supervision s'en servira.")}</div>
+    <h2>${t("À suivre")}</h2>${ouvertes.length ? `<div class="liste">${ouvertes.map(l).join("")}</div>` : `<div class="carte vide">${t("Aucune recommandation ouverte.")}</div>`}
+    <h2>${t("Réalisées")}</h2>${faites.length ? `<div class="liste">${faites.map(l).join("")}</div>` : `<div class="carte vide">${t("Rien pour le moment.")}</div>`}`;
   document.querySelectorAll("[data-k]").forEach(c => c.onchange = () => { suivi[c.dataset.k] = c.checked; sauver(); rendre(); });
+}
+
+// Part des libellés du formulaire (hors listes géographiques) qui ont une traduction anglaise.
+function couverture() {
+  const geo = new Set(["region", "province", "district", "commune", "csps", "village", "asbc"]);
+  const textes = new Set();
+  FORM.survey.forEach(r => { if (r.label && r.type !== "calculate") textes.add(r.label); if (r.constraint_message) textes.add(r.constraint_message); });
+  Object.entries(FORM.choices).forEach(([k, l]) => { if (!geo.has(k)) l.forEach(c => textes.add(c[1])); });
+  const tous = [...textes];
+  return { total: tous.length, faits: tous.filter(x => TRAD_FORM[x] != null).length };
 }
 
 function ecranFormulaire() {
@@ -525,45 +631,50 @@ function ecranFormulaire() {
   const questions = FORM.survey.filter(r => !["begin_group", "end_group", "begin_repeat", "end_repeat", "calculate", "note", "start", "end"].includes(r.type.split(" ")[0])).length;
   const ctr = FORM.controles || [];
   const asbc = (FORM.choices.asbc || []).length;
-  barre("Formulaire", esc(s.id_string || "") + (s.version ? " · version " + esc(s.version) : ""));
+  const cv = couverture(), pctTrad = cv.total ? Math.round(100 * cv.faits / cv.total) : 0;
+  barre(t("Formulaire"), esc(s.id_string || "") + (s.version ? " · " + t("version") + " " + esc(s.version) : ""));
   $("#ecran").innerHTML = `
     <div class="carte"><dl class="kv">
-      <dt>Questions</dt><dd>${questions}</dd><dt>Calculs de score</dt><dd>${types.calculate || 0}</dd>
-      <dt>Écrans</dt><dd>${PAGES.length}</dd><dt>Listes de choix</dt><dd>${Object.keys(FORM.choices).length}</dd>
-      <dt>ASBC dans la liste</dt><dd>${asbc.toLocaleString("fr-FR")}</dd><dt>Villages</dt><dd>${(FORM.choices.village || []).length.toLocaleString("fr-FR")}</dd>
+      <dt>${t("Questions")}</dt><dd>${questions}</dd><dt>${t("Calculs de score")}</dt><dd>${types.calculate || 0}</dd>
+      <dt>${t("Écrans")}</dt><dd>${PAGES.length}</dd><dt>${t("Listes de choix")}</dt><dd>${Object.keys(FORM.choices).length}</dd>
+      <dt>${t("ASBC dans la liste")}</dt><dd>${asbc.toLocaleString(locale())}</dd><dt>${t("Villages")}</dt><dd>${(FORM.choices.village || []).length.toLocaleString(locale())}</dd>
     </dl></div>
-    <div class="indice">L'application lit le XLSForm tel quel : groupes, conditions d'affichage (relevant), calculs, contraintes, listes en cascade (choice_filter) et répétitions.</div>
-    <h2>Contrôle du XLSForm</h2>
-    <div class="carte">${ctr.length ? `<div class="indice" style="margin-bottom:6px">${ctr.filter(c => c.corrige).length} code(s) corrigé(s) dans le prototype, ${ctr.filter(c => !c.corrige).length} à corriger dans Kobo.</div>` +
-      ctr.map(c => `<div class="anomalie"><span class="pastille ${c.corrige ? "p-alerte" : "p-critique"}">${c.corrige ? "Corrigé ici" : "À corriger"}</span> Dans <code>${esc(c.dans)}</code>, ${c.message ? `<code>${esc(c.champ)}</code> : ${esc(c.message)}` : `la valeur <code>${esc(c.avant)}</code> n'existe pas pour <code>${esc(c.champ)}</code>${c.apres ? ` (remplacée par <code>${esc(c.apres)}</code>)` : ""}.`}</div>`).join("") : "Aucune anomalie détectée."}
-      ${ERREURS_EXPR.length ? ERREURS_EXPR.map(e => `<div class="anomalie"><span class="pastille p-critique">Expression</span> ${esc(e)}</div>`).join("") : ""}</div>
-    <h2>Données de démonstration</h2>
-    <button class="btn btn-contour btn-large" id="reinit">Effacer mes fiches et remettre les exemples</button>`;
-  $("#reinit").onclick = () => feuille(`<h3>Effacer les fiches ?</h3><div class="indice">Les fiches saisies sur ce téléphone seront supprimées.</div><div class="actions"><button class="btn btn-contour" data-fermer>Annuler</button><button class="btn btn-plein" id="ok-reinit">Effacer</button></div>`,
-    () => { $("#ok-reinit").onclick = () => { fiches = EXEMPLES.map(x => ({ ...x })); suivi = {}; sauver(); fermer(); toast("Fiches effacées."); rendre(); }; });
+    <div class="indice">${t("L'application lit le XLSForm tel quel : groupes, conditions d'affichage (relevant), calculs, contraintes, listes en cascade (choice_filter) et répétitions.")}</div>
+    <h2>${t("Traduction")}</h2>
+    <div class="carte"><div class="sec-score"><span>${t("Libellés traduits en anglais")}</span><b class="score ${classe(pctTrad)}" style="font-size:15px">${cv.faits} / ${cv.total}</b><div class="jauge"><i style="width:${pctTrad}%;background:var(--ok)"></i></div></div>
+      <div class="indice" style="margin-top:10px">${t("Les textes non traduits restent en français. Pour Kobo, build.py peut produire un XLSForm bilingue (colonnes label::English).")}</div>
+      <pre class="json" style="margin:10px 0 0;max-height:none">python3 build.py formulaire.xlsx --xlsform-bilingue bilingue.xlsx</pre></div>
+    <h2>${t("Contrôle du XLSForm")}</h2>
+    <div class="carte">${ctr.length ? `<div class="indice" style="margin-bottom:6px">${t("{a} code(s) corrigé(s) dans le prototype, {b} à corriger dans Kobo.", { a: ctr.filter(c => c.corrige).length, b: ctr.filter(c => !c.corrige).length })}</div>` +
+      ctr.map(c => `<div class="anomalie"><span class="pastille ${c.corrige ? "p-alerte" : "p-critique"}">${t(c.corrige ? "Corrigé ici" : "À corriger")}</span> ${t("Dans")} <code>${esc(c.dans)}</code>, ${c.message ? `<code>${esc(c.champ)}</code> : ${esc(LANGUE === "en" ? c.message.replace("sum() porte sur des codes non numériques", "sum() is applied to non-numeric codes").replace(" : le résultat est NaN.", ": the result is NaN.") : c.message)}` : `${t("la valeur")} <code>${esc(c.avant)}</code> ${t("n'existe pas pour")} <code>${esc(c.champ)}</code>${c.apres ? ` (${t("remplacée par")} <code>${esc(c.apres)}</code>)` : ""}.`}</div>`).join("") : t("Aucune anomalie détectée.")}
+      ${ERREURS_EXPR.length ? ERREURS_EXPR.map(e => `<div class="anomalie"><span class="pastille p-critique">${t("Expression")}</span> ${esc(e)}</div>`).join("") : ""}</div>
+    <h2>${t("Données de démonstration")}</h2>
+    <button class="btn btn-contour btn-large" id="reinit">${t("Effacer mes fiches et remettre les exemples")}</button>`;
+  $("#reinit").onclick = () => feuille(`<h3>${t("Effacer les fiches ?")}</h3><div class="indice">${t("Les fiches saisies sur ce téléphone seront supprimées.")}</div><div class="actions"><button class="btn btn-contour" data-fermer>${t("Annuler")}</button><button class="btn btn-plein" id="ok-reinit">${t("Effacer")}</button></div>`,
+    () => { $("#ok-reinit").onclick = () => { fiches = EXEMPLES.map(x => ({ ...x })); suivi = {}; sauver(); fermer(); toast(t("Fiches effacées.")); rendre(); }; });
 }
 
 /* ---------- Fiche existante ---------- */
 function ouvrirFiche(id) {
   const f = fiches.find(x => x.id === id); const r = f.resume;
   if (f.statut === "brouillon" && !f.exemple) { inst = JSON.parse(JSON.stringify(f.inst)); page = f.page || 0; erreurs = {}; onglet = "form"; recalculer(); rendre(); return; }
-  feuille(`<h3>${esc(r.asbc)}</h3><div class="indice">${esc(dateFr(r.date))}${r.lieu ? " · " + esc(r.lieu) : ""}</div>
+  feuille(`<h3>${esc(nomAsbc(r.asbc))}</h3><div class="indice">${esc(dateFr(r.date))}${r.lieu ? " · " + esc(r.lieu) : ""}</div>
     ${blocResultat(r)}
-    <div class="actions">${f.inst && f.statut !== "envoyee" ? `<button class="btn btn-contour" id="modifier">Modifier</button>` : ""}${f.inst ? `<button class="btn btn-contour" id="voir-json">Données</button>` : ""}<button class="btn btn-bleu" data-fermer>Fermer</button></div>`, () => {
+    <div class="actions">${f.inst && f.statut !== "envoyee" ? `<button class="btn btn-contour" id="modifier">${t("Modifier")}</button>` : ""}${f.inst ? `<button class="btn btn-contour" id="voir-json">${t("Données")}</button>` : ""}<button class="btn btn-bleu" data-fermer>${t("Fermer")}</button></div>`, () => {
     if ($("#modifier")) $("#modifier").onclick = () => { fermer(); inst = JSON.parse(JSON.stringify(f.inst)); inst.id = f.id; page = 0; erreurs = {}; onglet = "form"; recalculer(); rendre(); };
     if ($("#voir-json")) $("#voir-json").onclick = () => voirJson(f.inst);
   });
 }
 function blocResultat(r) {
-  return `<div class="resultat" style="margin-top:14px"><div style="font-size:13px;opacity:.85">Score global ASBC</div><div class="grand">${r.pct === "" || r.pct == null ? "–" : r.pct + " %"}</div><div style="font-weight:600;margin-top:4px">${esc(r.perf || "")}</div><div class="barre-score"><i style="width:${Math.min(100, +r.pct || 0)}%"></i></div></div>
-    ${r.sections && r.sections.length ? `<div class="sections-score" style="margin-top:14px">${r.sections.map(([n, p]) => `<div class="sec-score"><span>${esc(n)}</span><b class="score ${classe(p)}" style="font-size:14px">${p} %</b><div class="jauge"><i style="width:${Math.min(100, p)}%;background:var(--${classe(p) === "neutre" ? "texte-2" : classe(p)})"></i></div></div>`).join("")}</div>` : ""}`;
+  return `<div class="resultat" style="margin-top:14px"><div style="font-size:14.5px;opacity:.85">${t("Score global ASBC")}</div><div class="grand">${r.pct === "" || r.pct == null ? "–" : r.pct + " %"}</div><div style="font-weight:600;margin-top:4px">${esc(tv(r.perf || ""))}</div><div class="barre-score"><i style="width:${Math.min(100, +r.pct || 0)}%"></i></div></div>
+    ${r.sections && r.sections.length ? `<div class="sections-score" style="margin-top:14px">${r.sections.map(([n, p]) => `<div class="sec-score"><span>${esc(t(n))}</span><b class="score ${classe(p)}" style="font-size:15.5px">${p} %</b><div class="jauge"><i style="width:${Math.min(100, p)}%;background:var(--${classe(p) === "neutre" ? "texte-2" : classe(p)})"></i></div></div>`).join("")}</div>` : ""}`;
 }
 function voirJson(i) {
   const sortie = soumission(i);
   const txt = JSON.stringify(sortie, null, 2);
-  feuille(`<h3>Données de la fiche</h3><div class="indice" style="margin-bottom:8px">Format proche d'une soumission Kobo (chemins de groupes). Les questions non pertinentes sont exclues.</div><pre class="json" id="json">${esc(txt)}</pre>
-    <div class="actions"><button class="btn btn-contour" id="copier">Copier</button><button class="btn btn-bleu" data-fermer>Fermer</button></div>`, () => {
-    $("#copier").onclick = () => navigator.clipboard.writeText(txt).then(() => toast("Données copiées."), () => { const r = document.createRange(); r.selectNodeContents($("#json")); getSelection().removeAllRanges(); getSelection().addRange(r); toast("Sélectionnées : copiez avec le menu du téléphone."); });
+  feuille(`<h3>${t("Données de la fiche")}</h3><div class="indice" style="margin-bottom:8px">${t("Format proche d'une soumission Kobo (chemins de groupes). Les questions non pertinentes sont exclues.")}</div><pre class="json" id="json">${esc(txt)}</pre>
+    <div class="actions"><button class="btn btn-contour" id="copier">${t("Copier")}</button><button class="btn btn-bleu" data-fermer>${t("Fermer")}</button></div>`, () => {
+    $("#copier").onclick = () => navigator.clipboard.writeText(txt).then(() => toast(t("Données copiées.")), () => { const r = document.createRange(); r.selectNodeContents($("#json")); getSelection().removeAllRanges(); getSelection().addRange(r); toast(t("Sélectionnées : copiez avec le menu du téléphone.")); });
   });
 }
 function soumission(i) {
@@ -589,6 +700,7 @@ function nouvelle() {
   inst = { id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())), valeurs: { start: new Date().toISOString() }, repets: {} };
   page = 0; erreurs = {}; onglet = "form"; recalculer(); rendre();
 }
+// Les données restent en français (codes et libellés du XLSForm) ; seule l'affichage est traduit.
 function resume() {
   const v = inst.valeurs, lab = (n, c) => (CHOIX_INDEX[CHAMPS[n]?.liste] || {})[c] || "";
   const sections = [];
@@ -608,6 +720,7 @@ function enregistrerBrouillon() {
   if (f) Object.assign(f, donnees); else fiches.unshift(donnees);
   sauver();
 }
+const titrePage = p => interpoler(p.titre);
 
 function ecranForm() {
   recalculer();
@@ -615,20 +728,20 @@ function ecranForm() {
   if (page >= pages.length) page = pages.length - 1;
   const pg = pages[page];
   const pct = inst.valeurs.supervision_choisie && !estVide(inst.valeurs.pct_global_total) ? inst.valeurs.pct_global_total : null;
-  barre(interpoler(pg.titre), `Écran ${page + 1} sur ${pages.length}`, {
-    sourcil: pg.sourcil, gauche: `<button class="icone-btn" id="quitter" aria-label="Fermer la fiche"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`,
-    droite: pct != null ? `<div class="puce-score"><b>${pct} %</b>score global</div>` : `<button class="reseau ${enLigne ? "" : "hors"}" id="btn-reseau"><span class="point"></span>${enLigne ? "En ligne" : "Hors ligne"}</button>`,
+  barre(titrePage(pg), t("Écran {a} sur {b}", { a: page + 1, b: pages.length }), {
+    sourcil: tf(pg.sourcil), gauche: `<button class="icone-btn" id="quitter" aria-label="${t("Fermer la fiche")}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`,
+    droite: pct != null ? `<div class="puce-score"><b>${pct} %</b>${t("score global")}</div>` : "",
     progression: `<div class="progression">${pages.map((_, i) => `<i class="${i < page ? "fait" : i === page ? "encours" : ""}"></i>`).join("")}</div>` });
-  $("#quitter").onclick = () => feuille(`<h3>Quitter la fiche ?</h3><div class="indice">Vous pouvez la garder en brouillon et la reprendre plus tard.</div>
-    <div class="actions"><button class="btn btn-contour" id="jeter">Abandonner</button><button class="btn btn-bleu" id="garder">Garder en brouillon</button></div>`, () => {
-    $("#garder").onclick = () => { enregistrerBrouillon(); fermer(); onglet = "accueil"; inst = null; rendre(); toast("Brouillon enregistré."); };
+  $("#quitter").onclick = () => feuille(`<h3>${t("Quitter la fiche ?")}</h3><div class="indice">${t("Vous pouvez la garder en brouillon et la reprendre plus tard.")}</div>
+    <div class="actions"><button class="btn btn-contour" id="jeter">${t("Abandonner")}</button><button class="btn btn-bleu" id="garder">${t("Garder en brouillon")}</button></div>`, () => {
+    $("#garder").onclick = () => { enregistrerBrouillon(); fermer(); onglet = "accueil"; inst = null; rendre(); toast(t("Brouillon enregistré.")); };
     $("#jeter").onclick = () => { if (!fiches.find(x => x.id === inst.id && x.statut !== "brouillon")) fiches = fiches.filter(x => x.id !== inst.id); sauver(); fermer(); onglet = "accueil"; inst = null; rendre(); };
   });
   dessinerPage(pg);
   $("#ecran").scrollTop = 0;
   const dernier = page === pages.length - 1;
-  $("#pied").innerHTML = `<div class="pied-form gouttiere"><button class="btn btn-contour icone" id="sommaire" aria-label="Sommaire"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
-    ${page > 0 ? `<button class="btn btn-contour" id="prec">Précédent</button>` : ""}<button class="btn ${dernier ? "btn-plein" : "btn-bleu"}" id="suiv">${dernier ? "Finaliser" : "Suivant"}</button></div>`;
+  $("#pied").innerHTML = `<div class="pied-form gouttiere"><button class="btn btn-contour icone" id="sommaire" aria-label="${t("Sommaire")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+    ${page > 0 ? `<button class="btn btn-contour" id="prec">${t("Précédent")}</button>` : ""}<button class="btn ${dernier ? "btn-plein" : "btn-bleu"}" id="suiv">${t(dernier ? "Finaliser" : "Suivant")}</button></div>`;
   if ($("#prec")) $("#prec").onclick = () => { page--; erreurs = {}; rendre(); };
   $("#suiv").onclick = () => { if (!validerPage(pg)) return; if (dernier) finaliser(); else { page++; enregistrerBrouillon(); rendre(); } };
   $("#sommaire").onclick = sommaire;
@@ -658,10 +771,11 @@ function dessinerPage(pg) {
   derniereSig = signaturePage(pg);
   if (actif) { const el = $(`#ecran input[data-k="${actif}"]:not([type=checkbox]), #ecran textarea[data-k="${actif}"]`); if (el) el.focus({ preventScroll: true }); }
 }
+const texteNote = (label, idx) => esc(interpoler(label, idx)).replace(/\s{2,}\|\s{2,}|[\u2028\u2029\r\n]+/g, "<br>").replace(/\s*[\uf000-\uf0ff]\s*/g, "<br>• ");
 function majNotes() {
   document.querySelectorAll("#ecran [data-note]").forEach(el => {
     const [nom, i] = el.dataset.note.split("#");
-    el.innerHTML = esc(interpoler(CHAMPS[nom].label, i == null ? null : +i)).replace(/\s{2,}\|\s{2,}|[\u2028\u2029\r\n]+/g, "<br>").replace(/\s*[\uf000-\uf0ff]\s*/g, "<br>• ");
+    el.innerHTML = texteNote(CHAMPS[nom].label, i == null ? null : +i);
   });
 }
 const pageCourante = () => pagesActives()[page];
@@ -688,9 +802,10 @@ function html(n, idx, sansTitre) {
   }
   if (n.kind === "repeat") {
     const l = inst.repets[n.name] || [{}];
-    return `<section class="groupe">${!sansTitre ? `<div class="groupe-titre">${esc(n.label)}</div>` : ""}
-      ${l.map((_, i) => `<div class="repet"><div class="repet-entete"><span>${esc(n.label.replace(/^\d+\.\s*/, "").slice(0, 34))}${n.label.length > 34 ? "…" : ""} · n° ${i + 1}</span>${l.length > 1 ? `<button class="btn btn-contour btn-petit" data-suppr="${n.name}" data-i="${i}">Retirer</button>` : ""}</div>${n.children.map(c => html(c, i)).join("")}</div>`).join("")}
-      <button class="btn btn-contour btn-large" data-ajout="${n.name}">+ Ajouter ${n.name === "groupe_enfants" ? "un enfant" : "une ligne"}</button></section>`;
+    const titre = tf(n.label).replace(/^\d+\.\s*/, "");
+    return `<section class="groupe">${!sansTitre ? `<div class="groupe-titre">${esc(tf(n.label))}</div>` : ""}
+      ${l.map((_, i) => `<div class="repet"><div class="repet-entete"><span>${esc(titre.slice(0, 34))}${titre.length > 34 ? "…" : ""} · ${t("n°")} ${i + 1}</span>${l.length > 1 ? `<button class="btn btn-contour btn-petit" data-suppr="${n.name}" data-i="${i}">${t("Retirer")}</button>` : ""}</div>${n.children.map(c => html(c, i)).join("")}</div>`).join("")}
+      <button class="btn btn-contour btn-large" data-ajout="${n.name}">${t(n.name === "groupe_enfants" ? "+ Ajouter un enfant" : "+ Ajouter une ligne")}</button></section>`;
   }
   return champ(n, idx);
 }
@@ -706,12 +821,12 @@ function champ(n, idx) {
   const k = cle(n.name, idx), v = DANS_REPET[n.name] ? brut(n.name, idx) : inst.valeurs[n.name];
   const lab = interpoler(n.label || "", idx);
   if (n.base === "note") {
-    const estScore = /score|performance/i.test(lab);
-    return `<div class="note ${estScore ? "score-note" : ""}" data-note="${k}">${esc(lab).replace(/\s{2,}\|\s{2,}|[\u2028\u2029\r\n]+/g, "<br>").replace(/\s*[\uf000-\uf0ff]\s*/g, "<br>• ")}</div>`;
+    const estScore = /score|performance/i.test(n.label || "");
+    return `<div class="note ${estScore ? "score-note" : ""}" data-note="${k}">${texteNote(n.label || "", idx)}</div>`;
   }
   const err = erreurs[k];
-  const q = `<span class="q">${esc(lab)}${n.required ? ' <span class="req">*</span>' : ""}</span>${n.hint ? `<div class="indice" style="margin:-6px 0 8px">${esc(n.hint)}</div>` : ""}`;
-  const fin = err ? `<div class="msg-erreur">${esc(err)}</div>` : "";
+  const q = `<span class="q">${esc(lab)}${n.required ? ' <span class="req">*</span>' : ""}</span>${n.hint ? `<div class="indice" style="margin:-6px 0 8px">${esc(tf(n.hint))}</div>` : ""}`;
+  const fin = err ? `<div class="msg-erreur">${esc(tf(err))}</div>` : "";
   const id = "f-" + k.replace("#", "-");
   let corps = "";
   const d = `data-k="${k}"`;
@@ -719,20 +834,20 @@ function champ(n, idx) {
     case "select_one": {
       const ch = choixFiltres(n, idx);
       if (n.appearance === "minimal" || ch.length > 6) {
-        corps = `<select id="${id}" ${d}><option value="">${ch.length ? "Choisir…" : "Choisissez d'abord la question précédente"}</option>${ch.map(c => `<option value="${esc(c[0])}" ${v === c[0] ? "selected" : ""}>${esc(c[1])}</option>`).join("")}</select>`;
-      } else corps = `<div class="choix" role="radiogroup">${ch.map(c => `<button type="button" role="radio" aria-checked="${v === c[0]}" ${d} data-v="${esc(c[0])}" class="${v === c[0] ? "sel" : ""}">${esc(c[1])}</button>`).join("")}</div>`;
+        corps = `<select id="${id}" ${d}><option value="">${t(ch.length ? "Choisir…" : "Choisissez d'abord la question précédente")}</option>${ch.map(c => `<option value="${esc(c[0])}" ${v === c[0] ? "selected" : ""}>${esc(tf(c[1]))}</option>`).join("")}</select>`;
+      } else corps = `<div class="choix" role="radiogroup">${ch.map(c => `<button type="button" role="radio" aria-checked="${v === c[0]}" ${d} data-v="${esc(c[0])}" class="${v === c[0] ? "sel" : ""}">${esc(tf(c[1]))}</button>`).join("")}</div>`;
       break;
     }
     case "select_multiple": {
       const sel = String(v || "").split(" ").filter(Boolean);
-      corps = `<div class="cases">${choixFiltres(n, idx).map(c => `<label><input type="checkbox" ${d} data-v="${esc(c[0])}" ${sel.includes(c[0]) ? "checked" : ""}><span>${esc(c[1])}</span></label>`).join("")}</div>`;
+      corps = `<div class="cases">${choixFiltres(n, idx).map(c => `<label><input type="checkbox" ${d} data-v="${esc(c[0])}" ${sel.includes(c[0]) ? "checked" : ""}><span>${esc(tf(c[1]))}</span></label>`).join("")}</div>`;
       break;
     }
     case "integer": case "decimal": corps = `<input type="number" inputmode="${n.base === "integer" ? "numeric" : "decimal"}" id="${id}" ${d} value="${esc(v)}">`; break;
     case "date": corps = `<input type="date" id="${id}" ${d} value="${esc(v)}">`; break;
-    case "geopoint": corps = `<div class="gps"><button type="button" class="btn btn-contour" data-gps="${k}">${v ? "Reprendre la position" : "Capturer la position"}</button>${v ? `<code>${esc(v)}</code>` : ""}</div>`; break;
+    case "geopoint": corps = `<div class="gps"><button type="button" class="btn btn-contour" data-gps="${k}">${t(v ? "Reprendre la position" : "Capturer la position")}</button>${v ? `<code>${esc(v)}</code>` : ""}</div>`; break;
     case "text":
-      if (n.appearance === "draw") corps = `<canvas class="signature" data-sig="${k}"></canvas><div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><span class="indice">Signez avec le doigt.</span><button type="button" class="btn btn-contour btn-petit" data-effacer="${k}">Effacer</button></div>`;
+      if (n.appearance === "draw") corps = `<canvas class="signature" data-sig="${k}"></canvas><div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><span class="indice">${t("Signez avec le doigt.")}</span><button type="button" class="btn btn-contour btn-petit" data-effacer="${k}">${t("Effacer")}</button></div>`;
       else if (n.appearance === "multiline") corps = `<textarea id="${id}" ${d}>${esc(v)}</textarea>`;
       else corps = `<input type="text" id="${id}" ${d} value="${esc(v)}">`;
       break;
@@ -769,7 +884,7 @@ function brancher() {
   e.querySelectorAll("[data-ajout]").forEach(b => b.onclick = () => { inst.repets[b.dataset.ajout].push({}); rafraichir(); });
   e.querySelectorAll("[data-suppr]").forEach(b => b.onclick = () => { inst.repets[b.dataset.suppr].splice(+b.dataset.i, 1); erreurs = {}; rafraichir(); });
   e.querySelectorAll("[data-gps]").forEach(b => b.onclick = () => {
-    const fixer = (lat, lon, acc, simule) => { poser(b.dataset.gps, `${lat.toFixed(6)} ${lon.toFixed(6)} 0 ${Math.round(acc)}`); rafraichir(); if (simule) toast("Position simulée : le GPS n'est pas accessible dans cet aperçu."); };
+    const fixer = (lat, lon, acc, simule) => { poser(b.dataset.gps, `${lat.toFixed(6)} ${lon.toFixed(6)} 0 ${Math.round(acc)}`); rafraichir(); if (simule) toast(t("Position simulée : le GPS n'est pas accessible dans cet aperçu.")); };
     const simuler = () => fixer(11.95 + Math.random() * .05, -3.75 + Math.random() * .05, 8, true);
     if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => fixer(p.coords.latitude, p.coords.longitude, p.coords.accuracy), simuler, { timeout: 4000 });
     else simuler();
@@ -792,6 +907,7 @@ function signature(cv) {
 }
 
 /* ---------- Contrôles : obligatoire et contraintes ---------- */
+// Les erreurs sont gardées en français (clé) et traduites à l'affichage.
 function erreursNoeuds(noeuds, idx, out) {
   for (const n of noeuds) {
     if (n.kind === "group") { if (pertinent[cle(n.name, idx)] !== false) erreursNoeuds(n.children, idx, out); continue; }
@@ -815,15 +931,15 @@ function validerPage(pg) {
   if (!n) return true;
   dessinerPage(pg);
   const premier = $("#ecran .champ.erreur"); if (premier) premier.scrollIntoView({ behavior: "smooth", block: "center" });
-  toast(n + (n > 1 ? " questions demandent" : " question demande") + " une correction.");
+  toast(tn(n, "{n} question demande une correction.", "{n} questions demandent une correction."));
   return false;
 }
 function sommaire() {
   recalculer();
   const pages = pagesActives();
-  feuille(`<h3>Sommaire de la fiche</h3><div class="sommaire">${pages.map((p, i) => {
+  feuille(`<h3>${t("Sommaire de la fiche")}</h3><div class="sommaire">${pages.map((p, i) => {
     const nErr = Object.keys(erreursNoeuds(p.noeuds, null, {})).length;
-    return `<button data-aller="${i}" class="${i === page ? "courant" : ""}"><span class="num ${nErr && i < page ? "err" : ""}">${i + 1}</span><span style="flex:1;min-width:0">${esc(interpoler(p.titre))}${p.sourcil ? `<span class="petit">${esc(p.sourcil)}</span>` : ""}</span>${nErr ? `<span class="pastille p-neutre">${nErr} à remplir</span>` : `<span class="pastille p-ok">OK</span>`}</button>`;
+    return `<button data-aller="${i}" class="${i === page ? "courant" : ""}"><span class="num ${nErr && i < page ? "err" : ""}">${i + 1}</span><span style="flex:1;min-width:0">${esc(titrePage(p))}${p.sourcil ? `<span class="petit">${esc(tf(p.sourcil))}</span>` : ""}</span>${nErr ? `<span class="pastille p-neutre">${t("{n} à remplir", { n: nErr })}</span>` : `<span class="pastille p-ok">${t("OK")}</span>`}</button>`;
   }).join("")}</div>`, () => document.querySelectorAll("[data-aller]").forEach(b => b.onclick = () => { page = +b.dataset.aller; erreurs = {}; fermer(); rendre(); }));
 }
 function finaliser() {
@@ -831,7 +947,7 @@ function finaliser() {
   const pages = pagesActives();
   for (let i = 0; i < pages.length; i++) {
     const e = erreursNoeuds(pages[i].noeuds, null, {});
-    if (Object.keys(e).length) { page = i; erreurs = e; rendre(); const p = $("#ecran .champ.erreur"); if (p) p.scrollIntoView({ block: "center" }); toast("Écran « " + pages[i].titre.slice(0, 40) + " » incomplet."); return; }
+    if (Object.keys(e).length) { page = i; erreurs = e; rendre(); const p = $("#ecran .champ.erreur"); if (p) p.scrollIntoView({ block: "center" }); toast(t("Écran « {t} » incomplet.", { t: titrePage(pages[i]).slice(0, 40) })); return; }
   }
   inst.valeurs.end = new Date().toISOString();
   recalculer();
@@ -842,18 +958,18 @@ function finaliser() {
   if (f) Object.assign(f, donnees); else fiches.unshift(donnees);
   sauver();
   inst = null; onglet = "accueil"; rendre();
-  feuille(`<h3>Fiche finalisée</h3><div class="indice">${esc(r.asbc)} · ${enLigne ? "prête à être envoyée." : "gardée sur le téléphone jusqu'au retour du réseau."}</div>${blocResultat(r)}
-    <div class="actions"><button class="btn btn-contour" data-fermer>Plus tard</button><button class="btn btn-bleu" id="env">Envoyer</button></div>`, () => { $("#env").onclick = () => { fermer(); envoyer(); }; });
+  feuille(`<h3>${t("Fiche finalisée")}</h3><div class="indice">${esc(nomAsbc(r.asbc))} · ${t(enLigne ? "prête à être envoyée." : "gardée sur le téléphone jusqu'au retour du réseau.")}</div>${blocResultat(r)}
+    <div class="actions"><button class="btn btn-contour" data-fermer>${t("Plus tard")}</button><button class="btn btn-bleu" id="env">${t("Envoyer")}</button></div>`, () => { $("#env").onclick = () => { fermer(); envoyer(); }; });
 }
 
 /* ---------- Envoi (simulé) ---------- */
 function envoyer() {
   const n = fiches.filter(f => f.statut === "attente").length;
   if (!n) return;
-  if (!enLigne) { toast("Pas de réseau : " + n + " fiche" + (n > 1 ? "s seront envoyées" : " sera envoyée") + " au retour du réseau."); return; }
-  feuille(`<h3>Envoi au serveur</h3><div class="indice">Envoi de ${n} fiche${n > 1 ? "s" : ""}…</div><div style="height:8px;background:var(--surface-2);border-radius:4px;margin-top:14px;overflow:hidden"><i id="pb" style="display:block;height:100%;width:0;background:var(--orange);transition:width .25s"></i></div>`, null, false);
-  let p = 0; const t = setInterval(() => { p += 20; const el = $("#pb"); if (el) el.style.width = p + "%";
-    if (p >= 100) { clearInterval(t); fiches.forEach(f => { if (f.statut === "attente") f.statut = "envoyee"; }); sauver(); fermer(); toast(n + (n > 1 ? " fiches envoyées." : " fiche envoyée.")); rendre(); } }, 250);
+  if (!enLigne) { toast(tn(n, "Pas de réseau : {n} fiche sera envoyée au retour du réseau.", "Pas de réseau : {n} fiches seront envoyées au retour du réseau.")); return; }
+  feuille(`<h3>${t("Envoi au serveur")}</h3><div class="indice">${tn(n, "Envoi de {n} fiche…", "Envoi de {n} fiches…")}</div><div style="height:8px;background:var(--surface-2);border-radius:4px;margin-top:14px;overflow:hidden"><i id="pb" style="display:block;height:100%;width:0;background:var(--jaune);transition:width .25s"></i></div>`, null, false);
+  let p = 0; const tm = setInterval(() => { p += 20; const el = $("#pb"); if (el) el.style.width = p + "%";
+    if (p >= 100) { clearInterval(tm); fiches.forEach(f => { if (f.statut === "attente") f.statut = "envoyee"; }); sauver(); fermer(); toast(tn(n, "{n} fiche envoyée.", "{n} fiches envoyées.")); rendre(); } }, 250);
 }
 
 /* ---------- Feuilles et messages ---------- */
@@ -864,9 +980,9 @@ function feuille(contenu, apres, fermable = true) {
 }
 function fermer() { $("#couche").innerHTML = ""; }
 let minuteur;
-function toast(t) {
+function toast(msg) {
   clearTimeout(minuteur); document.querySelectorAll(".toast").forEach(x => x.remove());
-  const d = document.createElement("div"); d.className = "toast"; d.setAttribute("role", "status"); d.textContent = t;
+  const d = document.createElement("div"); d.className = "toast"; d.setAttribute("role", "status"); d.textContent = msg;
   $("#tel").appendChild(d); minuteur = setTimeout(() => d.remove(), 3500);
 }
 
