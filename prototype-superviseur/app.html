@@ -1,0 +1,876 @@
+<title>Supervision ASBC</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Mise en page : application Android d'une colonne (barre du haut, écran défilant, navigation en bas),
+   dans un cadre de téléphone sur grand écran et en plein écran sur mobile ou dans une WebView. */
+:root {
+  --bleu: #1f5f9e; --bleu-fonce: #17497a; --orange: #c4580f;
+  --fond: #eef2f6; --surface: #ffffff; --surface-2: #f4f7fa; --ligne: #dbe3ea;
+  --texte: #1c2833; --texte-2: #5b6b78; --sur-bleu: #ffffff; --cadre: #c9d3dc;
+  --ok: #1d7a4f; --ok-fond: #dcefe3; --alerte: #a8620b; --alerte-fond: #fbead3;
+  --critique: #a23b2a; --critique-fond: #f6dcd6;
+  --ombre: 0 1px 3px rgba(23, 73, 122, .10), 0 4px 14px rgba(23, 73, 122, .07);
+  --f-titre: "Space Grotesk", "Segoe UI", Roboto, sans-serif;
+  --f-texte: "Inter", Roboto, "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bleu: #6fa8de; --bleu-fonce: #1b3a5a; --orange: #f08a45;
+  --fond: #0f161d; --surface: #18222c; --surface-2: #1f2b37; --ligne: #2c3a47;
+  --texte: #e4ebf1; --texte-2: #9aabb9; --sur-bleu: #0f161d; --cadre: #2a3642;
+  --ok: #6cc79a; --ok-fond: #183528; --alerte: #f0b05e; --alerte-fond: #3a2b14;
+  --critique: #f08a7a; --critique-fond: #3d1f1a; --ombre: 0 1px 3px rgba(0,0,0,.4); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bleu: #6fa8de; --bleu-fonce: #1b3a5a; --orange: #f08a45;
+  --fond: #0f161d; --surface: #18222c; --surface-2: #1f2b37; --ligne: #2c3a47;
+  --texte: #e4ebf1; --texte-2: #9aabb9; --sur-bleu: #0f161d; --cadre: #2a3642;
+  --ok: #6cc79a; --ok-fond: #183528; --alerte: #f0b05e; --alerte-fond: #3a2b14;
+  --critique: #f08a7a; --critique-fond: #3d1f1a; --ombre: 0 1px 3px rgba(0,0,0,.4); color-scheme: dark; }
+
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--cadre); color: var(--texte); font-family: var(--f-texte); font-size: 15px; line-height: 1.45; }
+* { box-sizing: border-box; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+
+.telephone { height: 100%; display: flex; flex-direction: column; background: var(--fond); overflow: hidden; position: relative; }
+@media (min-width: 560px) {
+  body { display: flex; align-items: center; justify-content: center; padding-block: 24px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .telephone { width: 412px; height: min(880px, 100%); border-radius: 30px; border: 8px solid #1c2833; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+}
+.gouttiere { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+.barre { background: var(--bleu-fonce); color: #fff; padding-block: 12px 14px; flex: none; }
+.barre-ligne { display: flex; align-items: center; gap: 8px; }
+.barre .sourcil { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.barre h1 { font-family: var(--f-titre); font-size: 18px; font-weight: 600; margin: 0; color: #fff; text-wrap: balance; line-height: 1.25; }
+.barre .sous { font-size: 12.5px; opacity: .8; margin-top: 2px; }
+.icone-btn { background: transparent; border: 0; color: #fff; width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.icone-btn:hover { background: rgba(255,255,255,.12); }
+.reseau { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; border: 1px solid rgba(255,255,255,.4); border-radius: 20px; padding: 4px 10px; background: transparent; color: #fff; flex: none; }
+.reseau .point { width: 8px; height: 8px; border-radius: 50%; background: #6ee7a8; }
+.reseau.hors .point { background: #f0b05e; }
+.puce-score { flex: none; background: rgba(255,255,255,.14); border-radius: 12px; padding: 4px 10px; text-align: right; font-size: 11px; line-height: 1.2; }
+.puce-score b { display: block; font-family: var(--f-titre); font-size: 17px; font-variant-numeric: tabular-nums; }
+
+.ecran { flex: 1; overflow-y: auto; padding-block: 16px 28px; display: flex; flex-direction: column; gap: 12px; }
+h2 { font-family: var(--f-titre); font-size: 13px; text-transform: uppercase; letter-spacing: .07em; color: var(--texte-2); margin: 12px 0 0; font-weight: 600; }
+.carte { background: var(--surface); border-radius: 14px; box-shadow: var(--ombre); padding: 14px 16px; }
+.exemple { font-size: 12px; color: var(--alerte); background: var(--alerte-fond); border-radius: 8px; padding: 6px 10px; }
+.chiffres { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.chiffre { background: var(--surface); border-radius: 12px; padding: 12px; box-shadow: var(--ombre); }
+.chiffre b { display: block; font-family: var(--f-titre); font-size: 26px; color: var(--bleu); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.chiffre span { font-size: 12px; color: var(--texte-2); }
+.chiffre.attention b { color: var(--orange); }
+
+.btn { border: 0; border-radius: 26px; padding: 12px 20px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-plein { background: var(--orange); color: #fff; }
+.btn-plein:hover { filter: brightness(.94); }
+.btn-bleu { background: var(--bleu); color: var(--sur-bleu); }
+.btn-contour { background: transparent; border: 1.5px solid var(--ligne); color: var(--texte); }
+.btn-petit { padding: 7px 14px; font-size: 13.5px; }
+.btn-large { width: 100%; }
+
+.liste { background: var(--surface); border-radius: 14px; box-shadow: var(--ombre); overflow: hidden; }
+.ligne { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 0; background: transparent; width: 100%; text-align: left; }
+.ligne + .ligne { border-top: 1px solid var(--ligne); }
+button.ligne:hover { background: var(--surface-2); }
+.ligne .corps { flex: 1; min-width: 0; }
+.ligne .titre { font-weight: 600; overflow-wrap: anywhere; }
+.ligne .meta { font-size: 12.5px; color: var(--texte-2); }
+.avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--surface-2); color: var(--bleu); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex: none; border: 1px solid var(--ligne); }
+.pastille { display: inline-block; font-size: 11.5px; font-weight: 600; border-radius: 12px; padding: 2px 9px; white-space: nowrap; }
+.p-ok { background: var(--ok-fond); color: var(--ok); }
+.p-alerte { background: var(--alerte-fond); color: var(--alerte); }
+.p-critique { background: var(--critique-fond); color: var(--critique); }
+.p-neutre { background: var(--surface-2); color: var(--texte-2); border: 1px solid var(--ligne); }
+.score { font-family: var(--f-titre); font-weight: 700; font-variant-numeric: tabular-nums; font-size: 16px; min-width: 50px; text-align: right; }
+.score.ok { color: var(--ok); } .score.alerte { color: var(--alerte); } .score.critique { color: var(--critique); } .score.neutre { color: var(--texte-2); }
+
+.nav { flex: none; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border-top: 1px solid var(--ligne); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.nav button { background: transparent; border: 0; padding: 8px 2px 10px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11.5px; color: var(--texte-2); position: relative; }
+.nav button svg { width: 22px; height: 22px; }
+.nav button.actif { color: var(--bleu); font-weight: 600; }
+.nav button.actif .ic { background: color-mix(in srgb, var(--bleu) 15%, transparent); }
+.nav .ic { border-radius: 14px; padding: 3px 16px; display: flex; }
+.nav .badge { position: absolute; top: 4px; left: calc(50% + 8px); background: var(--orange); color: #fff; border-radius: 9px; font-size: 10px; padding: 0 5px; font-weight: 700; }
+
+/* Formulaire */
+.progression { display: flex; gap: 3px; margin-top: 12px; }
+.progression i { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,.25); }
+.progression i.fait { background: #fff; }
+.progression i.encours { background: var(--orange); }
+.groupe { display: flex; flex-direction: column; gap: 12px; }
+.groupe-titre { font-family: var(--f-titre); font-weight: 600; color: var(--bleu); font-size: 15.5px; margin-top: 8px; padding-bottom: 6px; border-bottom: 2px solid color-mix(in srgb, var(--bleu) 25%, transparent); text-wrap: balance; }
+.groupe .groupe .groupe-titre { font-size: 14.5px; color: var(--texte); border-bottom-width: 1px; }
+.champ { background: var(--surface); border-radius: 14px; box-shadow: var(--ombre); padding: 14px 16px; }
+.champ .q { font-weight: 600; display: block; margin-bottom: 10px; overflow-wrap: anywhere; }
+.champ .q .req { color: var(--critique); }
+.champ input[type=text], .champ input[type=number], .champ input[type=date], .champ select, .champ textarea {
+  width: 100%; border: 1.5px solid var(--ligne); border-radius: 10px; padding: 10px 12px; background: var(--surface-2); min-width: 0; }
+.champ select { appearance: auto; }
+.champ input:focus, .champ select:focus, .champ textarea:focus { border-color: var(--bleu); outline: none; }
+.champ textarea { min-height: 80px; resize: vertical; }
+.champ.erreur { box-shadow: 0 0 0 2px var(--critique); }
+.msg-erreur { color: var(--critique); font-size: 12.5px; margin-top: 8px; font-weight: 500; }
+.choix { display: flex; flex-wrap: wrap; gap: 8px; }
+.choix button { border: 1.5px solid var(--ligne); background: var(--surface-2); border-radius: 22px; padding: 8px 16px; font-weight: 500; }
+.choix button.sel { background: var(--bleu); border-color: var(--bleu); color: var(--sur-bleu); font-weight: 600; }
+.cases { display: flex; flex-direction: column; gap: 6px; }
+.cases label { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border: 1.5px solid var(--ligne); border-radius: 10px; background: var(--surface-2); cursor: pointer; font-size: 14px; }
+.cases label:has(input:checked) { border-color: var(--bleu); background: color-mix(in srgb, var(--bleu) 10%, var(--surface)); }
+.cases input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--bleu); flex: none; }
+.note { background: color-mix(in srgb, var(--bleu) 9%, var(--surface)); border-radius: 12px; padding: 11px 14px; font-size: 13.5px; overflow-wrap: anywhere; }
+.note.score-note { background: var(--surface); border: 1.5px solid color-mix(in srgb, var(--bleu) 30%, transparent); font-weight: 600; color: var(--bleu); font-variant-numeric: tabular-nums; }
+.repet { border: 1.5px dashed var(--ligne); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.repet-entete { display: flex; justify-content: space-between; align-items: center; font-weight: 600; color: var(--texte-2); font-size: 13px; text-transform: uppercase; letter-spacing: .05em; }
+.signature { width: 100%; height: 160px; border: 1.5px dashed var(--ligne); border-radius: 10px; background: var(--surface-2); touch-action: none; display: block; }
+.gps { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.gps code { font-size: 12.5px; background: var(--surface-2); padding: 4px 8px; border-radius: 6px; }
+.indice { font-size: 12.5px; color: var(--texte-2); }
+.pied-form { flex: none; display: flex; gap: 10px; padding-block: 10px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--surface); border-top: 1px solid var(--ligne); }
+.pied-form .btn { flex: 1; }
+.pied-form .icone { flex: none; width: 46px; padding: 0; color: var(--texte); }
+
+.resultat { border-radius: 16px; padding: 18px; color: #fff; background: var(--bleu-fonce); }
+.resultat .grand { font-family: var(--f-titre); font-size: 44px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.resultat .barre-score { height: 8px; background: rgba(255,255,255,.2); border-radius: 4px; margin-top: 12px; overflow: hidden; }
+.resultat .barre-score i { display: block; height: 100%; background: var(--orange); border-radius: 4px; }
+.sections-score { display: flex; flex-direction: column; gap: 10px; }
+.sec-score { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; font-size: 14px; }
+.sec-score .jauge { grid-column: 1 / -1; height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.sec-score .jauge i { display: block; height: 100%; border-radius: 3px; }
+
+.toast { position: absolute; left: 16px; right: 16px; bottom: 80px; background: var(--texte); color: var(--surface); border-radius: 10px; padding: 12px 14px; font-size: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.25); z-index: 8; }
+.feuille { position: absolute; inset: 0; background: rgba(15,22,29,.45); display: flex; align-items: flex-end; z-index: 6; }
+.feuille .panneau { background: var(--surface); width: 100%; max-height: 88%; overflow-y: auto; border-radius: 18px 18px 0 0; padding-block: 18px calc(18px + env(safe-area-inset-bottom, 0px)); }
+.feuille h3 { font-family: var(--f-titre); margin: 0 0 6px; font-size: 18px; }
+.feuille .actions { display: flex; gap: 10px; margin-top: 16px; }
+.feuille .actions .btn { flex: 1; }
+.sommaire button { display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; border: 0; background: transparent; padding: 10px 4px; border-top: 1px solid var(--ligne); }
+.sommaire button.courant { color: var(--bleu); font-weight: 600; }
+.sommaire .num { width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; flex: none; font-variant-numeric: tabular-nums; }
+.sommaire .num.err { background: var(--critique-fond); color: var(--critique); }
+.sommaire .petit { font-size: 11.5px; color: var(--texte-2); font-weight: 400; display: block; }
+pre.json { background: var(--surface-2); border-radius: 10px; padding: 12px; font-size: 11.5px; overflow: auto; max-height: 50vh; white-space: pre; }
+.vide { text-align: center; color: var(--texte-2); padding: 26px 10px; font-size: 14px; }
+.filtres { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; flex: none; }
+.filtres button { border: 1.5px solid var(--ligne); background: var(--surface); border-radius: 18px; padding: 6px 14px; font-size: 13px; white-space: nowrap; }
+.filtres button.sel { background: var(--bleu); color: var(--sur-bleu); border-color: var(--bleu); font-weight: 600; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14px; margin: 0; }
+.kv dt { color: var(--texte-2); } .kv dd { margin: 0; font-weight: 500; text-align: right; overflow-wrap: anywhere; }
+.anomalie { font-size: 13px; padding: 8px 0; border-top: 1px solid var(--ligne); overflow-wrap: anywhere; }
+.anomalie code { font-size: 12px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+</style>
+
+<div class="telephone" id="tel">
+  <header class="barre gouttiere" id="barre"></header>
+  <main class="ecran gouttiere" id="ecran"></main>
+  <div id="pied"></div>
+  <nav class="nav" id="nav">
+    <button data-onglet="accueil"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></span>Accueil</button>
+    <button data-onglet="supervisions"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span>Supervisions<span class="badge" id="badge-sync" hidden></span></button>
+    <button data-onglet="plan"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l5 5L20 6"/></svg></span>Plan d'action</button>
+    <button data-onglet="formulaire"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></span>Formulaire</button>
+  </nav>
+  <div id="couche"></div>
+</div>
+
+<script>
+const FORM = /*FORMULAIRE*/null;
+
+/* =======================================================================
+   1. Lecture du XLSForm : arbre des groupes, répétitions et questions
+   ======================================================================= */
+const racine = { kind: "root", children: [], name: "" };
+const CHAMPS = {};          // name -> noeud
+const DANS_REPET = {};      // name -> nom de la répétition qui le contient
+(function construire() {
+  const pile = [racine];
+  for (const r of FORM.survey) {
+    const [base, liste] = r.type.trim().split(/\s+/);
+    const parent = pile[pile.length - 1];
+    if (base === "end_group" || base === "end_repeat") { if (pile.length > 1) pile.pop(); continue; }
+    const n = { ...r, base, liste, parent, children: [] };
+    if (base === "begin_group" || base === "begin_repeat") { n.kind = base === "begin_group" ? "group" : "repeat"; parent.children.push(n); pile.push(n); }
+    else { n.kind = "field"; parent.children.push(n); }
+    if (n.name) CHAMPS[n.name] = n;
+    const rep = pile.slice(0, n.kind === "field" ? undefined : -1).reverse().find(p => p.kind === "repeat");
+    if (rep && n.kind === "field") DANS_REPET[n.name] = rep.name;
+  }
+})();
+const CHOIX_INDEX = {};
+for (const [k, l] of Object.entries(FORM.choices)) CHOIX_INDEX[k] = Object.fromEntries(l.map(c => [c[0], c[1]]));
+
+/* =======================================================================
+   2. Évaluateur des expressions XLSForm (sous-ensemble XPath d'ODK)
+   ======================================================================= */
+function tokens(s) {
+  const t = []; let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (/\s/.test(c)) { i++; continue; }
+    if (c === "$" && s[i + 1] === "{") { const j = s.indexOf("}", i); t.push({ k: "ref", v: s.slice(i + 2, j) }); i = j + 1; continue; }
+    if (c === "'" || c === '"' || c === "’" || c === "‘") { const fin = c === "‘" ? "’" : c; const j = s.indexOf(fin, i + 1); t.push({ k: "str", v: s.slice(i + 1, j) }); i = j + 1; continue; }
+    if (/[0-9]/.test(c) || (c === "." && /[0-9]/.test(s[i + 1] || ""))) { const m = s.slice(i).match(/^[0-9]*\.?[0-9]+/); t.push({ k: "num", v: +m[0] }); i += m[0].length; continue; }
+    if (s.startsWith("..", i)) { t.push({ k: "parentdot" }); i += 2; continue; }
+    if (c === ".") { t.push({ k: "dot" }); i++; continue; }
+    const op = ["!=", "<=", ">=", "=", "<", ">", "+", "-", "*", "(", ")", ","].find(o => s.startsWith(o, i));
+    if (op) { t.push({ k: "op", v: op }); i += op.length; continue; }
+    const m = s.slice(i).match(/^[A-Za-z_][\w\-:]*/);
+    if (m) { t.push({ k: "id", v: m[0] }); i += m[0].length; continue; }
+    throw new Error("Caractère inattendu « " + c + " »");
+  }
+  return t;
+}
+const estVide = v => v === undefined || v === null || v === "" || (typeof v === "number" && isNaN(v));
+const num = v => Array.isArray(v) ? num(v[0]) : (v === "" || v == null ? NaN : typeof v === "boolean" ? +v : Number(v));
+const bool = v => Array.isArray(v) ? v.length > 0 : typeof v === "boolean" ? v : typeof v === "number" ? !isNaN(v) && v !== 0 : !!v;
+const str = v => Array.isArray(v) ? str(v[0]) : v == null ? "" : typeof v === "number" ? (isNaN(v) ? "NaN" : String(+v.toFixed(10))) : typeof v === "boolean" ? String(v) : String(v);
+function compare(a, b, op) {
+  if (Array.isArray(a)) return a.some(x => compare(x, b, op));
+  if (Array.isArray(b)) return b.some(x => compare(a, x, op));
+  if (op === "=" || op === "!=") {
+    let eq;
+    if (typeof a === "boolean" || typeof b === "boolean") eq = bool(a) === bool(b);
+    else if (typeof a === "number" || typeof b === "number") eq = num(a) === num(b);
+    else eq = str(a) === str(b);
+    return op === "=" ? eq : !eq;
+  }
+  const x = num(a), y = num(b);
+  return op === "<" ? x < y : op === "<=" ? x <= y : op === ">" ? x > y : x >= y;
+}
+const FONCTIONS = {
+  "if": (c, a, b) => bool(c) ? a : b,
+  "selected": (a, b) => str(a).split(/\s+/).includes(str(b)),
+  "count-selected": a => str(a).split(/\s+/).filter(Boolean).length,
+  "not": a => !bool(a), "true": () => true, "false": () => false,
+  "round": (a, d = 0) => { const f = Math.pow(10, num(d)); return Math.round(num(a) * f) / f; },
+  "int": a => Math.trunc(num(a)), "number": a => num(a), "string": a => str(a),
+  "sum": a => (Array.isArray(a) ? a : [a]).reduce((s, x) => s + (estVide(x) ? 0 : num(x)), 0),
+  "count": a => Array.isArray(a) ? a.length : (estVide(a) ? 0 : 1),
+  "concat": (...a) => a.map(str).join(""),
+  "coalesce": (a, b) => estVide(a) ? b : a,
+  "string-length": a => str(a).length,
+  "today": () => new Date().toISOString().slice(0, 10),
+  "now": () => new Date().toISOString(),
+  "max": (...a) => Math.max(...a.flat().map(num)), "min": (...a) => Math.min(...a.flat().map(num)),
+  "jr:choice-name": (v, ref) => v
+};
+function compiler(src) {
+  const t = tokens(src); let p = 0;
+  const voir = () => t[p], suivant = () => t[p++];
+  const estOp = (...o) => voir() && ((voir().k === "op" && o.includes(voir().v)) || (voir().k === "id" && o.includes(voir().v)));
+  const ou = () => { let a = et(); while (estOp("or")) { suivant(); const g = a, d = et(); a = c => bool(g(c)) || bool(d(c)); } return a; };
+  const et = () => { let a = egal(); while (estOp("and")) { suivant(); const g = a, d = egal(); a = c => bool(g(c)) && bool(d(c)); } return a; };
+  const egal = () => { let a = rel(); while (estOp("=", "!=")) { const o = suivant().v, g = a, d = rel(); a = c => compare(g(c), d(c), o); } return a; };
+  const rel = () => { let a = add(); while (estOp("<", "<=", ">", ">=")) { const o = suivant().v, g = a, d = add(); a = c => compare(g(c), d(c), o); } return a; };
+  const add = () => { let a = mul(); while (estOp("+", "-")) { const o = suivant().v, g = a, d = mul(); a = o === "+" ? c => num(g(c)) + num(d(c)) : c => num(g(c)) - num(d(c)); } return a; };
+  const mul = () => { let a = un(); while (estOp("*", "div", "mod")) { const o = suivant().v, g = a, d = un(); a = o === "*" ? c => num(g(c)) * num(d(c)) : o === "div" ? c => num(g(c)) / num(d(c)) : c => num(g(c)) % num(d(c)); } return a; };
+  const un = () => { if (estOp("-")) { suivant(); const a = un(); return c => -num(a(c)); } return prim(); };
+  const prim = () => {
+    const k = suivant();
+    if (!k) throw new Error("Expression incomplète");
+    if (k.k === "num") return () => k.v;
+    if (k.k === "str") return () => k.v;
+    if (k.k === "ref") return c => c.lire(k.v);
+    if (k.k === "dot") return c => c.point;
+    if (k.k === "parentdot") return c => c.parentdot;
+    if (k.k === "op" && k.v === "(") { const e = ou(); suivant(); return e; }
+    if (k.k === "id") {
+      if (voir() && voir().k === "op" && voir().v === "(") {
+        suivant(); const args = [];
+        if (!(voir().k === "op" && voir().v === ")")) { args.push(ou()); while (voir().k === "op" && voir().v === ",") { suivant(); args.push(ou()); } }
+        suivant();
+        if (k.v === "position") return c => c.position;
+        const f = FONCTIONS[k.v]; if (!f) throw new Error("Fonction non prise en charge : " + k.v);
+        if (k.v === "if") return c => bool(args[0](c)) ? args[1](c) : args[2](c);
+        return c => f(...args.map(a => a(c)));
+      }
+      return c => c.attribut ? c.attribut(k.v) : "";
+    }
+    throw new Error("Jeton inattendu");
+  };
+  const e = ou();
+  if (p < t.length) throw new Error("Fin d'expression inattendue");
+  return e;
+}
+const CACHE = {}, ERREURS_EXPR = [];
+function evaluer(src, ctx) {
+  if (!src) return "";
+  let f = CACHE[src];
+  if (!f) { try { f = compiler(src); } catch (e) { ERREURS_EXPR.push(src.slice(0, 80) + " : " + e.message); f = () => ""; } CACHE[src] = f; }
+  try { return f(ctx); } catch (e) { return ""; }
+}
+
+/* =======================================================================
+   3. Instance (réponses), pertinence et calculs
+   ======================================================================= */
+let inst = null;            // { id, valeurs: {}, repets: { nom: [ {} ] }, ... }
+let pertinent = {};         // clé -> bool
+const cle = (nom, i) => i == null ? nom : nom + "#" + i;
+
+function brut(nom, idx) {
+  const r = DANS_REPET[nom];
+  if (r) return (inst.repets[r] && inst.repets[r][idx] || {})[nom];
+  return inst.valeurs[nom];
+}
+function contexte(idx, point) {
+  return {
+    point, position: idx == null ? 1 : idx + 1, parentdot: null,
+    lire(nom) {
+      const n = CHAMPS[nom]; if (!n) return "";
+      if (n.kind === "repeat") return (inst.repets[nom] || []).map((_, i) => i);
+      const r = DANS_REPET[nom];
+      if (r) {
+        if (idx != null) return pertinent[cle(nom, idx)] === false ? "" : valeurTypee(n, brut(nom, idx));
+        return (inst.repets[r] || []).map((_, i) => pertinent[cle(nom, i)] === false ? "" : valeurTypee(n, brut(nom, i)));
+      }
+      return pertinent[nom] === false ? "" : valeurTypee(n, inst.valeurs[nom]);
+    }
+  };
+}
+let contexteRepet = null;
+function valeurTypee(n, v) {
+  if (estVide(v)) return "";
+  if (["integer", "decimal"].includes(n.base)) return Number(v);
+  return v;
+}
+function recalculer() {
+  pertinent = {};
+  const parcourir = (noeuds, parentOk, idx, rep) => {
+    for (const n of noeuds) {
+      const ctx = contexte(idx);
+      const ok = parentOk && (!n.relevant || bool(evaluer(n.relevant, ctx)));
+      if (n.kind === "repeat") {
+        pertinent[n.name] = ok;
+        const liste = inst.repets[n.name] || (inst.repets[n.name] = [{}]);
+        const avant = contexteRepet; contexteRepet = n.name;
+        liste.forEach((_, i) => parcourir(n.children, ok, i, n.name));
+        contexteRepet = avant;
+        continue;
+      }
+      if (n.kind === "group") { pertinent[cle(n.name, idx)] = ok; parcourir(n.children, ok, idx, rep); continue; }
+      pertinent[cle(n.name, idx)] = ok;
+      if (n.base === "calculate") {
+        let v = ok ? evaluer(n.calculation, ctx) : "";
+        if (typeof v === "number") v = isNaN(v) || !isFinite(v) ? "" : +v.toFixed(10);
+        if (typeof v === "boolean") v = v ? "true" : "false";
+        if (idx != null) inst.repets[rep][idx][n.name] = v; else inst.valeurs[n.name] = v;
+      }
+    }
+  };
+  for (let passe = 0; passe < 3; passe++) parcourir(racine.children, true, null, null);
+}
+function interpoler(txt, idx) {
+  return (txt || "").replace(/\$\{(\w+)\}/g, (_, nom) => {
+    const n = CHAMPS[nom]; if (!n) return "";
+    const v = DANS_REPET[nom] ? brut(nom, idx) : inst.valeurs[nom];
+    if (estVide(v)) return "…";
+    if (n.liste && CHOIX_INDEX[n.liste]) return String(v).split(" ").map(c => CHOIX_INDEX[n.liste][c] || c).join(", ");
+    return String(v);
+  });
+}
+
+/* =======================================================================
+   4. Pages : chaque section du formulaire devient un écran
+   ======================================================================= */
+const PAGES = [];
+(function decouper() {
+  let debut = { titre: "Démarrage", sourcil: "", noeuds: [] };
+  for (const n of racine.children) {
+    if (n.kind === "field") { debut.noeuds.push(n); continue; }
+    const sousGroupes = n.children.some(c => c.kind !== "field");
+    if (n.kind === "group" && sousGroupes) {
+      let libres = [];
+      for (const c of n.children) {
+        if (c.kind === "field") { libres.push(c); continue; }
+        if (libres.length) { PAGES.push({ titre: n.label, sourcil: "", noeuds: libres, groupe: n }); libres = []; }
+        PAGES.push({ titre: c.label || c.name, sourcil: n.label, noeuds: [c], groupe: n, sansTitre: true });
+      }
+      if (libres.length) PAGES.push({ titre: n.label, sourcil: "", noeuds: libres, groupe: n });
+    } else PAGES.push({ titre: n.label || n.name, sourcil: "", noeuds: [n], sansTitre: true });
+  }
+  if (debut.noeuds.length) PAGES.unshift(debut);
+})();
+function noeudVisible(n) {
+  if (n.kind === "field" && ["calculate", "start", "end", "today", "deviceid", "username"].includes(n.base)) return false;
+  if (pertinent[n.name] === false && !DANS_REPET[n.name]) return false;
+  if (n.kind === "field") return true;
+  if (n.kind === "repeat") return pertinent[n.name] !== false;
+  return n.children.some(noeudVisible);
+}
+function pageVisible(pg) {
+  if (pg.groupe && pertinent[pg.groupe.name] === false) return false;
+  return pg.noeuds.some(noeudVisible);
+}
+const pagesActives = () => PAGES.filter(pageVisible);
+
+/* =======================================================================
+   5. Stockage local (le prototype garde tout sur l'appareil)
+   ======================================================================= */
+function lire(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+function ecrire(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+const jour = (dec = 0) => { const d = new Date(); d.setDate(d.getDate() + dec); return d.toISOString().slice(0, 10); };
+const EXEMPLES = [
+  { id: "ex-1", exemple: true, statut: "attente", resume: { asbc: "Exemple : ASBC de Doussi", lieu: "CSPS Bagassi · Boromo", date: jour(-1), pct: 72.4, perf: "Satisfaisant", sections: [["Prise en charge (PCIME)", 68.2], ["Promotion de la santé", 81], ["Gestion des intrants", 69.2]] },
+    plan: [{ Insuffisances: "PB non mesuré chez l'enfant de 6 à 59 mois", Recommandations_001: "Mesurer systématiquement le PB", Responsable: "ASBC", _ch_ance: jour(14) }] },
+  { id: "ex-2", exemple: true, statut: "envoyee", resume: { asbc: "Exemple : ASBC de Haho", lieu: "CSPS Bagassi · Boromo", date: jour(-6), pct: 46.5, perf: "Peu satisfaisant", sections: [["Prise en charge (PCIME)", 40.6], ["Gestion des intrants", 53.8]] },
+    plan: [{ Insuffisances: "Cahier de gestion de stock non à jour", Recommandations_001: "Mettre à jour le cahier chaque semaine", Responsable: "ICP", _ch_ance: jour(-2) },
+           { Insuffisances: "Seuils de respiration rapide non connus", Recommandations_001: "Recyclage PCIME-c au prochain regroupement", Responsable: "Superviseur", _ch_ance: jour(20) }] }
+];
+let fiches = lire("asbc_fiches", null) || EXEMPLES;
+let enLigne = lire("asbc_enligne", true);
+let suivi = lire("asbc_suivi", {});    // plan d'action : clé -> fait
+const sauver = () => { ecrire("asbc_fiches", fiches); ecrire("asbc_enligne", enLigne); ecrire("asbc_suivi", suivi); };
+
+/* =======================================================================
+   6. Interface
+   ======================================================================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const dateFr = d => d ? new Date(d + "T12:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : "";
+const classe = p => p === "" || p == null || isNaN(p) ? "neutre" : p >= 80 ? "ok" : p >= 50 ? "alerte" : "critique";
+let onglet = "accueil", page = 0, erreurs = {}, filtre = "toutes";
+
+function rendre() {
+  const enForm = onglet === "form";
+  $("#nav").hidden = enForm;
+  document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("actif", b.dataset.onglet === onglet));
+  const n = fiches.filter(f => f.statut === "attente").length;
+  $("#badge-sync").hidden = !n; $("#badge-sync").textContent = n;
+  $("#pied").innerHTML = "";
+  ({ accueil: ecranAccueil, supervisions: ecranSupervisions, plan: ecranPlan, formulaire: ecranFormulaire, form: ecranForm })[onglet]();
+}
+
+function barre(titre, sous, opts = {}) {
+  $("#barre").innerHTML = `<div class="barre-ligne">${opts.gauche || ""}<div style="flex:1;min-width:0">${opts.sourcil ? `<div class="sourcil">${esc(opts.sourcil)}</div>` : ""}<h1>${esc(titre)}</h1>${sous ? `<div class="sous">${sous}</div>` : ""}</div>
+    ${opts.droite || `<button class="reseau ${enLigne ? "" : "hors"}" id="btn-reseau" title="Simuler la perte de réseau"><span class="point"></span>${enLigne ? "En ligne" : "Hors ligne"}</button>`}</div>${opts.progression || ""}`;
+  const r = $("#btn-reseau");
+  if (r) r.onclick = () => { enLigne = !enLigne; sauver(); toast(enLigne ? "Réseau retrouvé : vous pouvez envoyer les fiches." : "Hors ligne : les fiches restent sur le téléphone."); rendre(); };
+}
+
+function ligneFiche(f) {
+  const r = f.resume;
+  const st = f.statut === "brouillon" ? `<span class="pastille p-neutre">Brouillon</span>` : f.statut === "attente" ? `<span class="pastille p-alerte">À envoyer</span>` : `<span class="pastille p-ok">Envoyée</span>`;
+  const ini = (r.asbc || "?").replace(/^Exemple : /, "").split(/\s+/).filter(m => m.length > 2).map(m => m[0]).join("").slice(0, 2).toUpperCase();
+  return `<button class="ligne" data-fiche="${f.id}"><div class="avatar">${esc(ini || "?")}</div><div class="corps"><div class="titre">${esc(r.asbc || "ASBC non choisi")}</div><div class="meta">${esc(dateFr(r.date))}${r.lieu ? " · " + esc(r.lieu) : ""}</div><div style="margin-top:3px">${st}</div></div><span class="score ${classe(r.pct)}">${r.pct === "" || r.pct == null ? "–" : r.pct + "%"}</span></button>`;
+}
+
+function ecranAccueil() {
+  barre("Supervision des ASBC", "Niveau formation sanitaire (PSC, CSPS, CM)");
+  const finies = fiches.filter(f => f.statut !== "brouillon" && f.resume.pct !== "");
+  const moy = finies.length ? Math.round(finies.reduce((s, f) => s + +f.resume.pct, 0) / finies.length) : "–";
+  const attente = fiches.filter(f => f.statut === "attente").length;
+  const brouillons = fiches.filter(f => f.statut === "brouillon");
+  $("#ecran").innerHTML = `
+    ${fiches.some(f => f.exemple) ? `<div class="exemple">Les fiches marquées « Exemple » sont fictives. Les vôtres s'ajoutent à la liste.</div>` : ""}
+    <div class="chiffres">
+      <div class="chiffre"><b>${fiches.filter(f => f.statut !== "brouillon").length}</b><span>fiches remplies</span></div>
+      <div class="chiffre"><b>${moy}${moy === "–" ? "" : '<small style="font-size:14px">%</small>'}</b><span>score global moyen</span></div>
+      <div class="chiffre ${attente ? "attention" : ""}"><b>${attente}</b><span>à envoyer</span></div>
+    </div>
+    <button class="btn btn-plein btn-large" id="nouvelle"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>Nouvelle supervision</button>
+    ${attente ? `<button class="btn btn-bleu btn-large" id="envoyer">Envoyer ${attente} fiche${attente > 1 ? "s" : ""} au serveur</button>` : ""}
+    ${brouillons.length ? `<h2>À terminer</h2><div class="liste">${brouillons.map(ligneFiche).join("")}</div>` : ""}
+    <h2>Dernières supervisions</h2>
+    ${finies.length ? `<div class="liste">${finies.slice(0, 4).map(ligneFiche).join("")}</div>` : `<div class="carte vide">Aucune fiche terminée.</div>`}`;
+  $("#nouvelle").onclick = nouvelle;
+  if ($("#envoyer")) $("#envoyer").onclick = envoyer;
+  brancherFiches();
+}
+
+function ecranSupervisions() {
+  const attente = fiches.filter(f => f.statut === "attente").length;
+  barre("Supervisions", attente ? `${attente} fiche${attente > 1 ? "s" : ""} en attente d'envoi` : "Tout est envoyé");
+  const l = fiches.filter(f => filtre === "toutes" || f.statut === filtre);
+  $("#ecran").innerHTML = `<div class="filtres">${[["toutes", "Toutes"], ["brouillon", "Brouillons"], ["attente", "À envoyer"], ["envoyee", "Envoyées"]].map(([k, t]) => `<button data-f="${k}" class="${filtre === k ? "sel" : ""}">${t}</button>`).join("")}</div>
+    ${attente ? `<button class="btn btn-bleu btn-large" id="envoyer">Envoyer maintenant</button>` : ""}
+    ${l.length ? `<div class="liste">${l.map(ligneFiche).join("")}</div>` : `<div class="carte vide">Aucune fiche dans ce filtre.</div>`}`;
+  document.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { filtre = b.dataset.f; rendre(); });
+  if ($("#envoyer")) $("#envoyer").onclick = envoyer;
+  brancherFiches();
+}
+function brancherFiches() { document.querySelectorAll("[data-fiche]").forEach(b => b.onclick = () => ouvrirFiche(b.dataset.fiche)); }
+
+function ecranPlan() {
+  const lignes = [];
+  fiches.filter(f => f.statut !== "brouillon").forEach(f => (f.plan || []).forEach((p, i) => { if (p.Insuffisances || p.Recommandations_001) lignes.push({ f, p, k: f.id + ":" + i }); }));
+  const ouvertes = lignes.filter(x => !suivi[x.k]).sort((a, b) => String(a.p._ch_ance || "9").localeCompare(String(b.p._ch_ance || "9")));
+  const faites = lignes.filter(x => suivi[x.k]);
+  barre("Plan de résolution", ouvertes.length + " recommandation" + (ouvertes.length > 1 ? "s" : "") + " à suivre");
+  const l = x => {
+    const retard = !suivi[x.k] && x.p._ch_ance && x.p._ch_ance < jour();
+    return `<label class="ligne" style="cursor:pointer;align-items:flex-start"><input type="checkbox" data-k="${x.k}" ${suivi[x.k] ? "checked" : ""} style="width:20px;height:20px;accent-color:var(--ok);flex:none;margin-top:2px">
+      <div class="corps"><div class="titre" style="font-weight:500;${suivi[x.k] ? "text-decoration:line-through;color:var(--texte-2)" : ""}">${esc(x.p.Recommandations_001 || x.p.Insuffisances)}</div>
+      ${x.p.Recommandations_001 && x.p.Insuffisances ? `<div class="meta">Insuffisance : ${esc(x.p.Insuffisances)}</div>` : ""}
+      <div class="meta">${esc(x.f.resume.asbc)}${x.p.Responsable ? " · " + esc(x.p.Responsable) : ""}${x.p._ch_ance ? " · échéance " + dateFr(x.p._ch_ance) : ""}</div></div>
+      ${suivi[x.k] ? `<span class="pastille p-ok">Réalisée</span>` : retard ? `<span class="pastille p-critique">En retard</span>` : `<span class="pastille p-neutre">Ouverte</span>`}</label>`;
+  };
+  $("#ecran").innerHTML = `<div class="indice">Les lignes viennent du « Plan de résolution des problèmes » de chaque fiche. Cochez une recommandation quand elle est réalisée : le taux de réalisation de la prochaine supervision s'en servira.</div>
+    <h2>À suivre</h2>${ouvertes.length ? `<div class="liste">${ouvertes.map(l).join("")}</div>` : `<div class="carte vide">Aucune recommandation ouverte.</div>`}
+    <h2>Réalisées</h2>${faites.length ? `<div class="liste">${faites.map(l).join("")}</div>` : `<div class="carte vide">Rien pour le moment.</div>`}`;
+  document.querySelectorAll("[data-k]").forEach(c => c.onchange = () => { suivi[c.dataset.k] = c.checked; sauver(); rendre(); });
+}
+
+function ecranFormulaire() {
+  const s = FORM.settings || {};
+  const types = {}; FORM.survey.forEach(r => { const b = r.type.split(" ")[0]; types[b] = (types[b] || 0) + 1; });
+  const questions = FORM.survey.filter(r => !["begin_group", "end_group", "begin_repeat", "end_repeat", "calculate", "note", "start", "end"].includes(r.type.split(" ")[0])).length;
+  const ctr = FORM.controles || [];
+  const asbc = (FORM.choices.asbc || []).length;
+  barre("Formulaire", esc(s.id_string || "") + (s.version ? " · version " + esc(s.version) : ""));
+  $("#ecran").innerHTML = `
+    <div class="carte"><dl class="kv">
+      <dt>Questions</dt><dd>${questions}</dd><dt>Calculs de score</dt><dd>${types.calculate || 0}</dd>
+      <dt>Écrans</dt><dd>${PAGES.length}</dd><dt>Listes de choix</dt><dd>${Object.keys(FORM.choices).length}</dd>
+      <dt>ASBC dans la liste</dt><dd>${asbc.toLocaleString("fr-FR")}</dd><dt>Villages</dt><dd>${(FORM.choices.village || []).length.toLocaleString("fr-FR")}</dd>
+    </dl></div>
+    <div class="indice">L'application lit le XLSForm tel quel : groupes, conditions d'affichage (relevant), calculs, contraintes, listes en cascade (choice_filter) et répétitions.</div>
+    <h2>Contrôle du XLSForm</h2>
+    <div class="carte">${ctr.length ? `<div class="indice" style="margin-bottom:6px">${ctr.filter(c => c.corrige).length} code(s) corrigé(s) dans le prototype, ${ctr.filter(c => !c.corrige).length} à corriger dans Kobo.</div>` +
+      ctr.map(c => `<div class="anomalie"><span class="pastille ${c.corrige ? "p-alerte" : "p-critique"}">${c.corrige ? "Corrigé ici" : "À corriger"}</span> Dans <code>${esc(c.dans)}</code>, ${c.message ? `<code>${esc(c.champ)}</code> : ${esc(c.message)}` : `la valeur <code>${esc(c.avant)}</code> n'existe pas pour <code>${esc(c.champ)}</code>${c.apres ? ` (remplacée par <code>${esc(c.apres)}</code>)` : ""}.`}</div>`).join("") : "Aucune anomalie détectée."}
+      ${ERREURS_EXPR.length ? ERREURS_EXPR.map(e => `<div class="anomalie"><span class="pastille p-critique">Expression</span> ${esc(e)}</div>`).join("") : ""}</div>
+    <h2>Données de démonstration</h2>
+    <button class="btn btn-contour btn-large" id="reinit">Effacer mes fiches et remettre les exemples</button>`;
+  $("#reinit").onclick = () => feuille(`<h3>Effacer les fiches ?</h3><div class="indice">Les fiches saisies sur ce téléphone seront supprimées.</div><div class="actions"><button class="btn btn-contour" data-fermer>Annuler</button><button class="btn btn-plein" id="ok-reinit">Effacer</button></div>`,
+    () => { $("#ok-reinit").onclick = () => { fiches = EXEMPLES.map(x => ({ ...x })); suivi = {}; sauver(); fermer(); toast("Fiches effacées."); rendre(); }; });
+}
+
+/* ---------- Fiche existante ---------- */
+function ouvrirFiche(id) {
+  const f = fiches.find(x => x.id === id); const r = f.resume;
+  if (f.statut === "brouillon" && !f.exemple) { inst = JSON.parse(JSON.stringify(f.inst)); page = f.page || 0; erreurs = {}; onglet = "form"; recalculer(); rendre(); return; }
+  feuille(`<h3>${esc(r.asbc)}</h3><div class="indice">${esc(dateFr(r.date))}${r.lieu ? " · " + esc(r.lieu) : ""}</div>
+    ${blocResultat(r)}
+    <div class="actions">${f.inst && f.statut !== "envoyee" ? `<button class="btn btn-contour" id="modifier">Modifier</button>` : ""}${f.inst ? `<button class="btn btn-contour" id="voir-json">Données</button>` : ""}<button class="btn btn-bleu" data-fermer>Fermer</button></div>`, () => {
+    if ($("#modifier")) $("#modifier").onclick = () => { fermer(); inst = JSON.parse(JSON.stringify(f.inst)); inst.id = f.id; page = 0; erreurs = {}; onglet = "form"; recalculer(); rendre(); };
+    if ($("#voir-json")) $("#voir-json").onclick = () => voirJson(f.inst);
+  });
+}
+function blocResultat(r) {
+  return `<div class="resultat" style="margin-top:14px"><div style="font-size:13px;opacity:.85">Score global ASBC</div><div class="grand">${r.pct === "" || r.pct == null ? "–" : r.pct + " %"}</div><div style="font-weight:600;margin-top:4px">${esc(r.perf || "")}</div><div class="barre-score"><i style="width:${Math.min(100, +r.pct || 0)}%"></i></div></div>
+    ${r.sections && r.sections.length ? `<div class="sections-score" style="margin-top:14px">${r.sections.map(([n, p]) => `<div class="sec-score"><span>${esc(n)}</span><b class="score ${classe(p)}" style="font-size:14px">${p} %</b><div class="jauge"><i style="width:${Math.min(100, p)}%;background:var(--${classe(p) === "neutre" ? "texte-2" : classe(p)})"></i></div></div>`).join("")}</div>` : ""}`;
+}
+function voirJson(i) {
+  const sortie = soumission(i);
+  const txt = JSON.stringify(sortie, null, 2);
+  feuille(`<h3>Données de la fiche</h3><div class="indice" style="margin-bottom:8px">Format proche d'une soumission Kobo (chemins de groupes). Les questions non pertinentes sont exclues.</div><pre class="json" id="json">${esc(txt)}</pre>
+    <div class="actions"><button class="btn btn-contour" id="copier">Copier</button><button class="btn btn-bleu" data-fermer>Fermer</button></div>`, () => {
+    $("#copier").onclick = () => navigator.clipboard.writeText(txt).then(() => toast("Données copiées."), () => { const r = document.createRange(); r.selectNodeContents($("#json")); getSelection().removeAllRanges(); getSelection().addRange(r); toast("Sélectionnées : copiez avec le menu du téléphone."); });
+  });
+}
+function soumission(i) {
+  const sauv = inst; inst = JSON.parse(JSON.stringify(i)); recalculer();
+  const out = {};
+  const chemin = n => { const p = []; let x = n.parent; while (x && x.kind !== "root") { if (x.kind !== "repeat") p.unshift(x.name); x = x.parent; } return p; };
+  const ecrireCh = (n, v, base) => { if (estVide(v)) return; base[[...chemin(n), n.name].join("/")] = v; };
+  const parcourir = (noeuds) => noeuds.forEach(n => {
+    if (n.kind === "group") return parcourir(n.children);
+    if (n.kind === "repeat") { out[n.name] = (inst.repets[n.name] || []).map((r, i) => { const o = {}; n.children.forEach(c => { if (c.kind === "field" && pertinent[cle(c.name, i)] !== false && c.base !== "note") ecrireCh(c, r[c.name], o); }); return o; }); return; }
+    if (n.base === "note" || pertinent[n.name] === false) return;
+    if (n.base === "draw" || n.appearance === "draw") return ecrireCh(n, inst.valeurs[n.name] ? "signature.png" : "", out);
+    ecrireCh(n, inst.valeurs[n.name], out);
+  });
+  parcourir(racine.children);
+  out["meta/instanceID"] = "uuid:" + i.id;
+  inst = sauv; if (inst) recalculer();
+  return out;
+}
+
+/* ---------- Saisie ---------- */
+function nouvelle() {
+  inst = { id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())), valeurs: { start: new Date().toISOString() }, repets: {} };
+  page = 0; erreurs = {}; onglet = "form"; recalculer(); rendre();
+}
+function resume() {
+  const v = inst.valeurs, lab = (n, c) => (CHOIX_INDEX[CHAMPS[n]?.liste] || {})[c] || "";
+  const sections = [];
+  const pc = (n, label) => { if (!estVide(v[n]) && pertinent[n] !== false) sections.push([label, +v[n]]); };
+  const ch = String(v.supervision_choisie || "").split(" ");
+  if (ch.includes("prise_en_charge")) pc("pct_global_pcime", "Prise en charge (PCIME)");
+  if (ch.includes("promotion")) pc("pct_global_promotion", "Promotion de la santé");
+  if (ch.includes("gestion_intrants")) pc("pct_global_gestion", "Gestion des intrants");
+  return {
+    asbc: v.Nom_et_pr_nom_de_l_ASBC || lab("asbc", v.asbc) || "", lieu: [lab("csps", v.csps), lab("district", v.district)].filter(Boolean).join(" · "),
+    date: v.Date_de_la_supervision || (v.start || "").slice(0, 10), pct: ch[0] && !estVide(v.pct_global_total) ? +v.pct_global_total : "", perf: ch[0] ? v.performance_globale || "" : "", sections
+  };
+}
+function enregistrerBrouillon() {
+  const f = fiches.find(x => x.id === inst.id);
+  const donnees = { id: inst.id, statut: "brouillon", inst: JSON.parse(JSON.stringify(inst)), resume: resume(), page };
+  if (f) Object.assign(f, donnees); else fiches.unshift(donnees);
+  sauver();
+}
+
+function ecranForm() {
+  recalculer();
+  const pages = pagesActives();
+  if (page >= pages.length) page = pages.length - 1;
+  const pg = pages[page];
+  const pct = inst.valeurs.supervision_choisie && !estVide(inst.valeurs.pct_global_total) ? inst.valeurs.pct_global_total : null;
+  barre(interpoler(pg.titre), `Écran ${page + 1} sur ${pages.length}`, {
+    sourcil: pg.sourcil, gauche: `<button class="icone-btn" id="quitter" aria-label="Fermer la fiche"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`,
+    droite: pct != null ? `<div class="puce-score"><b>${pct} %</b>score global</div>` : `<button class="reseau ${enLigne ? "" : "hors"}" id="btn-reseau"><span class="point"></span>${enLigne ? "En ligne" : "Hors ligne"}</button>`,
+    progression: `<div class="progression">${pages.map((_, i) => `<i class="${i < page ? "fait" : i === page ? "encours" : ""}"></i>`).join("")}</div>` });
+  $("#quitter").onclick = () => feuille(`<h3>Quitter la fiche ?</h3><div class="indice">Vous pouvez la garder en brouillon et la reprendre plus tard.</div>
+    <div class="actions"><button class="btn btn-contour" id="jeter">Abandonner</button><button class="btn btn-bleu" id="garder">Garder en brouillon</button></div>`, () => {
+    $("#garder").onclick = () => { enregistrerBrouillon(); fermer(); onglet = "accueil"; inst = null; rendre(); toast("Brouillon enregistré."); };
+    $("#jeter").onclick = () => { if (!fiches.find(x => x.id === inst.id && x.statut !== "brouillon")) fiches = fiches.filter(x => x.id !== inst.id); sauver(); fermer(); onglet = "accueil"; inst = null; rendre(); };
+  });
+  dessinerPage(pg);
+  $("#ecran").scrollTop = 0;
+  const dernier = page === pages.length - 1;
+  $("#pied").innerHTML = `<div class="pied-form gouttiere"><button class="btn btn-contour icone" id="sommaire" aria-label="Sommaire"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+    ${page > 0 ? `<button class="btn btn-contour" id="prec">Précédent</button>` : ""}<button class="btn ${dernier ? "btn-plein" : "btn-bleu"}" id="suiv">${dernier ? "Finaliser" : "Suivant"}</button></div>`;
+  if ($("#prec")) $("#prec").onclick = () => { page--; erreurs = {}; rendre(); };
+  $("#suiv").onclick = () => { if (!validerPage(pg)) return; if (dernier) finaliser(); else { page++; enregistrerBrouillon(); rendre(); } };
+  $("#sommaire").onclick = sommaire;
+}
+
+let derniereSig = "";
+function signaturePage(pg) {
+  const out = [];
+  const marcher = (noeuds, idx) => noeuds.forEach(n => {
+    if (!noeudVisible(n)) return;
+    if (n.kind === "group") { if (idx == null || pertinent[cle(n.name, idx)] !== false) marcher(n.children, idx); return; }
+    if (n.kind === "repeat") { const l = inst.repets[n.name] || []; out.push(n.name + ":" + l.length); l.forEach((_, i) => marcher(n.children, i)); return; }
+    const k = cle(n.name, idx);
+    if (pertinent[k] === false) return;
+    out.push(k);
+    if (n.choice_filter) out.push(choixFiltres(n, idx).length);
+  });
+  marcher(pg.noeuds, null);
+  return out.join("|") + "/" + Object.keys(erreurs).join("|");
+}
+function dessinerPage(pg) {
+  const y = $("#ecran").scrollTop;
+  const actif = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.k : null;
+  $("#ecran").innerHTML = pg.noeuds.map(n => html(n, null, pg.sansTitre)).join("");
+  brancher();
+  $("#ecran").scrollTop = y;
+  derniereSig = signaturePage(pg);
+  if (actif) { const el = $(`#ecran input[data-k="${actif}"]:not([type=checkbox]), #ecran textarea[data-k="${actif}"]`); if (el) el.focus({ preventScroll: true }); }
+}
+function majNotes() {
+  document.querySelectorAll("#ecran [data-note]").forEach(el => {
+    const [nom, i] = el.dataset.note.split("#");
+    el.innerHTML = esc(interpoler(CHAMPS[nom].label, i == null ? null : +i)).replace(/\s{2,}\|\s{2,}|[\u2028\u2029\r\n]+/g, "<br>").replace(/\s*[\uf000-\uf0ff]\s*/g, "<br>• ");
+  });
+}
+const pageCourante = () => pagesActives()[page];
+// Redessine l'écran seulement si les questions visibles ont changé ; sinon met à jour les scores en place.
+function rafraichir() {
+  recalculer();
+  const pg = pageCourante();
+  if (signaturePage(pg) === derniereSig) majNotes(); else dessinerPage(pg);
+  majPuce();
+}
+function majPuce() {
+  const p = $(".puce-score b"); const v = inst.valeurs.pct_global_total;
+  if (p && !estVide(v)) p.textContent = v + " %";
+}
+
+function html(n, idx, sansTitre) {
+  if (!noeudVisible(n)) return "";
+  if (n.kind === "field" && pertinent[cle(n.name, idx)] === false) return "";
+  if (n.kind === "group") {
+    if (idx != null && pertinent[cle(n.name, idx)] === false) return "";
+    const enfants = n.children.map(c => html(c, idx)).join("");
+    if (!enfants) return "";
+    return `<section class="groupe">${!sansTitre && n.label ? `<div class="groupe-titre">${esc(interpoler(n.label, idx))}</div>` : ""}${enfants}</section>`;
+  }
+  if (n.kind === "repeat") {
+    const l = inst.repets[n.name] || [{}];
+    return `<section class="groupe">${!sansTitre ? `<div class="groupe-titre">${esc(n.label)}</div>` : ""}
+      ${l.map((_, i) => `<div class="repet"><div class="repet-entete"><span>${esc(n.label.replace(/^\d+\.\s*/, "").slice(0, 34))}${n.label.length > 34 ? "…" : ""} · n° ${i + 1}</span>${l.length > 1 ? `<button class="btn btn-contour btn-petit" data-suppr="${n.name}" data-i="${i}">Retirer</button>` : ""}</div>${n.children.map(c => html(c, i)).join("")}</div>`).join("")}
+      <button class="btn btn-contour btn-large" data-ajout="${n.name}">+ Ajouter ${n.name === "groupe_enfants" ? "un enfant" : "une ligne"}</button></section>`;
+  }
+  return champ(n, idx);
+}
+
+function choixFiltres(n, idx) {
+  const liste = FORM.choices[n.liste] || [];
+  if (!n.choice_filter) return liste;
+  const base = contexte(idx);
+  return liste.filter(c => bool(evaluer(n.choice_filter, { ...base, attribut: a => a === "name" ? c[0] : a === "label" ? c[1] : a === "parent" ? (c[2] || "") : "" })));
+}
+
+function champ(n, idx) {
+  const k = cle(n.name, idx), v = DANS_REPET[n.name] ? brut(n.name, idx) : inst.valeurs[n.name];
+  const lab = interpoler(n.label || "", idx);
+  if (n.base === "note") {
+    const estScore = /score|performance/i.test(lab);
+    return `<div class="note ${estScore ? "score-note" : ""}" data-note="${k}">${esc(lab).replace(/\s{2,}\|\s{2,}|[\u2028\u2029\r\n]+/g, "<br>").replace(/\s*[\uf000-\uf0ff]\s*/g, "<br>• ")}</div>`;
+  }
+  const err = erreurs[k];
+  const q = `<span class="q">${esc(lab)}${n.required ? ' <span class="req">*</span>' : ""}</span>${n.hint ? `<div class="indice" style="margin:-6px 0 8px">${esc(n.hint)}</div>` : ""}`;
+  const fin = err ? `<div class="msg-erreur">${esc(err)}</div>` : "";
+  const id = "f-" + k.replace("#", "-");
+  let corps = "";
+  const d = `data-k="${k}"`;
+  switch (n.base) {
+    case "select_one": {
+      const ch = choixFiltres(n, idx);
+      if (n.appearance === "minimal" || ch.length > 6) {
+        corps = `<select id="${id}" ${d}><option value="">${ch.length ? "Choisir…" : "Choisissez d'abord la question précédente"}</option>${ch.map(c => `<option value="${esc(c[0])}" ${v === c[0] ? "selected" : ""}>${esc(c[1])}</option>`).join("")}</select>`;
+      } else corps = `<div class="choix" role="radiogroup">${ch.map(c => `<button type="button" role="radio" aria-checked="${v === c[0]}" ${d} data-v="${esc(c[0])}" class="${v === c[0] ? "sel" : ""}">${esc(c[1])}</button>`).join("")}</div>`;
+      break;
+    }
+    case "select_multiple": {
+      const sel = String(v || "").split(" ").filter(Boolean);
+      corps = `<div class="cases">${choixFiltres(n, idx).map(c => `<label><input type="checkbox" ${d} data-v="${esc(c[0])}" ${sel.includes(c[0]) ? "checked" : ""}><span>${esc(c[1])}</span></label>`).join("")}</div>`;
+      break;
+    }
+    case "integer": case "decimal": corps = `<input type="number" inputmode="${n.base === "integer" ? "numeric" : "decimal"}" id="${id}" ${d} value="${esc(v)}">`; break;
+    case "date": corps = `<input type="date" id="${id}" ${d} value="${esc(v)}">`; break;
+    case "geopoint": corps = `<div class="gps"><button type="button" class="btn btn-contour" data-gps="${k}">${v ? "Reprendre la position" : "Capturer la position"}</button>${v ? `<code>${esc(v)}</code>` : ""}</div>`; break;
+    case "text":
+      if (n.appearance === "draw") corps = `<canvas class="signature" data-sig="${k}"></canvas><div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><span class="indice">Signez avec le doigt.</span><button type="button" class="btn btn-contour btn-petit" data-effacer="${k}">Effacer</button></div>`;
+      else if (n.appearance === "multiline") corps = `<textarea id="${id}" ${d}>${esc(v)}</textarea>`;
+      else corps = `<input type="text" id="${id}" ${d} value="${esc(v)}">`;
+      break;
+    case "draw": corps = `<canvas class="signature" data-sig="${k}"></canvas>`; break;
+    default: corps = `<input type="text" id="${id}" ${d} value="${esc(v)}">`;
+  }
+  return `<div class="champ ${err ? "erreur" : ""}" id="c-${k.replace("#", "-")}">${["integer", "decimal", "date", "text"].includes(n.base) && n.appearance !== "draw" ? `<label class="q" for="${id}">${esc(lab)}${n.required ? ' <span class="req">*</span>' : ""}</label>` : q}${corps}${fin}</div>`;
+}
+
+function poser(k, v) {
+  const [nom, i] = k.split("#");
+  if (i != null) { const r = DANS_REPET[nom]; inst.repets[r][+i][nom] = v; } else inst.valeurs[nom] = v;
+  delete erreurs[k];
+  // listes en cascade : vider les questions qui dépendent de celle-ci
+  for (const n of Object.values(CHAMPS)) if (n.choice_filter && n.choice_filter.includes("${" + nom + "}") && !DANS_REPET[n.name]) {
+    const ok = choixFiltres(n, null).some(c => c[0] === inst.valeurs[n.name]); if (!ok && inst.valeurs[n.name]) poser(n.name, "");
+  }
+}
+const valeur = k => { const [nom, i] = k.split("#"); return i != null ? brut(nom, +i) : inst.valeurs[nom]; };
+
+function brancher() {
+  const e = $("#ecran");
+  e.querySelectorAll("button[data-k]").forEach(b => b.onclick = () => { const k = b.dataset.k; poser(k, valeur(k) === b.dataset.v ? "" : b.dataset.v); rafraichir(); });
+  e.querySelectorAll("select[data-k]").forEach(s => s.onchange = () => { poser(s.dataset.k, s.value); rafraichir(); });
+  e.querySelectorAll("input[type=checkbox][data-k]").forEach(c => c.onchange = () => {
+    const k = c.dataset.k; let l = String(valeur(k) || "").split(" ").filter(Boolean);
+    l = c.checked ? [...l, c.dataset.v] : l.filter(x => x !== c.dataset.v);
+    poser(k, l.join(" ")); rafraichir();
+  });
+  e.querySelectorAll("input[type=number][data-k], input[type=text][data-k], input[type=date][data-k], textarea[data-k]").forEach(el => {
+    el.oninput = () => { poser(el.dataset.k, el.value); recalculer(); majPuce(); };
+    el.onchange = () => { poser(el.dataset.k, el.value); setTimeout(rafraichir, 0); };
+  });
+  e.querySelectorAll("[data-ajout]").forEach(b => b.onclick = () => { inst.repets[b.dataset.ajout].push({}); rafraichir(); });
+  e.querySelectorAll("[data-suppr]").forEach(b => b.onclick = () => { inst.repets[b.dataset.suppr].splice(+b.dataset.i, 1); erreurs = {}; rafraichir(); });
+  e.querySelectorAll("[data-gps]").forEach(b => b.onclick = () => {
+    const fixer = (lat, lon, acc, simule) => { poser(b.dataset.gps, `${lat.toFixed(6)} ${lon.toFixed(6)} 0 ${Math.round(acc)}`); rafraichir(); if (simule) toast("Position simulée : le GPS n'est pas accessible dans cet aperçu."); };
+    const simuler = () => fixer(11.95 + Math.random() * .05, -3.75 + Math.random() * .05, 8, true);
+    if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => fixer(p.coords.latitude, p.coords.longitude, p.coords.accuracy), simuler, { timeout: 4000 });
+    else simuler();
+  });
+  e.querySelectorAll("[data-sig]").forEach(signature);
+}
+
+function signature(cv) {
+  const k = cv.dataset.sig, ctx = cv.getContext("2d"), r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  cv.width = r.width * dpr; cv.height = r.height * dpr; ctx.scale(dpr, dpr);
+  ctx.lineWidth = 2.2; ctx.lineCap = "round"; ctx.strokeStyle = getComputedStyle(document.body).color;
+  const v = valeur(k); if (v) { const im = new Image(); im.onload = () => ctx.drawImage(im, 0, 0, r.width, r.height); im.src = v; }
+  let actif = false;
+  const pos = e => { const b = cv.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
+  cv.onpointerdown = e => { actif = true; cv.setPointerCapture(e.pointerId); ctx.beginPath(); ctx.moveTo(...pos(e)); };
+  cv.onpointermove = e => { if (actif) { ctx.lineTo(...pos(e)); ctx.stroke(); } };
+  cv.onpointerup = () => { actif = false; poser(k, cv.toDataURL()); };
+  const eff = document.querySelector(`[data-effacer="${k}"]`);
+  if (eff) eff.onclick = () => { ctx.clearRect(0, 0, cv.width, cv.height); poser(k, ""); };
+}
+
+/* ---------- Contrôles : obligatoire et contraintes ---------- */
+function erreursNoeuds(noeuds, idx, out) {
+  for (const n of noeuds) {
+    if (n.kind === "group") { if (pertinent[cle(n.name, idx)] !== false) erreursNoeuds(n.children, idx, out); continue; }
+    if (n.kind === "repeat") { if (pertinent[n.name] !== false) (inst.repets[n.name] || []).forEach((_, i) => erreursNoeuds(n.children, i, out)); continue; }
+    if (["note", "calculate", "start", "end"].includes(n.base)) continue;
+    const k = cle(n.name, idx);
+    if (pertinent[k] === false) continue;
+    const v = valeur(k);
+    if (n.required && estVide(v)) { out[k] = "Réponse obligatoire."; continue; }
+    if (n.constraint && !estVide(v)) {
+      const ok = bool(evaluer(n.constraint, contexte(idx, valeurTypee(n, v))));
+      if (!ok) out[k] = n.constraint_message || "Réponse non valide.";
+    }
+  }
+  return out;
+}
+function validerPage(pg) {
+  recalculer();
+  erreurs = erreursNoeuds(pg.noeuds, null, {});
+  const n = Object.keys(erreurs).length;
+  if (!n) return true;
+  dessinerPage(pg);
+  const premier = $("#ecran .champ.erreur"); if (premier) premier.scrollIntoView({ behavior: "smooth", block: "center" });
+  toast(n + (n > 1 ? " questions demandent" : " question demande") + " une correction.");
+  return false;
+}
+function sommaire() {
+  recalculer();
+  const pages = pagesActives();
+  feuille(`<h3>Sommaire de la fiche</h3><div class="sommaire">${pages.map((p, i) => {
+    const nErr = Object.keys(erreursNoeuds(p.noeuds, null, {})).length;
+    return `<button data-aller="${i}" class="${i === page ? "courant" : ""}"><span class="num ${nErr && i < page ? "err" : ""}">${i + 1}</span><span style="flex:1;min-width:0">${esc(interpoler(p.titre))}${p.sourcil ? `<span class="petit">${esc(p.sourcil)}</span>` : ""}</span>${nErr ? `<span class="pastille p-neutre">${nErr} à remplir</span>` : `<span class="pastille p-ok">OK</span>`}</button>`;
+  }).join("")}</div>`, () => document.querySelectorAll("[data-aller]").forEach(b => b.onclick = () => { page = +b.dataset.aller; erreurs = {}; fermer(); rendre(); }));
+}
+function finaliser() {
+  recalculer();
+  const pages = pagesActives();
+  for (let i = 0; i < pages.length; i++) {
+    const e = erreursNoeuds(pages[i].noeuds, null, {});
+    if (Object.keys(e).length) { page = i; erreurs = e; rendre(); const p = $("#ecran .champ.erreur"); if (p) p.scrollIntoView({ block: "center" }); toast("Écran « " + pages[i].titre.slice(0, 40) + " » incomplet."); return; }
+  }
+  inst.valeurs.end = new Date().toISOString();
+  recalculer();
+  const r = resume();
+  const f = fiches.find(x => x.id === inst.id);
+  const plan = (inst.repets.group_fr4gh16 || []).map(x => ({ ...x }));
+  const donnees = { id: inst.id, statut: "attente", inst: JSON.parse(JSON.stringify(inst)), resume: r, plan };
+  if (f) Object.assign(f, donnees); else fiches.unshift(donnees);
+  sauver();
+  inst = null; onglet = "accueil"; rendre();
+  feuille(`<h3>Fiche finalisée</h3><div class="indice">${esc(r.asbc)} · ${enLigne ? "prête à être envoyée." : "gardée sur le téléphone jusqu'au retour du réseau."}</div>${blocResultat(r)}
+    <div class="actions"><button class="btn btn-contour" data-fermer>Plus tard</button><button class="btn btn-bleu" id="env">Envoyer</button></div>`, () => { $("#env").onclick = () => { fermer(); envoyer(); }; });
+}
+
+/* ---------- Envoi (simulé) ---------- */
+function envoyer() {
+  const n = fiches.filter(f => f.statut === "attente").length;
+  if (!n) return;
+  if (!enLigne) { toast("Pas de réseau : " + n + " fiche" + (n > 1 ? "s seront envoyées" : " sera envoyée") + " au retour du réseau."); return; }
+  feuille(`<h3>Envoi au serveur</h3><div class="indice">Envoi de ${n} fiche${n > 1 ? "s" : ""}…</div><div style="height:8px;background:var(--surface-2);border-radius:4px;margin-top:14px;overflow:hidden"><i id="pb" style="display:block;height:100%;width:0;background:var(--orange);transition:width .25s"></i></div>`, null, false);
+  let p = 0; const t = setInterval(() => { p += 20; const el = $("#pb"); if (el) el.style.width = p + "%";
+    if (p >= 100) { clearInterval(t); fiches.forEach(f => { if (f.statut === "attente") f.statut = "envoyee"; }); sauver(); fermer(); toast(n + (n > 1 ? " fiches envoyées." : " fiche envoyée.")); rendre(); } }, 250);
+}
+
+/* ---------- Feuilles et messages ---------- */
+function feuille(contenu, apres, fermable = true) {
+  $("#couche").innerHTML = `<div class="feuille" id="f"><div class="panneau gouttiere">${contenu}</div></div>`;
+  if (fermable) $("#f").onclick = e => { if (e.target.id === "f" || e.target.closest("[data-fermer]")) fermer(); };
+  if (apres) apres();
+}
+function fermer() { $("#couche").innerHTML = ""; }
+let minuteur;
+function toast(t) {
+  clearTimeout(minuteur); document.querySelectorAll(".toast").forEach(x => x.remove());
+  const d = document.createElement("div"); d.className = "toast"; d.setAttribute("role", "status"); d.textContent = t;
+  $("#tel").appendChild(d); minuteur = setTimeout(() => d.remove(), 3500);
+}
+
+document.querySelectorAll("#nav button").forEach(b => b.onclick = () => { onglet = b.dataset.onglet; rendre(); });
+// Compile toutes les expressions une fois pour signaler celles que le moteur ne sait pas lire.
+FORM.survey.forEach(r => ["relevant", "calculation", "constraint", "choice_filter"].forEach(k => { if (r[k]) evaluer(r[k], { lire: () => "", attribut: () => "" }); }));
+rendre();
+</script>
