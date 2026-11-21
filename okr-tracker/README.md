@@ -6,6 +6,10 @@ anglais, comme dans le fichier source *2027 OKR Consolidated Plans_V2.xlsx*.
 
 Architecture, modèle de données, règles d'import et de calcul : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+Le design reprend celui du tableau de bord **Big Wins** (dépôt `BigWin`) : barre du haut bleu marine, onglets,
+polices Oswald et Source Sans 3, cartes KPI, tableaux à en-tête marine, badges de statut pleins,
+barre de navigation en bas sur mobile, écran de connexion plein écran (mode Supabase).
+
 ## Installation
 
 Prérequis : Node.js 20 ou plus.

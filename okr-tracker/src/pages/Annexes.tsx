@@ -12,7 +12,7 @@ export default function Annexes() {
       <PageHeader title="Annexes" subtitle="Tableaux de référence repris tels quels du fichier source." />
       <div className="flex flex-wrap gap-2">
         {ds.annexes.map((x, i) => (
-          <button key={x.id} onClick={() => setTab(i)} className={`rounded-full px-3 py-1 text-sm font-medium ${i === tab ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'}`}>{x.sheet}</button>
+          <button key={x.id} onClick={() => setTab(i)} className={`rounded-full px-3 py-1 text-sm font-medium ${i === tab ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'}`}>{x.sheet}</button>
         ))}
       </div>
       <Card>

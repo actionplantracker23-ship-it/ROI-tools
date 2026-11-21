@@ -98,7 +98,7 @@ export default function CountryView() {
           return (
             <details key={t} className="border-t border-slate-100 py-2 first:border-t-0">
               <summary className="flex cursor-pointer items-center gap-2 text-sm">
-                <Link to={`/equipe/${t}`} className="font-semibold text-brand-700 hover:underline">{team.name}</Link>
+                <Link to={`/equipe/${t}`} className="font-semibold text-brand-500 hover:underline">{team.name}</Link>
                 <span className="text-xs text-slate-500">{list.length} initiative(s)</span>
                 <span className="ml-auto"><RagBadge rag={sc.rag} score={sc.progress} compact /></span>
               </summary>

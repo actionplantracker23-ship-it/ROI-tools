@@ -39,7 +39,7 @@ function MilestoneForm({ m, initiative, editable }: { m: Milestone; initiative: 
   };
 
   return (
-    <div className="rounded-lg border border-slate-200 p-3">
+    <div className="rounded-lg border border-ligne p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-semibold">Jalon Q{m.quarter}</span>
         <StatusBadge status={m.status} />
@@ -52,7 +52,7 @@ function MilestoneForm({ m, initiative, editable }: { m: Milestone; initiative: 
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-5">
               {STATUSES.map((s) => (
                 <button key={s} type="button" onClick={() => setStatus(s)}
-                  className={`rounded-lg border px-2 py-2 text-xs font-medium ${status === s ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600'}`}>
+                  className={`rounded-lg border px-2 py-2 text-xs font-medium ${status === s ? 'border-brand-600 bg-brand-50 text-brand-500' : 'border-ligne text-slate-600'}`}>
                   {STATUS_LABEL[s]}
                 </button>
               ))}
@@ -83,14 +83,14 @@ function MilestoneForm({ m, initiative, editable }: { m: Milestone; initiative: 
       ) : (
         <div className="space-y-1 text-xs text-slate-600">
           {m.actualValue !== null && <p>Valeur réelle : {m.actualValue}</p>}
-          {m.evidenceUrl && <p>Preuve : <a className="text-brand-700 underline" href={m.evidenceUrl} target="_blank" rel="noreferrer">{m.evidenceUrl}</a></p>}
+          {m.evidenceUrl && <p>Preuve : <a className="text-brand-500 underline" href={m.evidenceUrl} target="_blank" rel="noreferrer">{m.evidenceUrl}</a></p>}
           {m.comment && <p>Commentaire : {m.comment}</p>}
           <p className="italic text-slate-400">Consultation seule : vous n’êtes pas Lead de cette entité.</p>
         </div>
       )}
       {history.length > 0 && (
         <div className="mt-3 border-t border-slate-100 pt-2">
-          <button className="text-xs font-medium text-slate-600 hover:text-brand-700" onClick={() => setShowHistory(!showHistory)}>
+          <button className="text-xs font-medium text-slate-600 hover:text-brand-500" onClick={() => setShowHistory(!showHistory)}>
             {showHistory ? '▾' : '▸'} Historique ({history.length})
           </button>
           {showHistory && (
@@ -100,7 +100,7 @@ function MilestoneForm({ m, initiative, editable }: { m: Milestone; initiative: 
                   <span className="font-medium text-slate-800">{dateTime(h.at)}</span> · {h.by} · {STATUS_LABEL[h.status]}
                   {h.actualValue !== null && <> · réel {h.actualValue}</>}
                   {h.comment && <> · « {h.comment} »</>}
-                  {h.evidenceUrl && <> · <a href={h.evidenceUrl} target="_blank" rel="noreferrer" className="text-brand-700 underline">preuve</a></>}
+                  {h.evidenceUrl && <> · <a href={h.evidenceUrl} target="_blank" rel="noreferrer" className="text-brand-500 underline">preuve</a></>}
                 </li>
               ))}
             </ol>
@@ -199,7 +199,7 @@ export default function CheckIn() {
             <input className={`${inputCls} mt-1`} value={search} onChange={(e) => { setSearch(e.target.value); setParams({}); }} placeholder="Nom ou mot-clé" />
           </label>
         </div>
-        {focus && <button className="mt-2 text-xs font-medium text-brand-700" onClick={() => setParams({})}>← Voir toutes les initiatives</button>}
+        {focus && <button className="mt-2 text-xs font-medium text-brand-500" onClick={() => setParams({})}>← Voir toutes les initiatives</button>}
       </Card>
 
       {list.length === 0 && <EmptyState title="Aucune initiative ne correspond aux filtres." />}

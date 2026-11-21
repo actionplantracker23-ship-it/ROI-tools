@@ -7,12 +7,13 @@ import { krHasPlaceholder } from '../lib/progress';
 import { STATUS_LABEL, type EntityKR, type Initiative, type MilestoneStatus } from '../types';
 import { ObjectiveChip, ProgressBar, RagBadge, RoleBadge } from './ui';
 
+// Bordure gauche à la couleur du statut (palette Big Wins)
 const CELL: Record<MilestoneStatus, string> = {
-  not_started: 'border-slate-200 bg-white',
-  in_progress: 'border-blue-200 bg-blue-50',
-  achieved: 'border-green-300 bg-green-50',
-  late: 'border-red-300 bg-red-50',
-  cancelled: 'border-slate-200 bg-slate-50 opacity-60',
+  not_started: 'border-ligne border-l-4 border-l-rag-grey bg-white',
+  in_progress: 'border-ligne border-l-4 border-l-rag-amber bg-[#fffaf0]',
+  achieved: 'border-ligne border-l-4 border-l-rag-green bg-[#f2faf4]',
+  late: 'border-ligne border-l-4 border-l-rag-red bg-[#fdf1f1]',
+  cancelled: 'border-ligne border-l-4 border-l-[#2f3640] bg-slate-50 opacity-60',
 };
 
 /** Timeline Q1–Q4 d'une initiative. */
@@ -24,14 +25,14 @@ export function Timeline({ initiativeId }: { initiativeId: string }) {
       {[1, 2, 3, 4].map((q) => {
         const m = ms.find((x) => x.quarter === q);
         return (
-          <li key={q} className={`rounded-lg border p-2 text-xs ${m ? CELL[m.status] : 'border-dashed border-slate-200 bg-transparent'} ${q === quarter ? 'ring-2 ring-brand-500/40' : ''}`}>
+          <li key={q} className={`rounded-md border p-2 text-xs ${m ? CELL[m.status] : 'border-dashed border-ligne bg-transparent'} ${q === quarter ? 'ring-2 ring-accent/60' : ''}`}>
             <div className="mb-0.5 flex items-center justify-between gap-1">
               <span className="font-semibold text-slate-700">Q{q}</span>
               {m && <span className="text-[11px] font-medium text-slate-600">{STATUS_LABEL[m.status]}</span>}
             </div>
             <p className="line-clamp-3 text-slate-600" title={m?.description}>{m?.description ?? '—'}</p>
             {m?.actualValue !== null && m?.actualValue !== undefined && <p className="mt-0.5 font-medium text-slate-800">Réel : {m.actualValue}</p>}
-            {m?.evidenceUrl && <a href={m.evidenceUrl} target="_blank" rel="noreferrer" className="mt-0.5 block truncate text-brand-700 underline">Preuve</a>}
+            {m?.evidenceUrl && <a href={m.evidenceUrl} target="_blank" rel="noreferrer" className="mt-0.5 block truncate text-brand-500 underline">Preuve</a>}
           </li>
         );
       })}
@@ -44,7 +45,7 @@ export function InitiativeCard({ i, showEntity }: { i: Initiative; showEntity?: 
   const s = computed.initiative.get(i.id)!;
   const ent = ds.entities.find((e) => e.id === i.entityId);
   return (
-    <div className="rounded-lg border border-slate-200 p-3">
+    <div className="rounded-lg border border-ligne p-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-sm font-medium text-slate-800">{showEntity && ent && <span className="mr-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs">{ent.name}</span>}{i.title}</p>
@@ -59,7 +60,7 @@ export function InitiativeCard({ i, showEntity }: { i: Initiative; showEntity?: 
         <div className="flex items-center gap-2">
           {s.quant !== null && <span className="text-xs text-slate-500" title="(réel − baseline) / (cible − baseline)">Quantitatif {pct(s.quant)}</span>}
           <RagBadge rag={s.rag} score={s.progress} compact />
-          <Link to={`/check-in?initiative=${encodeURIComponent(i.id)}`} className="no-print text-xs font-medium text-brand-700 hover:underline">Check-in</Link>
+          <Link to={`/check-in?initiative=${encodeURIComponent(i.id)}`} className="no-print text-xs font-medium text-brand-500 hover:underline">Check-in</Link>
         </div>
       </div>
       <div className="mt-2"><Timeline initiativeId={i.id} /></div>
@@ -76,7 +77,7 @@ export function KrBlock({ kr, defaultOpen = false }: { kr: EntityKR; defaultOpen
   const inits = ds.initiatives.filter((i) => i.entityKrId === kr.id).sort((a, b) => a.order - b.order);
   const placeholder = krHasPlaceholder(ds, kr.id);
   return (
-    <div className="rounded-lg border border-slate-200 bg-white">
+    <div className="rounded-lg border border-ligne bg-white">
       <button onClick={() => setOpen(!open)} className="w-full p-3 text-left" aria-expanded={open}>
         <div className="flex flex-wrap items-center gap-1.5">
           {links.map((c) => {

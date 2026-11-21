@@ -49,7 +49,7 @@ export default function TeamView() {
                 const s = computed.globalKr.get(g)!;
                 return (
                   <li key={g}>
-                    <Link to={`/kr/${encodeURIComponent(g)}`} className="flex items-center gap-2 rounded-lg border border-slate-200 p-2 text-sm hover:bg-slate-50">
+                    <Link to={`/kr/${encodeURIComponent(g)}`} className="flex items-center gap-2 rounded-lg border border-ligne p-2 text-sm hover:bg-slate-50">
                       <b>{g}</b><RoleBadge role={lead ? 'Lead' : 'Contributes'} />
                       <span className="min-w-0 flex-1 truncate text-slate-600" title={gk?.title}>{gk?.title}</span>
                       <span className="tabular-nums">{pct(s?.progress)}</span>

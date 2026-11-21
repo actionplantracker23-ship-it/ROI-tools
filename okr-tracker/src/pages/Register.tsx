@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../AppContext';
 import { Button, Card, inputCls, NoData, PageHeader, RoleBadge } from '../components/ui';
@@ -65,30 +65,39 @@ export default function Register() {
           <input className={inputCls} placeholder="Rechercher…" value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} />
         </div>
       </Card>
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="min-w-[1000px] w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs text-slate-600">
+      <div className="overflow-x-auto rounded-lg border border-ligne bg-white">
+        <div className="border-b border-ligne px-4 pb-2.5 pt-4 text-center">
+          <h2 className="text-[21px] font-semibold">Registre OKR 2027</h2>
+          <p className="mt-1 text-sm text-slate-500">Chaque ligne relie un KR global à un KR pays/équipe (onglet « 1 OKR Register »)</p>
+        </div>
+        <table className="suivi min-w-[1000px]">
+          <thead>
             <tr>
               {COLS.map(([k, label]) => (
-                <th key={k} className="cursor-pointer select-none px-3 py-2 font-semibold" onClick={() => setSort({ col: k, asc: sort.col === k ? !sort.asc : true })}>
+                <th key={k} className="cursor-pointer select-none" onClick={() => setSort({ col: k, asc: sort.col === k ? !sort.asc : true })}>
                   {label}{sort.col === k ? (sort.asc ? ' ↑' : ' ↓') : ''}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {filtered.map((r) => (
-              <tr key={r.c.id} className="align-top hover:bg-slate-50">
-                <td className="px-3 py-2 text-xs"><span className="font-semibold" style={{ color: r.o?.color }}>{r.o?.id}</span></td>
-                <td className="px-3 py-2 font-semibold"><Link className="hover:text-brand-700" to={`/kr/${encodeURIComponent(r.ref)}`}>{r.ref}</Link></td>
+          <tbody>
+            {filtered.map((r, idx) => (
+              <Fragment key={r.c.id}>
+              {sort.col === 'ref' && filtered[idx - 1]?.ref !== r.ref && (
+                <tr className="grp"><td colSpan={COLS.length}><b className="mr-2 text-base">{r.ref}</b>{r.globalKr} <small className="ml-2 text-[#4a6584]">{r.o?.id} · {r.o?.title}</small></td></tr>
+              )}
+              <tr className="hover:bg-[#fafbfc]">
+                <td className=" text-xs"><span className="font-semibold" style={{ color: r.o?.color }}>{r.o?.id}</span></td>
+                <td className=" font-semibold"><Link className="hover:text-brand-500" to={`/kr/${encodeURIComponent(r.ref)}`}>{r.ref}</Link></td>
                 <td className="max-w-xs px-3 py-2 text-slate-600">{r.globalKr}</td>
-                <td className="px-3 py-2"><Link className="font-medium text-brand-700 hover:underline" to={entityPath(r.e)}>{r.entity}</Link></td>
-                <td className="px-3 py-2"><RoleBadge role={r.c.role} />{r.c.inferred && <span className="ml-1 text-[10px] text-slate-400" title="Absent du registre, déduit de la colonne Ref de l'onglet">déduit</span>}</td>
+                <td className=""><Link className="font-medium text-brand-500 hover:underline" to={entityPath(r.e)}>{r.entity}</Link></td>
+                <td className=""><RoleBadge role={r.c.role} />{r.c.inferred && <span className="ml-1 text-[10px] text-slate-400" title="Absent du registre, déduit de la colonne Ref de l'onglet">déduit</span>}</td>
                 <td className="max-w-xs px-3 py-2 text-slate-600">{r.entityObjective}</td>
                 <td className="max-w-sm px-3 py-2">{r.entityKr}</td>
-                <td className="px-3 py-2 text-slate-600">{r.lead}</td>
-                <td className="px-3 py-2 text-slate-600">{r.scope}</td>
+                <td className=" text-slate-600">{r.lead}</td>
+                <td className=" text-slate-600">{r.scope}</td>
               </tr>
+              </Fragment>
             ))}
           </tbody>
         </table>

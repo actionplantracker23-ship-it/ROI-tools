@@ -61,7 +61,7 @@ export default function GlobalKRView() {
                     if (!active || !payload?.length) return null;
                     const d = payload[0].payload as (typeof chart)[number];
                     return (
-                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow">
+                      <div className="rounded-lg border border-ligne bg-white px-3 py-2 text-xs shadow">
                         <div className="font-semibold">{d.name} · {d.role}</div>
                         <div>Avancement : {d.hasData ? pct(d.progress) : 'sans donnée'}</div>
                         <div>Poids : {d.weight} · Apport au KR global : {pct(d.share, 1)}</div>
@@ -88,22 +88,22 @@ export default function GlobalKRView() {
             const s = computed.entityKr.get(k.id)!;
             const inits = ds.initiatives.filter((i) => i.entityKrId === k.id);
             return (
-              <li key={c.id} className="rounded-lg border border-slate-200">
+              <li key={c.id} className="rounded-lg border border-ligne">
                 <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-3 py-2">
                   <RoleBadge role={c.role} />
-                  <Link to={entityPath(e)} className="text-sm font-semibold text-brand-700 hover:underline">{e.name}</Link>
+                  <Link to={entityPath(e)} className="text-sm font-semibold text-brand-500 hover:underline">{e.name}</Link>
                   <span className="text-xs text-slate-500">{c.scope}{c.inferred ? ' · lien déduit de l’onglet' : ''} · poids {contributionWeight(c, ds.settings)}</span>
                   <span className="ml-auto"><RagBadge rag={s.rag} score={s.progress} compact /></span>
                 </div>
                 <div className="px-3 py-2">
                   <p className="text-sm text-slate-800">{k.title}</p>
                   <p className="text-xs text-slate-500">KR Lead : {k.lead || '—'}</p>
-                  <ul className="mt-2 space-y-1 border-l-2 border-slate-200 pl-3">
+                  <ul className="mt-2 space-y-1 border-l-2 border-ligne pl-3">
                     {inits.map((i) => {
                       const is = computed.initiative.get(i.id)!;
                       return (
                         <li key={i.id}>
-                          <button onClick={() => setOpenInit(openInit === i.id ? null : i.id)} className="flex w-full items-center gap-2 text-left text-sm hover:text-brand-700">
+                          <button onClick={() => setOpenInit(openInit === i.id ? null : i.id)} className="flex w-full items-center gap-2 text-left text-sm hover:text-brand-500">
                             <span className="text-slate-400">{openInit === i.id ? '▾' : '▸'}</span>
                             <span className="flex-1">{i.title}</span>
                             <RagBadge rag={is.rag} score={is.progress} compact />
