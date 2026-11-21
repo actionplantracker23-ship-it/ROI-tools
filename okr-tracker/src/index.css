@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html { -webkit-text-size-adjust: 100%; }
+@media print {
+  .no-print { display: none !important; }
+  aside, header.app-bar { display: none !important; }
+  main { padding: 0 !important; }
+}
