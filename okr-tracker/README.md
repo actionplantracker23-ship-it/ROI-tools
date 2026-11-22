@@ -45,6 +45,15 @@ npx tsx scripts/check-import.ts "2027 OKR Consolidated Plans_V2.xlsx"
 
 `scripts/make-test-workbook.ts` produit un classeur **fictif** de même structure (tests uniquement).
 
+## Fichier HTML autonome (test local, sans publication)
+
+```bash
+npm run build:single
+```
+
+Produit `dist-single/okr-tracker-2027.html` : un seul fichier qui s'ouvre par double-clic dans le
+navigateur, sans serveur. Mode local : les données importées restent dans ce navigateur.
+
 ## Mode Supabase (multi-utilisateurs, droits réels)
 
 1. Créer un projet sur supabase.com.
