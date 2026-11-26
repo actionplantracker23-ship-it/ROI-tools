@@ -1,63 +1,29 @@
 /**
- * Import Excel à deux feuilles, avec correspondance de colonnes (proposée automatiquement, corrigeable) :
+ * Import du classeur OKR (format Living Goods), deux feuilles :
  *
- *  1. Registre OKR (« 1 OKR Register ») :
- *     Ref | Global Key Result | Country / Team | Role | Country/Team Objective | Country/Team Key Result | KR Lead | Scope | Go to plan
- *     + lignes de section « OBJECTIVE 1 · Embed and scale … » → objectifs du plan.
- *     → objectifs, KR globaux, engagements des unités (Lead / Contributes).
+ * 1. Registre (« OR register ») :
+ *    Ref | Global Key Result | Country / Team | Role | Country/Team Objective | Country/Team Key Result | KR Lead | Scope | Go to plan
+ *    - lignes « OBJECTIVE N · titre » → objectifs ;
+ *    - Ref « KR1.1 » + Global Key Result (« KR1.1\nIntitulé », cellule fusionnée) → KR global ;
+ *    - Ref « Team KR · O1 » → groupe des KR d'équipe sans KR global de l'objectif 1 ;
+ *    - chaque ligne = un KR d'équipe globale (activité globale) ou un KR pays (activité pays) ;
+ *      « Global Programs (PEI) » → équipe PEI ; « Kenya (Finance & Admin) » → Kenya, sous-équipe Finance & Admin ;
+ *    - « No country/team plan yet » → KR global sans plan (signalé).
  *
- *  2. Analyse d'alignement activités globales ↔ activités pays, deux formats acceptés :
- *     - « long » : une ligne par lien (Ref, Département, Activité globale, Pays, Activité pays, Alignement…) ;
- *     - « large » : une ligne par activité globale et une colonne par pays contenant l'activité pays.
- *     → activités globales (par département), activités pays liées ; une activité pays sans activité
- *       globale (ou marquée non alignée) est ORPHELINE. Une activité globale sans pays est normale.
+ * 2. Analyse d'alignement (« alignement du OKR ») :
+ *    A · Country | Obj. | Ref | Country Key Result | KR Lead | Global teams with a KR under the same Ref | # | Status | Finding / gap | Recommended action
+ *    B · Global team | Obj. | Ref | Global team Key Result | Scope | Countries with a KR under the same Ref | # | Status | Finding / gap | Recommended action
+ *    → liens KR pays ↔ KR des équipes globales (même Ref), statut (Aligned, Partial, Conflict, Gap, Global only),
+ *      constat et action recommandée. KR pays sans équipe globale (« — none — ») = ORPHELIN.
  *
- * Cellules fusionnées dépliées ; cellules vides des colonnes de regroupement (Ref, département, pays)
- * propagées vers le bas. La colonne « Activité globale » n'est PAS propagée : une ligne pays sans
- * activité globale (cellule non fusionnée vide) est donc bien une activité orpheline.
+ * Réimport : les éléments déjà présents (même unité, même Ref, même intitulé) sont mis à jour en conservant
+ * leur suivi (statut, avancement, indicateurs, historique).
  */
 import * as XLSX from 'xlsx';
-import type { Activity, Commitment, Indicator, KeyResult, Objective, Unit, Workspace } from '../types';
+import type { Activity, AlignStatus, KeyResult, Objective, Unit, Workspace } from '../types';
 import { OBJECTIVE_COLORS } from '../types';
-import { newActivity, newIndicator } from './ops';
-import { clean, key, uid } from './util';
-
-export interface Field { id: string; label: string; aliases: string[]; required?: boolean; fill?: boolean; hint?: string }
-
-export const REGISTER_FIELDS: Field[] = [
-  { id: 'ref', label: 'Ref (KR global)', aliases: ['ref', 'reference', 'kr ref'], required: true, fill: true },
-  { id: 'globalKr', label: 'Global Key Result', aliases: ['global key result', 'global kr', 'kr global', 'resultat cle global'], fill: true },
-  { id: 'unit', label: 'Country / Team', aliases: ['country team', 'country', 'team', 'pays equipe', 'equipe', 'pays', 'unit'], required: true },
-  { id: 'role', label: 'Role', aliases: ['role'] },
-  { id: 'unitObjective', label: 'Country/Team Objective', aliases: ['country team objective', 'country objective', 'team objective', 'objectif pays'] },
-  { id: 'unitKr', label: 'Country/Team Key Result', aliases: ['country team key result', 'country key result', 'team key result', 'kr pays'] },
-  { id: 'krLead', label: 'KR Lead', aliases: ['kr lead', 'key result lead', 'responsable kr'] },
-  { id: 'scope', label: 'Scope', aliases: ['scope', 'portee'] },
-  { id: 'planRef', label: 'Go to plan', aliases: ['go to plan', 'plan', 'lien plan'] },
-  { id: 'indicator', label: 'Indicateur du KR (facultatif)', aliases: ['indicator', 'indicateur', 'kpi', 'metric'] },
-];
-
-export const ALIGN_FIELDS: Field[] = [
-  { id: 'ref', label: 'Ref (KR global)', aliases: ['ref', 'reference', 'kr', 'global kr ref'], fill: true },
-  { id: 'globalUnit', label: 'Département global', aliases: ['global team', 'department', 'departement', 'global department', 'team', 'equipe globale', 'global unit'], fill: true },
-  { id: 'globalActivity', label: 'Activité globale', aliases: ['global activity', 'global activities', 'activite globale', 'activites globales', 'global initiative', 'activite du global'], required: true },
-  { id: 'country', label: 'Pays', aliases: ['country', 'pays'], fill: true },
-  { id: 'countryActivity', label: 'Activité pays', aliases: ['country activity', 'country activities', 'activite pays', 'activites pays', 'country initiative', 'activite du pays'] },
-  { id: 'alignment', label: 'Statut d’alignement', aliases: ['alignment', 'alignement', 'aligned', 'aligne', 'status', 'statut', 'link', 'lien'], hint: 'Aligné / Partiel / Non aligné (orphelin)' },
-  { id: 'globalIndicator', label: 'Indicateur activité globale', aliases: ['global indicator', 'indicateur global', 'indicateur activite globale'] },
-  { id: 'countryIndicator', label: 'Indicateur activité pays', aliases: ['country indicator', 'indicateur pays', 'indicateur activite pays'] },
-  { id: 'comment', label: 'Commentaire', aliases: ['comment', 'comments', 'commentaire', 'commentaires', 'remarks', 'observation', 'gap', 'ecart'] },
-];
-
-export interface SheetInfo {
-  name: string;
-  headerRow: number; // index dans grid
-  headers: string[];
-  grid: string[][];
-  guess: 'register' | 'alignment' | 'other';
-}
-
-export type Mapping = Record<string, number>; // id de champ → index de colonne (-1 = non utilisé)
+import { newActivity } from './ops';
+import { clean, key, similarity, uid } from './util';
 
 // ------------------------------------------------------------------ lecture
 
@@ -75,294 +41,295 @@ export function sheetToGrid(ws: XLSX.WorkSheet): string[][] {
   return grid;
 }
 
-const fieldHits = (headers: string[], fields: Field[]) => fields.filter((f) => headers.some((h) => f.aliases.some((a) => key(h) === a || key(h).startsWith(a + ' ')))).length;
-
-export function readWorkbook(wb: XLSX.WorkBook): SheetInfo[] {
-  return wb.SheetNames.map((name) => {
-    const grid = sheetToGrid(wb.Sheets[name]);
-    let headerRow = -1;
-    let best = 0;
-    let guess: SheetInfo['guess'] = 'other';
-    for (let r = 0; r < Math.min(grid.length, 30); r++) {
-      const row = grid[r];
-      if (row.filter(Boolean).length < 2) continue;
-      const reg = fieldHits(row, REGISTER_FIELDS);
-      const ali = fieldHits(row, ALIGN_FIELDS) + (row.filter((h) => key(h).includes('activ')).length >= 2 ? 2 : 0);
-      const score = Math.max(reg, ali);
-      if (score > best) { best = score; headerRow = r; guess = ali > reg ? 'alignment' : 'register'; }
+type Cols = Record<string, number>;
+/** Repère une ligne d'en-tête contenant tous les intitulés demandés ; renvoie la ligne et l'index des colonnes. */
+function findHeader(grid: string[][], wanted: Record<string, string[]>, from = 0): { row: number; cols: Cols } | null {
+  for (let r = from; r < grid.length; r++) {
+    const keys = grid[r].map(key);
+    const cols: Cols = {};
+    let ok = true;
+    for (const [f, aliases] of Object.entries(wanted)) {
+      const i = keys.findIndex((k) => aliases.some((a) => k === a || k.startsWith(a)));
+      if (i < 0) { ok = false; break; }
+      cols[f] = i;
     }
-    if (best < 2) { headerRow = grid.findIndex((r) => r.filter(Boolean).length >= 2); guess = 'other'; }
-    const k = key(name);
-    if (k.includes('register') || k.includes('registre')) guess = 'register';
-    else if (k.includes('align') || k.includes('analys')) guess = 'alignment';
-    return { name, headerRow, headers: headerRow >= 0 ? grid[headerRow] : [], grid, guess };
-  });
+    if (ok) return { row: r, cols };
+  }
+  return null;
 }
 
-/** Correspondance proposée : intitulé identique, puis commençant par, puis contenant l'alias. */
-export function guessMapping(headers: string[], fields: Field[]): Mapping {
-  const keys = headers.map(key);
-  const used = new Set<number>();
-  const map: Mapping = Object.fromEntries(fields.map((f) => [f.id, -1]));
-  const tests: ((h: string, a: string) => boolean)[] = [(h, a) => h === a, (h, a) => h.startsWith(a + ' '), (h, a) => a.length > 4 && h.includes(a)];
-  for (const t of tests) {
-    for (const f of fields) {
-      if (map[f.id] >= 0) continue;
-      for (const a of f.aliases) {
-        const i = keys.findIndex((h, n) => !used.has(n) && h && t(h, a));
-        if (i >= 0) { map[f.id] = i; used.add(i); break; }
+const REGISTER_COLS = {
+  ref: ['ref'], globalKr: ['global key result'], unit: ['country team'], role: ['role'], objective: ['country team objective'],
+  kr: ['country team key result'], lead: ['kr lead'], scope: ['scope'],
+};
+const A_COLS = {
+  country: ['country'], obj: ['obj'], ref: ['ref'], kr: ['country key result'], lead: ['kr lead'], teams: ['global teams with'],
+  status: ['status'], finding: ['finding'], action: ['recommended action'],
+};
+const B_COLS = {
+  team: ['global team'], obj: ['obj'], ref: ['ref'], kr: ['global team key result'], scope: ['scope'], countries: ['countries with'],
+  status: ['status'], finding: ['finding'], action: ['recommended action'],
+};
+
+export interface RegRow { row: number; objective: number; code: string; team: boolean; krTitle: string; unit: string; role: string; objectiveText: string; kr: string; lead: string; scope: string }
+export interface ARow { row: number; country: string; code: string; kr: string; lead: string; teams: string[]; status: AlignStatus | null; finding: string; action: string }
+export interface BRow { row: number; team: string; code: string; kr: string; scope: string; countries: string[]; status: AlignStatus | null; finding: string; action: string }
+
+export interface OkrFile {
+  registerSheet: string | null;
+  alignmentSheet: string | null;
+  objectives: Map<number, string>;
+  register: RegRow[];
+  a: ARow[];
+  b: BRow[];
+  noPlan: string[]; // KR globaux sans plan pays/équipe
+  warnings: string[];
+}
+
+const SECTION = /^\s*OBJECTIVE\s*(\d+)\s*[·:.\-–—|]?\s*([\s\S]*)$/i;
+
+/** « KR1.1 » → KR1.1 ; « Team KR · O3 » ou (« Team KR », « O3 ») → « Team KR · O3 ». */
+function refCode(ref: string, obj = ''): { code: string; objective: number; team: boolean } | null {
+  const m = ref.match(/KR\s*(\d+)\s*\.\s*(\d+)/i);
+  if (m) return { code: `KR${Number(m[1])}.${Number(m[2])}`, objective: Number(m[1]), team: false };
+  if (/team\s*kr/i.test(ref)) {
+    const o = (ref.match(/O\s*(\d+)/i) ?? obj.match(/O?\s*(\d+)/i));
+    if (o) return { code: `Team KR · O${Number(o[1])}`, objective: Number(o[1]), team: true };
+  }
+  return null;
+}
+
+const statusOf = (s: string): AlignStatus | null => {
+  const k = key(s);
+  if (k.startsWith('align')) return 'aligned';
+  if (k.startsWith('partial')) return 'partial';
+  if (k.startsWith('conflict')) return 'conflict';
+  if (k.startsWith('gap')) return 'gap';
+  if (k.startsWith('global only')) return 'global_only';
+  return null;
+};
+/** « Global Programs (PEI), DHGP » → [« Global Programs (PEI) », « DHGP »] ; « — none — » → []. */
+const splitList = (s: string) => (key(s) === 'none' || !key(s) ? [] : s.split(/\s*,\s*/).map(clean).filter((x) => key(x) && key(x) !== 'none'));
+
+export function readOkrWorkbook(wb: XLSX.WorkBook): OkrFile {
+  const out: OkrFile = { registerSheet: null, alignmentSheet: null, objectives: new Map(), register: [], a: [], b: [], noPlan: [], warnings: [] };
+  for (const name of wb.SheetNames) {
+    const grid = sheetToGrid(wb.Sheets[name]);
+    const reg = findHeader(grid, REGISTER_COLS);
+    if (reg && !out.registerSheet) {
+      out.registerSheet = name;
+      const c = reg.cols;
+      let objective = 0;
+      let lastRef = '';
+      let lastKrTitle = '';
+      for (let r = reg.row + 1; r < grid.length; r++) {
+        const row = grid[r];
+        const first = row.find(Boolean) ?? '';
+        if (!first) continue;
+        const sec = first.match(SECTION);
+        if (sec) { objective = Number(sec[1]); out.objectives.set(objective, clean(sec[2])); continue; }
+        const ref = row[c.ref] || lastRef;
+        const rc = refCode(ref);
+        if (!rc) { out.warnings.push(`Registre, ligne ${r + 1} : Ref illisible (« ${row[c.ref]} »).`); continue; }
+        if (ref !== lastRef) lastKrTitle = '';
+        lastRef = ref;
+        const g = row[c.globalKr];
+        if (g) lastKrTitle = rc.team ? 'Team KRs (no Global KR)' : clean(g.replace(/^KR\s*\d+\s*\.\s*\d+\s*/i, ''));
+        const kr = row[c.kr];
+        const base = { row: r + 1, objective: rc.objective || objective, code: rc.code, team: rc.team, krTitle: lastKrTitle, unit: row[c.unit], role: row[c.role], objectiveText: row[c.objective], kr, lead: row[c.lead], scope: row[c.scope] };
+        if (!kr || /no country.?team plan/i.test(kr)) { out.noPlan.push(`${rc.code}${row[c.unit] ? ` (${row[c.unit]})` : ''}`); out.register.push({ ...base, kr: '' }); continue; }
+        out.register.push(base);
+      }
+    }
+    const ha = findHeader(grid, A_COLS);
+    const hb = findHeader(grid, B_COLS);
+    if ((ha || hb) && !out.alignmentSheet) {
+      out.alignmentSheet = name;
+      const stopAt = (from: number) => { let r = from; while (r < grid.length && grid[r].some(Boolean) && !/^\s*[AB]\s*·/.test(grid[r][0])) r++; return r; };
+      if (ha) {
+        const c = ha.cols;
+        for (let r = ha.row + 1, end = stopAt(ha.row + 1); r < end; r++) {
+          const row = grid[r];
+          const rc = refCode(row[c.ref], row[c.obj]);
+          if (!rc || !row[c.kr]) continue;
+          out.a.push({ row: r + 1, country: row[c.country], code: rc.code, kr: row[c.kr], lead: row[c.lead], teams: splitList(row[c.teams]), status: statusOf(row[c.status]), finding: row[c.finding], action: row[c.action] });
+        }
+      }
+      if (hb) {
+        const c = hb.cols;
+        for (let r = hb.row + 1, end = stopAt(hb.row + 1); r < end; r++) {
+          const row = grid[r];
+          const rc = refCode(row[c.ref], row[c.obj]);
+          if (!rc || !row[c.kr]) continue;
+          out.b.push({ row: r + 1, team: row[c.team], code: rc.code, kr: row[c.kr], scope: row[c.scope], countries: splitList(row[c.countries]), status: statusOf(row[c.status]), finding: row[c.finding], action: row[c.action] });
+        }
       }
     }
   }
-  return map;
-}
-
-/** Colonnes dont l'intitulé est un pays connu → format « large » de l'analyse d'alignement. */
-export function countryColumns(headers: string[], units: Unit[]): { col: number; unit: Unit | null; label: string }[] {
-  const out: { col: number; unit: Unit | null; label: string }[] = [];
-  headers.forEach((h, col) => {
-    const u = resolveUnit(h, units, 'country');
-    if (u && u.type === 'country') out.push({ col, unit: u, label: h });
-  });
+  if (!out.registerSheet) out.warnings.push('Feuille du registre non trouvée (en-têtes Ref, Global Key Result, Country / Team, …).');
+  if (!out.alignmentSheet) out.warnings.push('Feuille d’analyse d’alignement non trouvée (en-têtes Country, Ref, Country Key Result, Status, …).');
   return out;
 }
 
 // ------------------------------------------------------------------ unités
 
-const UNIT_ALIASES: Record<string, string[]> = {
-  'burkina-faso': ['burkina', 'bf'], uganda: ['ouganda', 'ug'], benin: ['bj'], zambia: ['zambie'], kenya: ['ke'],
-  pc: ['p c', 'people culture', 'people and culture'], dt: ['digital technology', 'digital transformation'],
-  innovations: ['innovation'],
+const COUNTRY_ALIASES: Record<string, string[]> = {
+  kenya: ['kenya'], 'burkina-faso': ['burkina faso', 'burkina', 'bf'], uganda: ['uganda', 'ouganda'], benin: ['benin'], zambia: ['zambia', 'zambie'],
 };
 
-export function resolveUnit(label: string, units: Unit[], prefer?: Unit['type']): Unit | null {
-  const k = key(label);
+/** « Global Programs (PEI) » → { name: PEI, group: Global Programs } ; « Kenya (Finance & Admin) » → { name: Kenya, sub: Finance & Admin }. */
+export function parseUnitLabel(label: string): { name: string; group?: string; sub: string } {
+  const m = clean(label).match(/^(.*?)\s*\((.*)\)\s*$/);
+  if (!m) return { name: clean(label), sub: '' };
+  if (key(m[1]) === 'global programs') return { name: clean(m[2]), group: 'Global Programs', sub: '' };
+  return { name: clean(m[1]), sub: clean(m[2]) };
+}
+
+export function findUnit(units: Unit[], name: string): Unit | null {
+  const k = key(name);
   if (!k) return null;
-  const cands: { u: Unit; len: number }[] = [];
-  for (const u of units) {
-    const names = [u.name, u.id.replace(/-/g, ' '), ...(UNIT_ALIASES[u.id] ?? [])].map(key).filter(Boolean);
-    for (const n of names) {
-      if (k === n) return u;
-      if (n.length >= 2 && new RegExp(`(^| )${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`).test(k)) cands.push({ u, len: n.length });
-    }
-  }
-  cands.sort((a, b) => b.len - a.len || (prefer && a.u.type === prefer ? -1 : 0));
-  return cands[0]?.u ?? null;
+  return units.find((u) => key(u.name) === k || u.id === k.replace(/ /g, '-') || (COUNTRY_ALIASES[u.id] ?? []).includes(k)) ?? null;
 }
 
 // ------------------------------------------------------------------ construction
 
-export interface ImportRequest {
-  planId: string;
-  register?: { sheet: SheetInfo; mapping: Mapping };
-  alignment?: {
-    sheet: SheetInfo; mapping: Mapping; wide: boolean; countryCols: { col: number; unitId: string }[];
-    /**
-     * Lignes de suite (défaut : oui) : une cellule « Activité globale » vide reprend l'activité du dessus
-     * si Ref et Département sont vides aussi et que la ligne n'est pas marquée non alignée.
-     * Sinon la ligne pays est orpheline.
-     */
-    continuation?: boolean;
-  };
-  replace: boolean; // vider le plan avant import
-}
-
 export interface ImportReport {
-  objectives: number; krs: number; commitments: number; globalActivities: number; countryActivities: number;
-  aligned: number; partial: number; orphans: number; indicators: number; unitsCreated: string[]; warnings: string[];
+  objectives: number; krs: number; globalActivities: number; countryActivities: number; updated: number;
+  linked: number; orphans: number; orphanTitles: string[];
+  countryStatus: Record<string, number>; globalStatus: Record<string, number>;
+  unmatched: string[]; noPlan: string[]; unitsCreated: string[]; kept: number; warnings: string[];
 }
 
-const isSection = (s: string) => /^\s*OBJECTIVE\s*\d+/i.test(s);
-const sectionMatch = (s: string) => s.match(/^\s*OBJECTIVE\s*(\d+)\s*[·:.\-–—|]?\s*([\s\S]*)$/i);
-const parseRef = (s: string) => { const m = s.match(/(?:KR\s*)?(\d{1,2})\s*[.,]\s*(\d{1,2})/i); return m ? { o: Number(m[1]), code: `KR${Number(m[1])}.${Number(m[2])}` } : null; };
-const alignmentOf = (s: string): 'full' | 'partial' | 'none' | null => {
-  const k = key(s);
-  if (!k) return null;
-  if (/(non|not|no|pas|aucun|orphan|orphelin|missing|manque|unaligned)/.test(k) && !/partial|partiel/.test(k)) return 'none';
-  if (/partial|partiel|partly|partiellement/.test(k)) return 'partial';
-  return 'full';
-};
-
-/** Lignes de données (après l'en-tête) avec propagation vers le bas des colonnes de regroupement. */
-function dataRows(sheet: SheetInfo, mapping: Mapping, fields: Field[], onSection: (n: number, title: string) => void) {
-  const out: Record<string, string>[] = [];
-  const carry: Record<string, string> = {};
-  for (let r = sheet.headerRow + 1; r < sheet.grid.length; r++) {
-    const row = sheet.grid[r];
-    const first = row.find(Boolean) ?? '';
-    if (!first) continue;
-    if (isSection(first)) {
-      const m = sectionMatch(first);
-      if (m) onSection(Number(m[1]), clean(m[2]));
-      for (const f of fields) if (f.fill) delete carry[f.id];
-      continue;
-    }
-    const v: Record<string, string> = { __row: String(r + 1) };
-    for (const f of fields) {
-      const c = mapping[f.id];
-      v[f.id] = c >= 0 ? clean(row[c]) : '';
-      if (f.fill) { if (v[f.id]) carry[f.id] = v[f.id]; else v[f.id] = carry[f.id] ?? ''; }
-    }
-    v.__raw = JSON.stringify(row);
-    out.push(v);
-  }
-  return out;
-}
-
-export function runImport(ws0: Workspace, req: ImportRequest): { ws: Workspace; report: ImportReport } {
+export function importOkr(ws0: Workspace, planId: string, file: OkrFile, opts: { replace: boolean }): { ws: Workspace; report: ImportReport } {
   let ws = ws0;
-  const planId = req.planId;
-  const report: ImportReport = { objectives: 0, krs: 0, commitments: 0, globalActivities: 0, countryActivities: 0, aligned: 0, partial: 0, orphans: 0, indicators: 0, unitsCreated: [], warnings: [] };
-  if (req.replace) {
+  if (opts.replace) {
     const acts = new Set(ws.activities.filter((a) => a.planId === planId).map((a) => a.id));
     const inds = new Set(ws.indicators.filter((i) => i.planId === planId).map((i) => i.id));
     ws = {
       ...ws, objectives: ws.objectives.filter((x) => x.planId !== planId), krs: ws.krs.filter((x) => x.planId !== planId),
-      commitments: ws.commitments.filter((x) => x.planId !== planId), activities: ws.activities.filter((x) => x.planId !== planId),
-      activityUpdates: ws.activityUpdates.filter((u) => !acts.has(u.activityId)), indicators: ws.indicators.filter((x) => x.planId !== planId),
-      indicatorValues: ws.indicatorValues.filter((v) => !inds.has(v.indicatorId)),
+      activities: ws.activities.filter((x) => x.planId !== planId), activityUpdates: ws.activityUpdates.filter((u) => !acts.has(u.activityId)),
+      indicators: ws.indicators.filter((x) => x.planId !== planId), indicatorValues: ws.indicatorValues.filter((v) => !inds.has(v.indicatorId)),
     };
   }
-  const objectives = ws.objectives.filter((o) => o.planId === planId);
-  const krs = ws.krs.filter((k) => k.planId === planId);
-  const acts = ws.activities.filter((a) => a.planId === planId);
+  const report: ImportReport = {
+    objectives: 0, krs: 0, globalActivities: 0, countryActivities: 0, updated: 0, linked: 0, orphans: 0, orphanTitles: [],
+    countryStatus: {}, globalStatus: {}, unmatched: [], noPlan: file.noPlan, unitsCreated: [], kept: 0, warnings: [...file.warnings],
+  };
   const units = [...ws.units];
-  const newObjectives: Objective[] = [];
-  const newKrs: KeyResult[] = [];
-  const newCommitments: Commitment[] = [];
-  const newActs: Activity[] = [];
-  const newInds: Indicator[] = [];
-  const sectionTitles = new Map<number, string>();
+  const objectives = new Map(ws.objectives.filter((o) => o.planId === planId).map((o) => [o.code, { ...o }]));
+  const krs = new Map(ws.krs.filter((k) => k.planId === planId).map((k) => [k.code, { ...k }]));
+  const existing = ws.activities.filter((a) => a.planId === planId);
+  const touched = new Set<string>();
 
-  const unitFor = (label: string, type: Unit['type'], row: string): Unit | null => {
-    if (!label) return null;
-    const u = resolveUnit(label, units, type);
-    if (u) return u;
-    const created: Unit = { id: uid('u-'), name: label.replace(/^global programs\s*[–-]\s*/i, ''), type, order: units.length };
-    units.push(created);
-    report.unitsCreated.push(`${created.name} (${type === 'country' ? 'pays' : 'département'}, ligne ${row})`);
-    return created;
+  const unitFor = (label: string, scope: string): { unit: Unit; sub: string } => {
+    const p = parseUnitLabel(label);
+    let u = findUnit(units, p.name);
+    if (!u) {
+      const isCountry = key(scope) === key(p.name) || Object.values(COUNTRY_ALIASES).some((a) => a.includes(key(p.name)));
+      u = { id: uid('u-'), name: p.name, type: isCountry ? 'country' : 'department', group: p.group, order: units.length };
+      units.push(u);
+      report.unitsCreated.push(`${u.name} (${isCountry ? 'pays' : 'équipe globale'})`);
+    }
+    return { unit: u, sub: p.sub };
   };
   const objectiveFor = (n: number): Objective => {
-    let o = [...objectives, ...newObjectives].find((x) => x.code === String(n));
-    if (!o) {
-      o = { id: uid('o-'), planId, code: String(n), title: sectionTitles.get(n) ?? `Objective ${n}`, color: OBJECTIVE_COLORS[(n - 1) % OBJECTIVE_COLORS.length], order: n - 1 };
-      newObjectives.push(o);
-    } else if (sectionTitles.get(n) && /^Objective \d+$/.test(o.title)) o.title = sectionTitles.get(n)!;
+    const code = String(n);
+    let o = objectives.get(code);
+    const title = file.objectives.get(n);
+    if (!o) { o = { id: uid('o-'), planId, code, title: title || `Objective ${n}`, color: OBJECTIVE_COLORS[(n - 1) % OBJECTIVE_COLORS.length], order: n - 1 }; objectives.set(code, o); report.objectives++; }
+    else if (title) o.title = title;
     return o;
   };
-  const krFor = (refText: string, title: string): KeyResult | null => {
-    const r = parseRef(refText);
-    if (!r) return null;
-    let k = [...krs, ...newKrs].find((x) => x.code === r.code);
-    const o = objectiveFor(r.o);
+  const krFor = (code: string, objective: number, title: string, team: boolean): KeyResult => {
+    let k = krs.get(code);
+    const o = objectiveFor(objective);
     if (!k) {
-      k = { id: uid('kr-'), planId, objectiveId: o.id, code: r.code, title: title || r.code, order: Number(r.code.split('.')[1]) - 1 };
-      newKrs.push(k);
-    } else if (title && (k.title === k.code || !k.title)) k.title = title;
+      const parts = code.match(/(\d+)\.(\d+)/);
+      k = { id: uid('kr-'), planId, objectiveId: o.id, code, title: title || code, order: parts ? Number(parts[2]) - 1 : 90, team };
+      krs.set(code, k);
+      report.krs++;
+    } else if (title) k.title = title;
     return k;
   };
-  const addIndicator = (type: Indicator['targetType'], targetId: string, name: string) => {
-    if (!name) return;
-    const all = [...ws.indicators, ...newInds];
-    if (all.some((i) => i.targetId === targetId && key(i.name) === key(name))) return;
-    newInds.push({ ...newIndicator({ ...ws, indicators: all }, planId, type, targetId), name });
+  for (const n of file.objectives.keys()) objectiveFor(n);
+
+  // 1. registre → activités globales / pays
+  const acts: Activity[] = [];
+  const newIds = new Set<string>();
+  const keyOf = (unitId: string, krId: string, title: string) => `${unitId}|${krId}|${key(title)}`;
+  const existingByKey = new Map(existing.map((a) => [keyOf(a.unitId, a.krId ?? '', a.title), a]));
+  file.register.forEach((r, n) => {
+    const k = krFor(r.code, r.objective, r.krTitle, r.team);
+    if (!r.kr) return;
+    const { unit, sub } = unitFor(r.unit, r.scope);
+    const role = key(r.role) === 'lead' ? 'Lead' : key(r.role).startsWith('contrib') ? 'Contributes' : null;
+    const fields = { role, unitObjective: r.objectiveText, subTeam: sub, scope: r.scope, owner: r.lead, krId: k.id, order: n } as const;
+    const prev = existingByKey.get(keyOf(unit.id, k.id, r.kr));
+    if (prev) { acts.push({ ...prev, ...fields }); touched.add(prev.id); report.updated++; return; }
+    const a = newActivity(ws, { planId, level: unit.type === 'country' ? 'country' : 'global', unitId: unit.id, title: r.kr, ...fields });
+    newIds.add(a.id);
+    acts.push(a);
+  });
+  const kept = existing.filter((a) => !touched.has(a.id)).map((a) => ({ ...a }));
+  report.kept = kept.length;
+  const all = [...acts, ...kept];
+  const krIdOf = (code: string) => krs.get(code)?.id;
+
+  /** Meilleure activité correspondant à une ligne de l'analyse (même unité, même Ref, texte le plus proche). */
+  const match = (level: Activity['level'], unitLabel: string, code: string, text: string): Activity | null => {
+    const p = parseUnitLabel(unitLabel);
+    const u = findUnit(units, p.name);
+    const kid = krIdOf(code);
+    if (!u || !kid) return null;
+    const cands = all.filter((a) => a.level === level && a.unitId === u.id && a.krId === kid);
+    if (cands.length === 1) return cands[0];
+    let best: Activity | null = null;
+    let s = 0;
+    for (const c of cands) { const x = similarity(c.title, text); if (x > s) { s = x; best = c; } }
+    return s >= 0.3 ? best : null;
   };
 
-  // 1. registre -------------------------------------------------------------------------------------
-  if (req.register) {
-    const rows = dataRows(req.register.sheet, req.register.mapping, REGISTER_FIELDS, (n, t) => { if (t) sectionTitles.set(n, t); });
-    for (const [n, t] of sectionTitles) { const o = [...objectives, ...newObjectives].find((x) => x.code === String(n)); if (o && t) o.title = t; }
-    for (const v of rows) {
-      const k = krFor(v.ref, v.globalKr);
-      if (!k) { if (v.unit || v.unitKr) report.warnings.push(`Registre, ligne ${v.__row} : référence de KR illisible (« ${v.ref} »).`); continue; }
-      // unité connue (quel que soit son type) ; sinon créée : pays si le scope l'indique, département sinon
-      const u = unitFor(v.unit, /pays|country/i.test(v.scope) ? 'country' : 'department', v.__row);
-      if (!u) continue;
-      const dup = [...ws.commitments, ...newCommitments].find((c) => c.planId === planId && c.krId === k.id && c.unitId === u.id && key(c.unitKr) === key(v.unitKr));
-      if (dup) continue;
-      newCommitments.push({
-        id: uid('c-'), planId, krId: k.id, unitId: u.id, role: key(v.role).startsWith('lead') ? 'Lead' : 'Contributes',
-        unitObjective: v.unitObjective, unitKr: v.unitKr, krLead: v.krLead, scope: v.scope, planRef: v.planRef,
-      });
-      addIndicator('kr', k.id, v.indicator);
-    }
-    // objectifs annoncés par une section sans KR
-    for (const n of sectionTitles.keys()) objectiveFor(n);
+  // 2. analyse A : KR pays → équipes globales qui le soutiennent
+  const fromA = new Set<string>();
+  for (const r of file.a) {
+    const a = match('country', r.country, r.code, r.kr);
+    if (!a) { report.unmatched.push(`Alignement A, ligne ${r.row} : ${r.country} ${r.code} « ${r.kr.slice(0, 60)} »`); continue; }
+    const kid = krIdOf(r.code);
+    const teamIds = new Set(r.teams.map((t) => findUnit(units, parseUnitLabel(t).name)?.id).filter(Boolean));
+    a.parentIds = all.filter((g) => g.level === 'global' && g.krId === kid && teamIds.has(g.unitId)).map((g) => g.id);
+    a.alignment = r.status; a.finding = r.finding; a.action = r.action;
+    fromA.add(a.id);
+  }
+  // KR pays absents de la partie A : règle du fichier (équipes globales ayant un KR sous la même Ref)
+  for (const a of all.filter((x) => x.level === 'country' && !fromA.has(x.id) && newIds.has(x.id))) {
+    a.parentIds = all.filter((g) => g.level === 'global' && g.krId === a.krId).map((g) => g.id);
+  }
+  // 3. analyse B : KR des équipes globales → pays
+  for (const r of file.b) {
+    const g = match('global', r.team, r.code, r.kr);
+    if (!g) { report.unmatched.push(`Alignement B, ligne ${r.row} : ${r.team} ${r.code} « ${r.kr.slice(0, 60)} »`); continue; }
+    g.alignment = r.status; g.finding = r.finding; g.action = r.action;
   }
 
-  // 2. analyse d'alignement -------------------------------------------------------------------------
-  if (req.alignment) {
-    const { sheet, mapping, wide, countryCols } = req.alignment;
-    const rows = dataRows(sheet, mapping, ALIGN_FIELDS, (n, t) => { if (t && !sectionTitles.has(n)) sectionTitles.set(n, t); });
-    const findAct = (level: Activity['level'], unitId: string, title: string) =>
-      [...acts, ...newActs].find((a) => a.level === level && a.unitId === unitId && key(a.title) === key(title));
-    const multiLinked = new Set<string>();
-    let alignedWithoutGlobal = 0;
-    let lastGlobal: Activity | null = null;
-    const rawCell = (v: Record<string, string>, f: string) => (mapping[f] >= 0 ? clean(JSON.parse(v.__raw)[mapping[f]]) : '');
-    for (const v of rows) {
-      const k = v.ref ? krFor(v.ref, '') : null;
-      let g: Activity | null = null;
-      const isContinuation = req.alignment.continuation !== false && !v.globalActivity && !rawCell(v, 'ref') && !rawCell(v, 'globalUnit')
-        && alignmentOf(v.alignment) !== 'none' && lastGlobal !== null;
-      if (isContinuation) g = lastGlobal;
-      if (v.globalActivity && !isSection(v.globalActivity)) {
-        const gu = unitFor(v.globalUnit || 'Global', 'department', v.__row)!;
-        g = findAct('global', gu.id, v.globalActivity) ?? null;
-        if (!g) {
-          g = newActivity({ ...ws, activities: [...ws.activities, ...newActs] }, { planId, level: 'global', unitId: gu.id, krId: k?.id ?? null, title: v.globalActivity });
-          newActs.push(g);
-        } else if (!g.krId && k) g.krId = k.id;
-        addIndicator('activity', g.id, v.globalIndicator);
-        lastGlobal = g;
-      } else if (!isContinuation) lastGlobal = null;
-      const pairs: { country: string; unitId?: string; text: string }[] = wide
-        ? countryCols.map((c) => ({ country: '', unitId: c.unitId, text: clean(JSON.parse(v.__raw)[c.col]) })).filter((p) => p.text)
-        : v.countryActivity ? [{ country: v.country, text: v.countryActivity }] : [];
-      for (const p of pairs) {
-        const cu = p.unitId ? units.find((u) => u.id === p.unitId)! : unitFor(p.country, 'country', v.__row);
-        if (!cu) { report.warnings.push(`Alignement, ligne ${v.__row} : pays manquant pour « ${p.text.slice(0, 50)} ».`); continue; }
-        // une même cellule peut lister plusieurs activités pays (une par ligne)
-        for (const text of p.text.split(/\n+/).map((t) => t.replace(/^[-•*\d.)\s]+/, '').trim()).filter(Boolean)) {
-          if (/^(n\/?a|na|-|none|aucune?|nil|0)$/i.test(text)) continue;
-          const st = alignmentOf(v.alignment);
-          if (!g && (st === 'full' || st === 'partial')) alignedWithoutGlobal++;
-          const parent = st === 'none' ? null : g;
-          let c = findAct('country', cu.id, text);
-          if (!c) {
-            c = newActivity({ ...ws, activities: [...ws.activities, ...newActs] }, {
-              planId, level: 'country', unitId: cu.id, krId: k?.id ?? null, title: text,
-              parentId: parent?.id ?? null, alignment: parent ? (st === 'partial' ? 'partial' : 'full') : null, comment: v.comment,
-            });
-            newActs.push(c);
-          } else if (parent && c.parentId && c.parentId !== parent.id) multiLinked.add(c.id);
-          else if (parent && !c.parentId) { c.parentId = parent.id; c.alignment = st === 'partial' ? 'partial' : 'full'; }
-          addIndicator('activity', c.id, v.countryIndicator);
-        }
-      }
-    }
-    if (alignedWithoutGlobal) report.warnings.push(`${alignedWithoutGlobal} activité(s) pays marquée(s) alignée(s) mais sans activité globale sur la ligne : classées orphelines, à rattacher.`);
-    if (multiLinked.size) report.warnings.push(`${multiLinked.size} activité(s) pays citée(s) pour plusieurs activités globales : rattachées à la première.`);
-  }
+  const planActs = all;
+  const country = planActs.filter((a) => a.level === 'country');
+  const global = planActs.filter((a) => a.level === 'global');
+  report.globalActivities = acts.filter((a) => a.level === 'global').length - global.filter((a) => touched.has(a.id)).length;
+  report.countryActivities = acts.filter((a) => a.level === 'country').length - country.filter((a) => touched.has(a.id)).length;
+  report.linked = country.filter((a) => a.parentIds.length).length;
+  const orphans = country.filter((a) => !a.parentIds.length);
+  report.orphans = orphans.length;
+  report.orphanTitles = orphans.map((a) => `${units.find((u) => u.id === a.unitId)?.name} · ${[...krs.values()].find((k) => k.id === a.krId)?.code ?? ''} · ${a.title.slice(0, 90)}`);
+  for (const a of country) report.countryStatus[a.alignment ?? 'none'] = (report.countryStatus[a.alignment ?? 'none'] ?? 0) + 1;
+  for (const a of global) report.globalStatus[a.alignment ?? 'none'] = (report.globalStatus[a.alignment ?? 'none'] ?? 0) + 1;
 
-  // titres d'objectifs connus après coup
-  for (const o of [...objectives, ...newObjectives]) { const t = sectionTitles.get(Number(o.code)); if (t && /^Objective \d+$/.test(o.title)) o.title = t; }
-
+  const objList = [...objectives.values()];
+  const krList = [...krs.values()];
   ws = {
     ...ws, units,
-    objectives: [...ws.objectives.map((o) => objectives.find((x) => x.id === o.id) ?? o), ...newObjectives],
-    krs: [...ws.krs.map((k) => krs.find((x) => x.id === k.id) ?? k), ...newKrs],
-    commitments: [...ws.commitments, ...newCommitments],
-    activities: [...ws.activities.map((a) => acts.find((x) => x.id === a.id) ?? a), ...newActs],
-    indicators: [...ws.indicators, ...newInds],
+    objectives: [...ws.objectives.filter((o) => o.planId !== planId), ...objList],
+    krs: [...ws.krs.filter((k) => k.planId !== planId), ...krList],
+    activities: [...ws.activities.filter((a) => a.planId !== planId), ...planActs],
   };
-  const countryNew = newActs.filter((a) => a.level === 'country');
-  Object.assign(report, {
-    objectives: newObjectives.length, krs: newKrs.length, commitments: newCommitments.length,
-    globalActivities: newActs.length - countryNew.length, countryActivities: countryNew.length,
-    aligned: countryNew.filter((a) => a.parentId).length, partial: countryNew.filter((a) => a.alignment === 'partial').length,
-    orphans: countryNew.filter((a) => !a.parentId).length, indicators: newInds.length,
-  });
   return { ws, report };
 }

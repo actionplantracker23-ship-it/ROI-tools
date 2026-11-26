@@ -1,48 +1,43 @@
-/** Classeur FICTIF reproduisant la structure décrite (registre + analyse d'alignement). Textes inventés. */
+/**
+ * Classeur de STRUCTURE pour les tests automatiques uniquement (mise en page identique au fichier OKR :
+ * registre avec sections et cellules fusionnées, analyse d'alignement parties A et B). Textes neutres.
+ */
 import * as XLSX from 'xlsx';
 
-export function registerSheet(): string[][] {
-  return [
+export function workbook(): XLSX.WorkBook {
+  const reg = [
+    ['OKR Register · test', '', '', '', '', '', '', '', '◄ Contents'],
+    [],
     ['Ref', 'Global Key Result', 'Country / Team', 'Role', 'Country/Team Objective', 'Country/Team Key Result', 'KR Lead', 'Scope', 'Go to plan'],
-    ['OBJECTIVE 1  ·  Embed and scale high performing eCHIS, Smart Supervision, and performance management practices into implementation support in Kenya and Burkina Faso.'],
-    ['KR1.1', 'eCHIS scaled in 2 countries', 'DHGP', 'Lead', 'DHGP objective', 'DHGP supports eCHIS scale-up', 'Lead D', 'Global', '7 DHGP'],
-    ['', '', 'Kenya', 'Contributes', 'Kenya objective', 'Kenya eCHIS in 10 counties', 'Lead K', 'Pays', '2 Kenya'],
-    ['', '', 'Burkina Faso', 'Contributes', 'BF objective', 'BF eCHIS in 3 regions', 'Lead B', 'Pays', '3 Burkina Faso'],
-    ['KR1.2', 'Smart supervision adopted', 'GSE', 'Lead', 'GSE objective', 'GSE smart supervision', 'Lead G', 'Global', '6 GSE'],
-    ['OBJECTIVE 2  ·  Second test objective'],
-    ['KR2.1', 'Finance KR', 'Finance', 'Lead', 'Fin objective', 'Finance KR text', 'Lead F', 'Global', '9 Finance'],
+    ['OBJECTIVE 1  ·  Objective one title'],
+    ['KR1.1', 'KR1.1\r\nGlobal KR one', 'Kenya', 'Lead', 'Obj K', 'Kenya KR a', 'Lead K', 'Kenya', 'Open ►'],
+    ['KR1.1', '', 'Kenya (Finance & Admin)', 'Contributes', 'Obj KF', 'Kenya finance KR', 'Lead KF', 'Kenya', 'Open ►'],
+    ['KR1.1', '', 'Global Programs (PEI)', 'Contributes', 'Obj PEI', 'PEI KR a', 'Lead P', 'Global', 'Open ►'],
+    ['KR1.1', '', 'DHGP', 'Contributes', 'Obj D', 'DHGP KR a', 'Lead D', 'Global', 'Open ►'],
+    ['KR1.2', 'KR1.2\r\nGlobal KR two', 'Burkina Faso', 'Lead', 'Obj B', 'Burkina KR orphan', 'Lead B', 'Burkina Faso', 'Open ►'],
+    ['Team KR · O1', 'Team KRs (no Global KR) Key Results set by a team', 'Global Programs (PEI)', 'Team KR', 'Obj PEI2', 'PEI team KR', 'Lead P', 'Global', 'Open ►'],
+    ['OBJECTIVE 2  ·  Objective two title'],
+    ['KR2.1', 'KR2.1\r\nGlobal KR three', 'CEO', '', 'No country/team plan yet', '', '', '', ''],
   ];
-}
-
-export function alignmentLong(): string[][] {
-  return [
-    ['Analyse d’alignement des activités'],
-    ['Ref', 'Département', 'Activité globale', 'Pays', 'Activité pays', 'Alignement', 'Commentaire'],
-    ['KR1.1', 'DHGP', 'Deploy eCHIS training package', 'Kenya', 'Train CHAs on eCHIS in 10 counties', 'Aligné', ''],
-    ['', '', '', 'Burkina Faso', 'Former les ASC sur eCHIS', 'Partiel', 'Couverture régionale seulement'],
-    ['KR1.2', 'GSE', 'Smart supervision rollout', '', '', '', 'Pas encore décliné en pays'],
-    ['KR1.1', '', '', 'Kenya', 'Kenya-only data dashboard', 'Non aligné', 'Initiative locale'],
-    ['KR2.1', 'Finance', 'Budget tracking tool', 'Zambia', 'Zambia budget tracking', 'Aligned', ''],
+  const ali = [
+    ['OKR Alignment · test'],
+    ['Status', 'Country KRs', 'Global team KRs'],
+    ['A  ·  COUNTRY KR  →  IS IT SUPPORTED BY A GLOBAL TEAM KR?'],
+    ['Country', 'Obj.', 'Ref', 'Country Key Result', 'KR Lead', 'Global teams with a KR under the same Ref', '# Global team KRs', 'Status', 'Finding / gap', 'Recommended action'],
+    ['Kenya', 'O1', 'KR1.1', 'Kenya KR a', 'Lead K', 'Global Programs (PEI), DHGP', '2', 'Aligned', 'Supported', 'None'],
+    ['Kenya', 'O1', 'KR1.1', 'Kenya finance KR', 'Lead KF', 'DHGP', '1', 'Partial', 'Only DHGP', 'Add PEI'],
+    ['Burkina Faso', 'O1', 'KR1.2', 'Burkina KR orphan', 'Lead B', '— none —', '0', 'Gap', 'No global team KR', 'Name a team'],
+    [],
+    ['B · GLOBAL TEAM KR → DO THE COUNTRIES COMMIT TO IT?'],
+    ['Global team', 'Obj.', 'Ref', 'Global team Key Result', 'Scope', 'Countries with a KR under the same Ref', '# Country KRs', 'Status', 'Finding / gap', 'Recommended action'],
+    ['Global Programs (PEI)', 'O1', 'KR1.1', 'PEI KR a', 'Global', 'Kenya', '2', 'Aligned', 'ok', 'None'],
+    ['DHGP', 'O1', 'KR1.1', 'DHGP KR a', 'Global', 'Kenya', '2', 'Conflict', 'Dates differ', 'Align dates'],
+    ['Global Programs (PEI)', 'O1', 'Team KR · O1', 'PEI team KR', 'Global', '— none —', '0', 'Global only', 'Analytics', 'None'],
   ];
-}
-
-export function alignmentWide(): string[][] {
-  return [
-    ['Ref', 'Department', 'Global activity', 'Kenya', 'Burkina Faso', 'Uganda'],
-    ['KR1.1', 'DHGP', 'Deploy eCHIS training package', 'Train CHAs on eCHIS', 'Former les ASC\nSuivi mensuel eCHIS', ''],
-    ['KR1.2', 'GSE', 'Smart supervision rollout', '', '', 'N/A'],
-  ];
-}
-
-export function workbook(align: string[][] = alignmentLong()): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
-  const reg = XLSX.utils.aoa_to_sheet(registerSheet());
-  XLSX.utils.book_append_sheet(wb, reg, 'OKR Register');
-  const al = XLSX.utils.aoa_to_sheet(align);
-  // l'activité globale DHGP est fusionnée sur deux lignes (Kenya + Burkina Faso)
-  if (align === undefined || align[1]?.[2] === 'Activité globale') {
-    al['!merges'] = [{ s: { r: 2, c: 2 }, e: { r: 3, c: 2 } }, { s: { r: 2, c: 1 }, e: { r: 3, c: 1 } }];
-  }
-  XLSX.utils.book_append_sheet(wb, al, 'Analyse alignement');
+  const ws = XLSX.utils.aoa_to_sheet(reg);
+  ws['!merges'] = [{ s: { r: 4, c: 1 }, e: { r: 7, c: 1 } }, { s: { r: 3, c: 0 }, e: { r: 3, c: 8 } }, { s: { r: 11, c: 4 }, e: { r: 11, c: 7 } }];
+  XLSX.utils.book_append_sheet(wb, ws, 'OR register');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ali), 'alignement du OKR');
   return XLSX.read(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }), { type: 'array' });
 }

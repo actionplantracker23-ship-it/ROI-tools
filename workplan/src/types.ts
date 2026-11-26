@@ -5,11 +5,11 @@
  *  ├─ Unit (départements globaux et pays, partagés entre les années)
  *  └─ Plan (un par année : 2027, 2028… ; un nouveau plan peut reprendre la structure du précédent)
  *      └─ Objective (Objective 1…)
- *          └─ KeyResult (KR1.1…)                            ← KR global
- *              ├─ Commitment (registre OKR) : unité, rôle Lead | Contributes, KR de l'unité, KR Lead, scope
- *              └─ Activity niveau « global » (département)
- *                  └─ Activity niveau « pays », liée par parentId
- *      Activity pays sans parentId = ORPHELINE (non liée au plan global)
+ *          └─ KeyResult (KR1.1… ; ou groupe « Team KR · O1 » pour les KR d'équipe sans KR global)
+ *              ├─ Activity niveau « global » : KR d'une équipe globale (PEI, PSE, DHGP, GSE, Finance…)
+ *              └─ Activity niveau « pays » : KR d'un pays, liée à 0..n activités globales (parentIds)
+ *      Une ligne du registre OKR = une activité (rôle Lead / Contributes, objectif d'équipe, KR Lead, scope).
+ *      Activité pays sans lien = ORPHELINE (non soutenue par le plan global).
  *      Indicator : attaché à un objectif, un KR, une activité globale ou une activité pays
  *          └─ IndicatorValue (par trimestre, historique)
  *      ActivityUpdate : historique des mises à jour d'activité
@@ -24,8 +24,8 @@ export type ActivityStatus = 'not_started' | 'in_progress' | 'done' | 'late' | '
 export type IndicatorKind = 'number' | 'percent' | 'yesno';
 export type TargetType = 'objective' | 'kr' | 'activity';
 export type Rag = 'green' | 'amber' | 'red' | 'none';
-/** Qualité du lien pays → global (renseignée par l'analyse d'alignement ou à la main). */
-export type AlignmentQuality = 'full' | 'partial';
+/** Statuts de l'analyse d'alignement (feuille « alignement du OKR »). */
+export type AlignStatus = 'aligned' | 'partial' | 'conflict' | 'gap' | 'global_only';
 
 export interface Unit {
   id: string;
@@ -61,20 +61,8 @@ export interface KeyResult {
   code: string; // « KR1.1 »
   title: string;
   order: number;
-}
-
-/** Ligne du registre OKR : engagement d'une unité sur un KR global. */
-export interface Commitment {
-  id: string;
-  planId: string;
-  krId: string;
-  unitId: string;
-  role: Role;
-  unitObjective: string;
-  unitKr: string;
-  krLead: string;
-  scope: string;
-  planRef: string; // « Go to plan »
+  /** Groupe de KR d'équipe sans KR global (« Team KR · O1 »). */
+  team?: boolean;
 }
 
 export interface Activity {
@@ -82,12 +70,18 @@ export interface Activity {
   planId: string;
   level: Level;
   unitId: string; // département (global) ou pays
-  krId: string | null; // KR global ; pour une activité pays, hérité de l'activité globale si vide
-  parentId: string | null; // activité pays → activité globale ; null = orpheline
-  alignment: AlignmentQuality | null;
+  krId: string | null; // KR global (Ref)
+  parentIds: string[]; // activité pays → activités globales qui la soutiennent ; [] = orpheline
+  alignment: AlignStatus | null; // statut de l'analyse d'alignement
+  finding: string; // « Finding / gap »
+  action: string; // « Recommended action »
+  role: Role | null; // registre : Lead / Contributes (null = KR d'équipe)
+  unitObjective: string; // registre : Country/Team Objective
+  subTeam: string; // ex. « Finance & Admin » pour « Kenya (Finance & Admin) »
+  scope: string; // registre : Scope
   code: string;
-  title: string;
-  owner: string;
+  title: string; // Country/Team Key Result
+  owner: string; // KR Lead
   startQ: Quarter;
   endQ: Quarter;
   status: ActivityStatus;
@@ -148,7 +142,6 @@ export interface Workspace {
   currentPlanId: string | null;
   objectives: Objective[];
   krs: KeyResult[];
-  commitments: Commitment[];
   activities: Activity[];
   activityUpdates: ActivityUpdate[];
   indicators: Indicator[];
@@ -162,6 +155,17 @@ export const STATUS_LABEL: Record<ActivityStatus, string> = {
   done: 'Réalisée',
   late: 'En retard',
   cancelled: 'Annulée',
+};
+
+export const ALIGN_LABEL: Record<AlignStatus, string> = {
+  aligned: 'Aligned', partial: 'Partial', conflict: 'Conflict', gap: 'Gap', global_only: 'Global only',
+};
+export const ALIGN_HELP: Record<AlignStatus, string> = {
+  aligned: 'Soutenu par le plan global et cohérent',
+  partial: 'Soutien partiel ou formulation à préciser',
+  conflict: 'Incohérence (dates, seuils, unités, étiquette)',
+  gap: 'Lien manquant ou insuffisant',
+  global_only: 'KR d’équipe globale sans déclinaison pays (normal)',
 };
 
 export const PLAN_STATUS_LABEL: Record<PlanStatus, string> = { draft: 'Brouillon', active: 'En cours', closed: 'Clôturé' };
@@ -194,7 +198,6 @@ export function emptyWorkspace(): Workspace {
     currentPlanId: null,
     objectives: [],
     krs: [],
-    commitments: [],
     activities: [],
     activityUpdates: [],
     indicators: [],

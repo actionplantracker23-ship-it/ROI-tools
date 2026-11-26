@@ -27,25 +27,22 @@ Outil de gestion du plan de travail annuel :
 | Plans annuels | Créer, ouvrir, clôturer un plan ; sauvegarde / restauration JSON |
 | Paramètres | Départements et pays, trimestre en cours, seuils de couleur |
 
-## Import du fichier Excel (deux feuilles)
+## Import du fichier OKR (deux feuilles)
 
-* **Registre OKR** : `Ref | Global Key Result | Country / Team | Role | Country/Team Objective |
-  Country/Team Key Result | KR Lead | Scope | Go to plan`, avec les lignes de section
-  `OBJECTIVE 1 · …` qui donnent les titres des objectifs.
-* **Analyse d'alignement** (activités globales ↔ pays), deux formats :
-  * une ligne par lien : `Ref | Département | Activité globale | Pays | Activité pays | Alignement | Commentaire` ;
-  * une colonne par pays : `Ref | Département | Activité globale | Kenya | Burkina Faso | …` (la cellule
-    contient l'activité pays, une par ligne).
+* **Registre** (« OR register ») : `Ref | Global Key Result | Country / Team | Role | Country/Team Objective |
+  Country/Team Key Result | KR Lead | Scope | Go to plan`, avec les lignes `OBJECTIVE N · …`.
+  * chaque ligne devient un KR / une activité d'**équipe globale** (Global Programs (PEI), PSE, Innovations, GSE,
+    DHGP, BDAC, Finance, DT, P&C) ou de **pays** (Kenya, « Kenya (Finance & Admin) » = Kenya, sous-équipe
+    Finance & Admin, Burkina Faso, Uganda, Benin, Zambia) ;
+  * `Team KR · O1` = KR d'équipe sans KR global ; « No country/team plan yet » = KR global sans plan (signalé).
+* **Analyse d'alignement** (« alignement du OKR ») :
+  * **A · KR pays → soutenu par quelles équipes globales ?** (même Ref) → liens, statut, constat, action ;
+  * **B · KR d'équipe globale → quels pays s'y engagent ?** → statut, constat, action ;
+  * statuts : Aligned, Partial, Conflict, Gap, Global only ; un KR pays sans équipe globale (« — none — ») est
+    **orphelin, non lié au global**.
 
-Les feuilles, la ligne d'en-tête et les colonnes sont reconnues automatiquement ; chaque correspondance
-est modifiable, avec des exemples de valeurs, et un aperçu (activités, liens, orphelines) s'affiche avant
-d'appliquer. Règles :
-
-* cellules fusionnées dépliées ; Ref, département et pays vides = valeur du dessus ;
-* **orpheline** : ligne pays sans activité globale, ou marquée « non aligné / orphelin » ;
-* **ligne de suite** (option activée par défaut) : une cellule « Activité globale » vide reprend celle du
-  dessus si Ref et Département sont vides aussi et que la ligne n'est pas marquée non alignée ;
-* statut « partiel » → lien partiel ; départements ou pays inconnus créés et signalés.
+Un **réimport** met le plan à jour (mêmes unité, Ref et intitulé) **sans perdre le suivi** (statuts,
+avancement, indicateurs, historique) ; l'option « remplacer » repart de zéro.
 
 ## Calcul de l'avancement
 
@@ -59,6 +56,13 @@ d'appliquer. Règles :
 ## Utilisation
 
 **Sans installation** : ouvrir `plan-de-travail.html` (généré par `npm run build:single`) par double-clic.
+
+**Fichier pré-rempli avec un plan** (données intégrées, à ne pas publier ni versionner) :
+
+```bash
+npx tsx scripts/build-seed.ts classeur.xlsx 2027 /chemin/hors-depot/plan.json
+npm run build:single -- --seed /chemin/hors-depot/plan.json --out plan-de-travail-2027
+```
 Les données restent dans le navigateur (enregistrement automatique) ; exporter une sauvegarde JSON
 depuis « Plans annuels » pour la conserver ou la transmettre.
 
@@ -70,16 +74,17 @@ npm install
 npm run dev
 ```
 
-Tests : `npm test` (import des deux formats, orphelines, lignes de suite, consolidation, plans annuels,
-performance). Fichier de test fictif : `npx tsx scripts/make-test-workbook.ts test.xlsx`.
+Tests : `npm test` (import du registre et de l'analyse, liens multiples, orphelins, réimport sans perte,
+consolidation, plans annuels, performance). Contrôle sur le vrai classeur, en local :
+`OKR_XLSX=/chemin/classeur.xlsx npm test` (vérifie que la synthèse de l'analyse est reproduite).
 
 ## Structure
 
 ```
-src/types.ts          modèle de données (plans annuels, unités, objectifs, KR, registre, activités, indicateurs)
+src/types.ts          modèle de données (plans annuels, unités, objectifs, KR, KR/activités d'équipes et de pays, indicateurs)
 src/lib/calc.ts       consolidation, alignement / orphelines, alertes (temps linéaire)
 src/lib/ops.ts        opérations : créer / dupliquer un plan, éditer, lier, suggestions de rattachement
-src/lib/importer.ts   import Excel à deux feuilles avec correspondance de colonnes
+src/lib/importer.ts   import du classeur OKR (registre + analyse d'alignement A et B)
 src/lib/storage.ts    stockage local + sauvegarde JSON
 src/pages/            pages de l'application
 ```

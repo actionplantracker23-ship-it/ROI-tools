@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { pct } from '../lib/format';
 import type { Score } from '../lib/calc';
-import { STATUS_LABEL, type ActivityStatus, type Objective, type Rag, type Role } from '../types';
+import { ALIGN_HELP, ALIGN_LABEL, STATUS_LABEL, type ActivityStatus, type AlignStatus, type Objective, type Rag, type Role } from '../types';
 
 // Couleurs de statut du tableau de bord Big Wins
 export const RAG_STYLE: Record<Rag, { cls: string; label: string; icon: string }> = {
@@ -158,9 +158,24 @@ export function Field({ label, children, className = '' }: { label: ReactNode; c
   return <label className={`block text-xs font-medium text-slate-600 ${className}`}>{label}<div className="mt-1">{children}</div></label>;
 }
 
-/** Badge « orpheline » : activité pays non liée au plan global. */
+/** Badge « orphelin » : KR / activité pays sans appui d'une équipe globale. */
 export function OrphanBadge() {
-  return <span className="inline-flex whitespace-nowrap rounded bg-[#d64545] px-2 py-0.5 text-[12px] font-semibold text-white" title="Activité pays non liée à une activité du plan global">Orpheline · non liée au global</span>;
+  return <span className="inline-flex whitespace-nowrap rounded bg-[#d64545] px-2 py-0.5 text-[12px] font-semibold text-white" title="Aucune équipe globale n’a de KR / d’activité qui le soutient">Orphelin · non lié au global</span>;
+}
+
+export const ALIGN_STYLE: Record<AlignStatus, string> = {
+  aligned: 'bg-rag-green text-white',
+  partial: 'bg-rag-amber text-[#2b2100]',
+  conflict: 'bg-[#7c3aed] text-white',
+  gap: 'bg-rag-red text-white',
+  global_only: 'bg-[#5b7b9a] text-white',
+};
+export const ALIGN_HEX: Record<AlignStatus, string> = { aligned: '#2e9e4f', partial: '#f2b01e', conflict: '#7c3aed', gap: '#d64545', global_only: '#5b7b9a' };
+
+/** Statut de l'analyse d'alignement (Aligned, Partial, Conflict, Gap, Global only). */
+export function AlignBadge({ status }: { status: AlignStatus | null }) {
+  if (!status) return <span className="text-xs text-slate-400">non analysé</span>;
+  return <span title={ALIGN_HELP[status]} className={`inline-flex whitespace-nowrap rounded px-2 py-0.5 text-[12px] font-semibold ${ALIGN_STYLE[status]}`}>{ALIGN_LABEL[status]}</span>;
 }
 
 export function UnitChip({ name, type }: { name: string; type: 'department' | 'country' }) {

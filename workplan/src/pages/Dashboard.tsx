@@ -21,13 +21,13 @@ export default function Dashboard() {
   return (
     <div className="space-y-5">
       <PageHeader eyebrow={<>{plan.name} · <span className="text-accent">Q{q}</span></>} title={`Avancement du plan de travail ${plan.year}`}
-        subtitle="Consolidation : activités pays → activités globales des départements → KR → objectifs. Chaque niveau combine l’exécution des activités et ses indicateurs de mesure." />
+        subtitle="Consolidation : KR / activités pays → KR / activités des équipes globales → KR globaux → objectifs. Chaque niveau combine l’exécution et ses indicateurs de mesure." />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Stat label="Avancement du plan" value={pct(view.plan.progress)} hint={`${view.objectives.length} objectifs · ${view.krs.length} KR`} />
-        <Stat label="Activités globales" value={view.globalActs.length} hint={`${ws.units.filter((u) => u.type === 'department' && view.globalActs.some((a) => a.unitId === u.id)).length} départements`} color="#5bc0eb" />
-        <Stat label="Activités pays" value={view.countryActs.length} hint={`${done} activités réalisées au total`} color="#f28c28" />
-        <Stat label="Alignement" value={pct(view.alignment.rate)} hint={<span className={view.orphans.length ? 'font-semibold text-rag-red' : ''}>{view.orphans.length} orpheline(s)</span>} color="#2e9e4f" />
+        <Stat label="KR équipes globales" value={view.globalActs.length} hint={`${ws.units.filter((u) => u.type === 'department' && view.globalActs.some((a) => a.unitId === u.id)).length} équipes`} color="#5bc0eb" />
+        <Stat label="KR pays" value={view.countryActs.length} hint={`${done} réalisé(s)`} color="#f28c28" />
+        <Stat label="Alignement" value={pct(view.alignment.rate)} hint={<span className={view.orphans.length ? 'font-semibold text-rag-red' : ''}>{view.orphans.length} orphelin(s) · {view.alignment.country.conflict} conflit(s)</span>} color="#2e9e4f" />
         <Stat label={`Indicateurs Q${q}`} value={<>{filled}<small className="text-base font-normal text-slate-500"> / {view.indicators.length}</small></>} hint="renseignés" color="#0b2e59" />
         <Stat label="En retard" value={<span className={late ? 'text-rag-red' : ''}>{late}</span>} hint="statut ou échéance dépassée" color="#d64545" />
       </div>
@@ -38,15 +38,16 @@ export default function Dashboard() {
           <table className="w-full min-w-[640px] border-collapse">
             <thead>
               <tr className="text-[12.5px] text-[#6D6E71]">
-                {['Objectif', 'Intitulé', 'Avancement', 'KR', 'Act. globales', 'Act. pays', 'Statut'].map((h, i) => <th key={h} className={`border-b-2 border-brand-500 px-2.5 py-2 font-normal ${i < 3 ? 'text-left' : 'text-right'} ${i === 2 ? 'w-[26%]' : ''}`}>{h}</th>)}
+                {['Objectif', 'Intitulé', 'Avancement', 'Ref', 'KR équipes', 'KR pays', 'Statut'].map((h, i) => <th key={h} className={`border-b-2 border-brand-500 px-2.5 py-2 font-normal ${i < 3 ? 'text-left' : 'text-right'} ${i === 2 ? 'w-[26%]' : ''}`}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
               {view.objectives.map((o) => {
                 const sc = view.objective.get(o.id)!;
                 const krs = view.krs.filter((k) => k.objectiveId === o.id);
-                const g = krs.flatMap((k) => view.actsByKr.get(k.id) ?? []);
-                const c = g.flatMap((x) => view.childrenOf.get(x.id) ?? []);
+                const ids = new Set(krs.map((x) => x.id));
+                const g = view.globalActs.filter((x) => ids.has(x.krId ?? ''));
+                const c = view.countryActs.filter((x) => ids.has(x.krId ?? ''));
                 const td = 'border-b border-[#E1E6EC] px-2.5 py-3';
                 return (
                   <tr key={o.id}>
@@ -67,7 +68,7 @@ export default function Dashboard() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {(['department', 'country'] as const).map((t) => (
-          <Card key={t} title={t === 'department' ? 'Départements globaux' : 'Pays'}>
+          <Card key={t} title={t === 'department' ? 'Équipes globales' : 'Pays'}>
             <ul className="divide-y divide-[#eef0f3]">
               {unitsOf(t).map((u) => {
                 const sc = view.unit.get(u.id)!;
@@ -76,7 +77,7 @@ export default function Dashboard() {
                 return (
                   <li key={u.id} className="flex flex-wrap items-center gap-2 py-2">
                     <Link to={t === 'department' ? '/globales' : '/pays'} className="w-28 font-semibold text-brand-500 hover:text-accent">{u.name}</Link>
-                    <span className="flex-1 text-xs text-slate-500">{acts.length} activité(s){orph ? <b className="ml-1 text-rag-red">· {orph} orpheline(s)</b> : null}{sc.late ? <b className="ml-1 text-rag-red">· retard</b> : null}</span>
+                    <span className="flex-1 text-xs text-slate-500">{acts.length} KR{orph ? <b className="ml-1 text-rag-red">· {orph} orphelin(s)</b> : null}{sc.late ? <b className="ml-1 text-rag-red">· retard</b> : null}</span>
                     <MiniProgress value={sc.progress} rag={sc.rag} />
                   </li>
                 );

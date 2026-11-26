@@ -5,7 +5,7 @@ import { pct } from '../lib/format';
 import { addIndicatorValue, newIndicator, remove, suggestParents, updateActivityStatus, upsert } from '../lib/ops';
 import { targetKey } from '../lib/calc';
 import { dateTime } from '../lib/format';
-import { KIND_LABEL, STATUS_LABEL, type Activity, type ActivityStatus, type Indicator, type IndicatorKind, type Quarter, type TargetType } from '../types';
+import { ALIGN_LABEL, KIND_LABEL, STATUS_LABEL, type Activity, type AlignStatus, type ActivityStatus, type Indicator, type IndicatorKind, type Quarter, type TargetType } from '../types';
 import { Button, Field, inputCls, Modal, OrphanBadge, ProgressBar, StatusBadge } from './ui';
 
 const num = (s: string): number | null => {
@@ -121,32 +121,51 @@ export function IndicatorList({ type, id, compact }: { type: TargetType; id: str
 
 // ------------------------------------------------------------------ activités
 
-/** Choix de l'activité globale à laquelle se rattache une activité pays (avec suggestions). */
-export function ParentPicker({ act, value, onChange }: { act: Activity; value: string | null; onChange: (id: string | null) => void }) {
+/** Activités (KR) globales qui soutiennent une activité pays : liste, retrait, suggestions, recherche. */
+export function LinksEditor({ act, value, onChange }: { act: Activity; value: string[]; onChange: (ids: string[]) => void }) {
   const { ws, view, unit } = useApp();
   const [q, setQ] = useState('');
-  const sugg = useMemo(() => suggestParents(ws, act), [ws, act]);
+  const sugg = useMemo(() => suggestParents(ws, { ...act, parentIds: value }, 4), [ws, act, value]);
   if (!view) return null;
   const k = q.toLowerCase();
-  const list = view.globalActs.filter((g) => !k || g.title.toLowerCase().includes(k) || (unit(g.unitId)?.name ?? '').toLowerCase().includes(k));
-  const krCode = (id: string | null) => view.krs.find((x) => x.id === id)?.code ?? '';
+  const code = (id: string | null) => view.krs.find((x) => x.id === id)?.code ?? '';
+  const list = view.globalActs.filter((g) => !value.includes(g.id) && (!k || `${g.title} ${unit(g.unitId)?.name} ${code(g.krId)}`.toLowerCase().includes(k)));
   return (
     <div className="space-y-2">
-      {sugg.length > 0 && !value && (
-        <div className="flex flex-wrap gap-1.5">
+      {value.length ? (
+        <ul className="space-y-1">
+          {value.map((id) => {
+            const g = view.byId.get(id);
+            return (
+              <li key={id} className="flex items-start gap-2 rounded-md bg-[#eaf7fd] px-2 py-1 text-sm">
+                <b className="whitespace-nowrap text-brand-500">{g ? `${unit(g.unitId)?.name} · ${code(g.krId)}` : 'introuvable'}</b>
+                <span className="flex-1">{g?.title}</span>
+                <button type="button" className="text-slate-500 hover:text-rag-red" aria-label="Retirer le lien" onClick={() => onChange(value.filter((x) => x !== id))}>×</button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : <OrphanBadge />}
+      {sugg.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-slate-500">Suggestions :</span>
           {sugg.map(({ a }) => (
-            <button key={a.id} type="button" onClick={() => onChange(a.id)} className="rounded-full border border-[#9ed8f2] bg-[#eaf7fd] px-2 py-0.5 text-xs text-brand-500 hover:border-accent">
-              {unit(a.unitId)?.name} · {a.title.slice(0, 50)}
+            <button key={a.id} type="button" onClick={() => onChange([...value, a.id])} className="rounded-full border border-[#9ed8f2] bg-white px-2 py-0.5 text-xs text-brand-500 hover:border-accent">
+              + {unit(a.unitId)?.name} · {code(a.krId)} · {a.title.slice(0, 45)}
             </button>
           ))}
         </div>
       )}
-      <input className={inputCls} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher une activité globale…" />
-      <select className={inputCls} size={Math.min(8, list.length + 1)} value={value ?? ''} onChange={(e) => onChange(e.target.value || null)}>
-        <option value="">— Aucune (activité orpheline, non liée au global) —</option>
-        {list.map((g) => <option key={g.id} value={g.id}>{unit(g.unitId)?.name} · {krCode(g.krId)} · {g.title}</option>)}
-      </select>
+      <input className={inputCls} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher un KR / une activité d’équipe globale à ajouter…" />
+      {q && (
+        <ul className="max-h-48 overflow-y-auto rounded-md border border-ligne">
+          {list.slice(0, 30).map((g) => (
+            <li key={g.id}><button type="button" className="w-full px-2 py-1 text-left text-sm hover:bg-brand-50" onClick={() => { onChange([...value, g.id]); setQ(''); }}>
+              <b className="text-brand-500">{unit(g.unitId)?.name} · {code(g.krId)}</b> {g.title}</button></li>
+          ))}
+          {!list.length && <li className="px-2 py-1 text-sm text-slate-500">Aucun résultat.</li>}
+        </ul>
+      )}
     </div>
   );
 }
@@ -157,20 +176,18 @@ export function ActivityEditor({ act, onClose }: { act: Activity; onClose: () =>
   const [a, setA] = useState<Activity>(act);
   if (!view) return null;
   const units = ws.units.filter((u) => u.type === (a.level === 'global' ? 'department' : 'country')).sort((x, y) => x.order - y.order);
-  const parent = a.parentId ? view.byId.get(a.parentId) : null;
   const history = ws.activityUpdates.filter((u) => u.activityId === a.id).sort((x, y) => y.at.localeCompare(x.at));
   const children = a.level === 'global' ? view.childrenOf.get(a.id) ?? [] : [];
   const save = () => {
-    const krId = a.level === 'country' && !a.krId && parent ? parent.krId : a.krId;
-    update((w) => upsert(w, 'activities', { ...a, title: a.title.trim(), krId, progress: a.status === 'done' ? 100 : a.progress }), isNew ? 'Activité créée.' : 'Activité enregistrée.');
+    update((w) => upsert(w, 'activities', { ...a, title: a.title.trim(), progress: a.status === 'done' ? 100 : a.progress }), isNew ? 'Activité créée.' : 'Activité enregistrée.');
     onClose();
   };
   return (
-    <Modal wide title={`${isNew ? 'Nouvelle activité' : 'Activité'} ${a.level === 'global' ? 'globale (département)' : 'pays'}`} onClose={onClose}>
+    <Modal wide title={`${isNew ? 'Nouveau KR / activité' : 'KR / activité'} ${a.level === 'global' ? 'd’équipe globale' : 'pays'}`} onClose={onClose}>
       <div className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-[1fr,200px]">
-          <Field label="Intitulé de l’activité"><textarea autoFocus rows={2} className={inputCls} value={a.title} onChange={(e) => setA({ ...a, title: e.target.value })} /></Field>
-          <Field label={a.level === 'global' ? 'Département' : 'Pays'}>
+          <Field label="Intitulé (Country/Team Key Result ou activité)"><textarea autoFocus rows={3} className={inputCls} value={a.title} onChange={(e) => setA({ ...a, title: e.target.value })} /></Field>
+          <Field label={a.level === 'global' ? 'Équipe globale' : 'Pays'}>
             <select className={inputCls} value={a.unitId} onChange={(e) => setA({ ...a, unitId: e.target.value })}>
               {units.map((u) => <option key={u.id} value={u.id}>{u.name}{u.group ? ` (${u.group})` : ''}</option>)}
             </select>
@@ -179,7 +196,7 @@ export function ActivityEditor({ act, onClose }: { act: Activity; onClose: () =>
         <div className="grid gap-3 sm:grid-cols-[1fr,110px,90px,90px]">
           <Field label="KR global">
             <select className={inputCls} value={a.krId ?? ''} onChange={(e) => setA({ ...a, krId: e.target.value || null })}>
-              <option value="">{a.level === 'country' ? '— hérité de l’activité globale —' : '— aucun —'}</option>
+              <option value="">— aucun —</option>
               {view.krs.map((k) => <option key={k.id} value={k.id}>{k.code} · {k.title.slice(0, 70)}</option>)}
             </select>
           </Field>
@@ -187,18 +204,27 @@ export function ActivityEditor({ act, onClose }: { act: Activity; onClose: () =>
           <Field label="Début"><select className={inputCls} value={a.startQ} onChange={(e) => setA({ ...a, startQ: Number(e.target.value) as Quarter })}>{[1, 2, 3, 4].map((q) => <option key={q} value={q}>Q{q}</option>)}</select></Field>
           <Field label="Fin"><select className={inputCls} value={a.endQ} onChange={(e) => setA({ ...a, endQ: Number(e.target.value) as Quarter })}>{[1, 2, 3, 4].map((q) => <option key={q} value={q} disabled={q < a.startQ}>Q{q}</option>)}</select></Field>
         </div>
+        <div className="grid gap-3 sm:grid-cols-[1fr,150px,1fr,150px]">
+          <Field label="Country/Team Objective"><input className={inputCls} value={a.unitObjective} onChange={(e) => setA({ ...a, unitObjective: e.target.value })} /></Field>
+          <Field label="Role"><select className={inputCls} value={a.role ?? ''} onChange={(e) => setA({ ...a, role: (e.target.value || null) as Activity['role'] })}><option value="">Team KR</option><option>Lead</option><option>Contributes</option></select></Field>
+          <Field label="Sous-équipe"><input className={inputCls} value={a.subTeam} onChange={(e) => setA({ ...a, subTeam: e.target.value })} placeholder="ex. Finance & Admin" /></Field>
+          <Field label="Scope"><input className={inputCls} value={a.scope} onChange={(e) => setA({ ...a, scope: e.target.value })} /></Field>
+        </div>
         {a.level === 'country' && (
           <div className="rounded-md border border-ligne p-3">
-            <div className="mb-2 flex flex-wrap items-center gap-2 text-sm font-semibold text-brand-500">Activité globale liée {!a.parentId && <OrphanBadge />}</div>
-            <ParentPicker act={a} value={a.parentId} onChange={(id) => setA({ ...a, parentId: id, alignment: id ? a.alignment ?? 'full' : null })} />
-            {a.parentId && (
-              <div className="mt-2 flex gap-4 text-sm">
-                <label className="inline-flex items-center gap-1.5"><input type="radio" checked={a.alignment !== 'partial'} onChange={() => setA({ ...a, alignment: 'full' })} /> Alignement complet</label>
-                <label className="inline-flex items-center gap-1.5"><input type="radio" checked={a.alignment === 'partial'} onChange={() => setA({ ...a, alignment: 'partial' })} /> Partiel</label>
-              </div>
-            )}
+            <div className="mb-2 text-sm font-semibold text-brand-500">Soutenu par les KR / activités des équipes globales</div>
+            <LinksEditor act={a} value={a.parentIds} onChange={(ids) => setA({ ...a, parentIds: ids })} />
           </div>
         )}
+        <div className="rounded-md border border-ligne p-3">
+          <div className="mb-2 text-sm font-semibold text-brand-500">Analyse d’alignement</div>
+          <div className="grid gap-3 sm:grid-cols-[170px,1fr,1fr]">
+            <Field label="Statut"><select className={inputCls} value={a.alignment ?? ''} onChange={(e) => setA({ ...a, alignment: (e.target.value || null) as AlignStatus | null })}>
+              <option value="">— non analysé —</option>{(Object.keys(ALIGN_LABEL) as AlignStatus[]).map((x) => <option key={x} value={x}>{ALIGN_LABEL[x]}</option>)}</select></Field>
+            <Field label="Finding / gap"><textarea rows={2} className={inputCls} value={a.finding} onChange={(e) => setA({ ...a, finding: e.target.value })} /></Field>
+            <Field label="Recommended action"><textarea rows={2} className={inputCls} value={a.action} onChange={(e) => setA({ ...a, action: e.target.value })} /></Field>
+          </div>
+        </div>
         <div className="grid gap-3 sm:grid-cols-[1fr,1fr,130px,140px]">
           <Field label="Responsable"><input className={inputCls} value={a.owner} onChange={(e) => setA({ ...a, owner: e.target.value })} /></Field>
           <Field label="Statut"><select className={inputCls} value={a.status} onChange={(e) => setA({ ...a, status: e.target.value as ActivityStatus })}>{(Object.keys(STATUS_LABEL) as ActivityStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select></Field>
@@ -222,10 +248,10 @@ export function ActivityEditor({ act, onClose }: { act: Activity; onClose: () =>
             </div>
             {a.level === 'global' && (
               <div className="border-t border-ligne pt-3">
-                <div className="mb-1.5 text-sm font-semibold text-brand-500">Activités pays liées ({children.length})</div>
+                <div className="mb-1.5 text-sm font-semibold text-brand-500">KR / activités pays soutenus ({children.length})</div>
                 {children.length ? (
                   <ul className="space-y-1 text-sm">{children.map((c) => <li key={c.id} className="flex items-center gap-2"><b>{unit(c.unitId)?.name}</b><span className="flex-1 truncate">{c.title}</span><StatusBadge status={c.status} /></li>)}</ul>
-                ) : <p className="text-sm text-slate-500">Aucune déclinaison pays (normal si l’activité est purement globale).</p>}
+                ) : <p className="text-sm text-slate-500">Aucun KR pays rattaché (« Global only » : normal pour un KR purement global).</p>}
               </div>
             )}
             {history.length > 0 && (

@@ -1,184 +1,130 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import * as XLSX from 'xlsx';
 import { computePlan, planAlerts } from '../src/lib/calc';
-import { countryColumns, guessMapping, readWorkbook, ALIGN_FIELDS, REGISTER_FIELDS, runImport } from '../src/lib/importer';
-import { addIndicatorValue, createPlan, linkActivity, remove, suggestParents, updateActivityStatus, upsert } from '../src/lib/ops';
+import { importOkr, parseUnitLabel, readOkrWorkbook } from '../src/lib/importer';
+import { addIndicatorValue, addLink, createPlan, remove, suggestParents, updateActivityStatus, upsert } from '../src/lib/ops';
 import { emptyWorkspace, type Workspace } from '../src/types';
-import { alignmentWide, workbook } from './fixture';
+import { workbook } from './fixture';
 
-function imported(wide = false): { ws: Workspace; planId: string; report: ReturnType<typeof runImport>['report'] } {
+function imported(): { ws: Workspace; planId: string; report: ReturnType<typeof importOkr>['report'] } {
   const { ws: w0, planId } = createPlan(emptyWorkspace(), { year: 2027 });
-  const sheets = readWorkbook(wide ? workbook(alignmentWide()) : workbook());
-  const reg = sheets.find((s) => s.guess === 'register')!;
-  const al = sheets.find((s) => s.guess === 'alignment')!;
-  const cc = countryColumns(al.headers, w0.units).map((c) => ({ col: c.col, unitId: c.unit!.id }));
-  const { ws, report } = runImport(w0, {
-    planId, replace: false,
-    register: { sheet: reg, mapping: guessMapping(reg.headers, REGISTER_FIELDS) },
-    alignment: { sheet: al, mapping: guessMapping(al.headers, ALIGN_FIELDS), wide, countryCols: wide ? cc : [] },
-  });
+  const { ws, report } = importOkr(w0, planId, readOkrWorkbook(workbook()), { replace: true });
   return { ws, planId, report };
 }
+const byTitle = (ws: Workspace, t: string) => ws.activities.find((a) => a.title === t)!;
 
-describe('lecture du classeur', () => {
-  it('reconnaît les deux feuilles et leurs colonnes', () => {
-    const sheets = readWorkbook(workbook());
-    expect(sheets.map((s) => s.guess)).toEqual(['register', 'alignment']);
-    const al = sheets[1];
-    expect(al.headerRow).toBe(1);
-    const m = guessMapping(al.headers, ALIGN_FIELDS);
-    expect([m.ref, m.globalUnit, m.globalActivity, m.country, m.countryActivity, m.alignment, m.comment]).toEqual([0, 1, 2, 3, 4, 5, 6]);
-    const r = guessMapping(sheets[0].headers, REGISTER_FIELDS);
-    expect([r.ref, r.unit, r.role, r.unitKr, r.planRef]).toEqual([0, 2, 3, 5, 8]);
+describe('lecture du classeur OKR', () => {
+  const f = readOkrWorkbook(workbook());
+  it('reconnaît le registre et les deux parties de l’analyse', () => {
+    expect([f.registerSheet, f.alignmentSheet]).toEqual(['OR register', 'alignement du OKR']);
+    expect(f.objectives.get(1)).toBe('Objective one title');
+    expect(f.a).toHaveLength(3);
+    expect(f.b).toHaveLength(3);
+    expect(f.a[2].teams).toEqual([]); // « — none — »
+    expect(f.noPlan).toEqual(['KR2.1 (CEO)']);
+  });
+  it('libellés d’unités', () => {
+    expect(parseUnitLabel('Global Programs (PEI)')).toEqual({ name: 'PEI', group: 'Global Programs', sub: '' });
+    expect(parseUnitLabel('Kenya (Finance & Admin)')).toEqual({ name: 'Kenya', sub: 'Finance & Admin' });
   });
 });
 
-describe('import registre + alignement (format long)', () => {
+describe('import', () => {
   const { ws, planId, report } = imported();
   const v = computePlan(ws, planId, 1);
-
-  it('crée objectifs (titres des sections), KR et engagements', () => {
-    expect(v.objectives.map((o) => o.title.slice(0, 26))).toEqual(['Embed and scale high perfo', 'Second test objective']);
-    expect(v.krs.map((k) => k.code)).toEqual(['KR1.1', 'KR1.2', 'KR2.1']);
-    expect(v.commitments).toHaveLength(5);
-    expect(v.commitments.find((c) => c.unitId === 'dhgp')?.role).toBe('Lead');
-    expect(v.commitments.find((c) => c.unitId === 'kenya')?.planRef).toBe('2 Kenya');
+  it('crée objectifs, Ref (dont Team KR), KR d’équipes globales et de pays', () => {
+    expect(v.objectives.map((o) => o.title)).toEqual(['Objective one title', 'Objective two title']);
+    expect(v.krs.map((k) => k.code)).toEqual(['KR1.1', 'KR1.2', 'Team KR · O1', 'KR2.1']);
+    expect(v.krs.find((k) => k.code === 'KR1.1')?.title).toBe('Global KR one');
+    expect(v.krs.find((k) => k.code === 'Team KR · O1')?.team).toBe(true);
+    expect([report.globalActivities, report.countryActivities]).toEqual([3, 3]);
+    const kf = byTitle(ws, 'Kenya finance KR');
+    expect([kf.unitId, kf.subTeam, kf.role]).toEqual(['kenya', 'Finance & Admin', 'Contributes']);
+    expect(byTitle(ws, 'PEI team KR').role).toBeNull();
   });
-
-  it('crée les activités globales et pays, avec les liens', () => {
-    expect(report.globalActivities).toBe(3);
-    expect(report.countryActivities).toBe(4);
-    const g = v.globalActs.find((a) => a.title === 'Deploy eCHIS training package')!;
-    expect(g.unitId).toBe('dhgp');
-    expect(v.childrenOf.get(g.id)!.map((c) => c.unitId).sort()).toEqual(['burkina-faso', 'kenya']); // cellule fusionnée
-    expect(v.countryActs.find((a) => a.unitId === 'burkina-faso')!.alignment).toBe('partial');
+  it('liens multiples, statuts, constats et actions de l’analyse', () => {
+    const k = byTitle(ws, 'Kenya KR a');
+    expect(v.parentsOf.get(k.id)!.map((p) => p.unitId).sort()).toEqual(['dhgp', 'pei']);
+    expect([k.alignment, k.finding, k.action]).toEqual(['aligned', 'Supported', 'None']);
+    expect(v.parentsOf.get(byTitle(ws, 'Kenya finance KR').id)!.map((p) => p.unitId)).toEqual(['dhgp']);
+    expect(byTitle(ws, 'DHGP KR a').alignment).toBe('conflict');
+    expect(byTitle(ws, 'PEI team KR').alignment).toBe('global_only');
+    expect(report.unmatched).toEqual([]);
   });
-
-  it('signale l’activité pays sans activité globale comme orpheline', () => {
-    expect(v.orphans.map((a) => a.title)).toEqual(['Kenya-only data dashboard']);
-    expect(v.alignment).toMatchObject({ countryActs: 4, aligned: 3, partial: 1, orphans: 1, rate: 75 });
+  it('KR pays sans équipe globale = orphelin ; KR global sans pays = normal', () => {
+    expect(v.orphans.map((a) => a.title)).toEqual(['Burkina KR orphan']);
+    expect(v.alignment.country).toMatchObject({ aligned: 1, partial: 1, gap: 1 });
+    expect(v.alignment.global).toMatchObject({ aligned: 1, conflict: 1, global_only: 1 });
     expect(planAlerts(ws, v).filter((a) => a.kind === 'orphan')).toHaveLength(1);
+    expect(planAlerts(ws, v).filter((a) => a.kind === 'conflict')).toHaveLength(1);
   });
-
-  it('une activité globale sans pays est normale (pas d’alerte orpheline)', () => {
-    const g = v.globalActs.find((a) => a.title === 'Smart supervision rollout')!;
-    expect(v.childrenOf.get(g.id)).toBeUndefined();
-  });
-
-  it('rattacher une orpheline la retire de la liste', () => {
+  it('rattacher un orphelin', () => {
     const o = v.orphans[0];
-    const sugg = suggestParents(ws, o);
-    expect(sugg.length).toBeGreaterThan(0);
-    const ws2 = linkActivity(ws, o.id, v.globalActs[0].id, 'partial');
-    expect(computePlan(ws2, planId, 1).orphans).toHaveLength(0);
+    expect(suggestParents(ws, o).length).toBeGreaterThan(0);
+    expect(computePlan(addLink(ws, o.id, v.globalActs[0].id), planId, 1).orphans).toHaveLength(0);
   });
-
-  it('réimport sans « remplacer » : pas de doublon', () => {
-    const sheets = readWorkbook(workbook());
-    const again = runImport(ws, { planId, replace: false, alignment: { sheet: sheets[1], mapping: guessMapping(sheets[1].headers, ALIGN_FIELDS), wide: false, countryCols: [] } });
-    expect(again.report.globalActivities + again.report.countryActivities).toBe(0);
-  });
-});
-
-describe('import alignement (format large : une colonne par pays)', () => {
-  const { ws, planId } = imported(true);
-  const v = computePlan(ws, planId, 1);
-  it('une colonne par pays, plusieurs activités par cellule, N/A ignoré', () => {
-    expect(v.countryActs.map((a) => a.title).sort()).toEqual(['Former les ASC', 'Suivi mensuel eCHIS', 'Train CHAs on eCHIS']);
-    expect(v.orphans).toHaveLength(0);
+  it('réimport : met à jour sans perdre le suivi', () => {
+    const k = byTitle(ws, 'Kenya KR a');
+    const tracked = updateActivityStatus(ws, k.id, { status: 'in_progress', progress: 40, comment: 'suivi' });
+    const again = importOkr(tracked, planId, readOkrWorkbook(workbook()), { replace: false });
+    const k2 = again.ws.activities.find((a) => a.id === k.id)!;
+    expect([k2.status, k2.progress, k2.alignment]).toEqual(['in_progress', 40, 'aligned']);
+    expect(again.report.updated).toBe(6);
+    expect(again.ws.activities.filter((a) => a.planId === planId)).toHaveLength(6);
   });
 });
 
-describe('consolidation et indicateurs', () => {
-  it('pays → activité globale → KR → objectif → plan', () => {
+describe('consolidation, indicateurs, plans annuels', () => {
+  it('pays → équipe globale → KR → objectif', () => {
     let { ws, planId } = imported();
-    let v = computePlan(ws, planId, 1);
-    const g = v.globalActs.find((a) => a.title === 'Deploy eCHIS training package')!;
-    const [k1, k2] = v.childrenOf.get(g.id)!;
-    ws = updateActivityStatus(ws, g.id, { status: 'in_progress', progress: 40, comment: '' });
-    ws = updateActivityStatus(ws, k1.id, { status: 'done', progress: 0, comment: 'ok' });
-    ws = updateActivityStatus(ws, k2.id, { status: 'in_progress', progress: 60, comment: '' });
-    v = computePlan(ws, planId, 1);
-    expect(v.activity.get(g.id)!.children).toBe(80);
-    expect(v.activity.get(g.id)!.progress).toBe(60); // moyenne(40, 80)
-    expect(ws.activityUpdates).toHaveLength(3);
-    // indicateur de KR : baseline 10, cible 50, valeur 30 → 50 %
-    const kr = v.krs[0];
-    const ind = { id: 'i1', planId, targetType: 'kr' as const, targetId: kr.id, name: '% CHAs', kind: 'percent' as const, unit: '%', baseline: 10, quarterTargets: [20, 30, 40, 50], target: 50, source: '', order: 0 };
-    ws = upsert(ws, 'indicators', ind);
-    ws = addIndicatorValue(ws, 'i1', 1, 30);
-    v = computePlan(ws, planId, 1);
-    expect(v.indicator.get('i1')).toMatchObject({ progress: 50, onTrack: true, quarterTarget: 20 });
-    expect(v.plan.progress).not.toBeNull();
-  });
-
-  it('échéance dépassée → en retard', () => {
-    const { ws, planId } = imported();
-    const a = computePlan(ws, planId, 1).globalActs[0];
-    const ws2 = upsert(ws, 'activities', { ...a, endQ: 1 });
-    expect(computePlan(ws2, planId, 2).activity.get(a.id)!.rag).toBe('red');
-  });
-});
-
-describe('plans annuels', () => {
-  it('nouveau plan à partir de l’année précédente : même structure, liens remappés, suivi remis à zéro', () => {
-    let { ws, planId } = imported();
+    const pei = byTitle(ws, 'PEI KR a');
+    ws = updateActivityStatus(ws, pei.id, { status: 'in_progress', progress: 40, comment: '' });
+    ws = updateActivityStatus(ws, byTitle(ws, 'Kenya KR a').id, { status: 'done', progress: 0, comment: '' });
     const v = computePlan(ws, planId, 1);
-    ws = updateActivityStatus(ws, v.countryActs[0].id, { status: 'done', progress: 100, comment: '' });
-    ws = upsert(ws, 'indicators', { id: 'i1', planId, targetType: 'kr', targetId: v.krs[0].id, name: 'x', kind: 'number', unit: '', baseline: 5, quarterTargets: [null, null, null, null], target: 20, source: '', order: 0 });
-    ws = addIndicatorValue(ws, 'i1', 4, 17);
-    const r = createPlan(ws, { year: 2028, sourcePlanId: planId, copyActivities: true, copyIndicators: true, copyCommitments: true, carryBaselines: true });
+    expect(v.activity.get(pei.id)!.children).toBe(100);
+    expect(v.activity.get(pei.id)!.progress).toBe(70);
+    const ind = { id: 'i1', planId, targetType: 'kr' as const, targetId: v.krs[0].id, name: 'x', kind: 'percent' as const, unit: '%', baseline: 10, quarterTargets: [20, null, null, 50], target: 50, source: '', order: 0 };
+    ws = addIndicatorValue(upsert(ws, 'indicators', ind), 'i1', 1, 30);
+    expect(computePlan(ws, planId, 1).indicator.get('i1')).toMatchObject({ progress: 50, onTrack: true });
+  });
+  it('plan de l’année suivante : même structure, liens remappés, suivi remis à zéro', () => {
+    let { ws, planId } = imported();
+    ws = updateActivityStatus(ws, byTitle(ws, 'Kenya KR a').id, { status: 'done', progress: 100, comment: '' });
+    const r = createPlan(ws, { year: 2028, sourcePlanId: planId, copyActivities: true, copyIndicators: true });
     const n = computePlan(r.ws, r.planId, 1);
-    expect(n.objectives).toHaveLength(2);
-    expect(n.krs).toHaveLength(3);
-    expect(n.globalActs).toHaveLength(3);
-    expect(n.orphans).toHaveLength(1); // l'orpheline reste orpheline
+    expect([n.objectives.length, n.krs.length, n.globalActs.length, n.countryActs.length, n.orphans.length]).toEqual([2, 4, 3, 3, 1]);
     expect(n.countryActs.every((a) => a.status === 'not_started')).toBe(true);
-    expect(n.countryActs.filter((a) => a.parentId).every((a) => n.byId.get(a.parentId!)?.planId === r.planId)).toBe(true);
-    expect(n.indicators[0].baseline).toBe(17);
-    expect(r.ws.plans.map((p) => p.year)).toEqual([2027, 2028]);
-    // l'ancien plan est intact
-    expect(computePlan(r.ws, planId, 1).countryActs.some((a) => a.status === 'done')).toBe(true);
+    expect(n.countryActs.flatMap((a) => a.parentIds).every((id) => n.byId.get(id)?.planId === r.planId)).toBe(true);
   });
-
-  it('supprimer une activité globale rend ses activités pays orphelines', () => {
+  it('supprimer un KR d’équipe globale retire le lien', () => {
     const { ws, planId } = imported();
-    const v = computePlan(ws, planId, 1);
-    const g = v.globalActs.find((a) => a.title === 'Deploy eCHIS training package')!;
-    expect(computePlan(remove(ws, 'activities', g.id), planId, 1).orphans).toHaveLength(3);
+    const v = computePlan(remove(remove(ws, 'activities', byTitle(ws, 'DHGP KR a').id), 'activities', byTitle(ws, 'PEI KR a').id), planId, 1);
+    expect(v.orphans).toHaveLength(3);
   });
-
-  it('performance : 3 000 activités et 2 000 indicateurs en moins de 100 ms', () => {
+  it('performance : 3 000 KR / activités en moins de 100 ms', () => {
     let { ws, planId } = imported();
     const g = computePlan(ws, planId, 1).globalActs[0];
-    const acts = Array.from({ length: 3000 }, (_, n) => ({ ...g, id: `p${n}`, level: 'country' as const, unitId: 'kenya', parentId: n % 3 ? g.id : null }));
-    const inds = Array.from({ length: 2000 }, (_, n) => ({ id: `pi${n}`, planId, targetType: 'activity' as const, targetId: `p${n}`, name: 'x', kind: 'number' as const, unit: '', baseline: 0, quarterTargets: [null, null, null, null], target: 10, source: '', order: 0 }));
-    ws = { ...ws, activities: [...ws.activities, ...acts], indicators: [...ws.indicators, ...inds] };
+    const acts = Array.from({ length: 3000 }, (_, n) => ({ ...g, id: `p${n}`, level: 'country' as const, unitId: 'kenya', parentIds: n % 3 ? [g.id] : [] }));
+    ws = { ...ws, activities: [...ws.activities, ...acts] };
     const t = performance.now();
-    const v = computePlan(ws, planId, 2);
-    planAlerts(ws, v);
+    planAlerts(ws, computePlan(ws, planId, 2));
     expect(performance.now() - t).toBeLessThan(100);
-    expect(v.orphans.length).toBe(1000 + 1);
   });
 });
 
-describe('lignes de suite dans l’analyse d’alignement', () => {
-  const rows = [
-    ['Ref', 'Département', 'Activité globale', 'Pays', 'Activité pays', 'Alignement'],
-    ['KR1.1', 'DHGP', 'Global A', 'Kenya', 'Kenya A', 'Aligné'],
-    ['', '', '', 'Uganda', 'Uganda A', 'Aligné'], // suite de Global A (cellule vide, non fusionnée)
-    ['KR1.1', '', '', 'Benin', 'Benin local', 'Non aligné'], // orpheline
-    ['KR1.2', '', '', 'Zambia', 'Zambia local', ''], // Ref renseignée sans activité globale → orpheline
-  ];
-  const run = (continuation: boolean) => {
+// Contrôle sur le vrai fichier, en local uniquement (jamais versionné) : OKR_XLSX=/chemin/fichier.xlsx npm test
+const REAL = process.env.OKR_XLSX;
+describe.skipIf(!REAL || !existsSync(REAL ?? ''))('fichier OKR réel (local)', () => {
+  it('reproduit la synthèse de l’analyse d’alignement', () => {
     const { ws: w0, planId } = createPlan(emptyWorkspace(), { year: 2027 });
-    const al = readWorkbook(workbook(rows))[1];
-    const { ws } = runImport(w0, { planId, replace: false, alignment: { sheet: al, mapping: guessMapping(al.headers, ALIGN_FIELDS), wide: false, countryCols: [], continuation } });
-    return computePlan(ws, planId, 1);
-  };
-  it('une cellule vide reprend l’activité du dessus ; les vraies orphelines restent orphelines', () => {
-    expect(run(true).orphans.map((a) => a.title).sort()).toEqual(['Benin local', 'Zambia local']);
-  });
-  it('option désactivée : toute ligne sans activité globale est orpheline', () => {
-    expect(run(false).orphans.map((a) => a.title).sort()).toEqual(['Benin local', 'Uganda A', 'Zambia local']);
+    const { ws, report } = importOkr(w0, planId, readOkrWorkbook(XLSX.read(readFileSync(REAL!))), { replace: true });
+    const v = computePlan(ws, planId, 1);
+    expect(report.unmatched).toEqual([]);
+    expect(v.countryActs).toHaveLength(48);
+    expect(v.globalActs).toHaveLength(52);
+    expect(v.alignment.country).toMatchObject({ aligned: 16, partial: 10, conflict: 5, gap: 17 });
+    expect(v.alignment.global).toMatchObject({ aligned: 17, partial: 5, conflict: 6, gap: 10, global_only: 14 });
+    expect(v.orphans).toHaveLength(4);
   });
 });

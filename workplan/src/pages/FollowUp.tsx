@@ -34,17 +34,18 @@ function Row({ a }: { a: Activity }) {
   const { view, unit } = useApp();
   const v = view!;
   const sc = v.activity.get(a.id)!;
-  const p = a.parentId ? v.byId.get(a.parentId) : null;
+  const parents = v.parentsOf.get(a.id) ?? [];
   const inds = v.indByTarget.get(targetKey('activity', a.id)) ?? [];
   return (
     <Card className="!py-3">
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-wide text-brand-500">{unit(a.unitId)?.name}{a.subTeam ? ` (${a.subTeam})` : ''}</div>
           <div className="font-semibold text-[#1d2327]">{a.title}</div>
           <div className="text-xs text-slate-500">
-            {v.krs.find((k) => k.id === (a.krId ?? p?.krId))?.code ?? 'sans KR'} · Q{a.startQ}–Q{a.endQ} · {a.owner || 'responsable non défini'}
-            {a.level === 'country' && (p ? <> · concourt à <b>{unit(p.unitId)?.name}</b> : {p.title}</> : <> · <OrphanBadge /></>)}
-            {a.level === 'global' && <> · {(v.childrenOf.get(a.id) ?? []).length} activité(s) pays liée(s), avancement pays {pct(sc.children)}</>}
+            {v.krs.find((k) => k.id === a.krId)?.code ?? 'sans KR'} · Q{a.startQ}–Q{a.endQ} · Lead : {a.owner || 'non défini'}
+            {a.level === 'country' && (parents.length ? <> · soutenu par <b>{[...new Set(parents.map((x) => unit(x.unitId)?.name))].join(', ')}</b></> : <> · <OrphanBadge /></>)}
+            {a.level === 'global' && <> · {(v.childrenOf.get(a.id) ?? []).length} KR pays rattaché(s), avancement pays {pct(sc.children)}</>}
           </div>
         </div>
         <div className="flex items-center gap-2"><StatusBadge status={a.status} /><MiniProgress value={sc.progress} rag={sc.rag} /></div>

@@ -15,14 +15,14 @@ export default function Plans() {
   const last = plans[0];
   const [f, setF] = useState({
     year: (last?.year ?? new Date().getFullYear()) + (last ? 1 : 0), name: '', source: last?.id ?? '',
-    activities: true, indicators: true, commitments: true, baselines: true,
+    activities: true, indicators: true, baselines: true,
   });
   const yearTaken = ws.plans.some((p) => p.year === f.year);
 
   const create = () => {
     update((w) => createPlan(w, {
       year: f.year, name: f.name.trim() || undefined, sourcePlanId: f.source || null,
-      copyActivities: f.activities, copyIndicators: f.indicators, copyCommitments: f.commitments, carryBaselines: f.baselines,
+      copyActivities: f.activities, copyIndicators: f.indicators, carryBaselines: f.baselines,
     }).ws, `Plan ${f.year} créé.`);
     navigate('/plan');
   };
@@ -56,8 +56,7 @@ export default function Plans() {
         {f.source && (
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
             <span className="text-slate-500">Objectifs et KR toujours repris, plus :</span>
-            <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={f.activities} onChange={(e) => setF({ ...f, activities: e.target.checked })} /> activités globales et pays (avec leurs liens)</label>
-            <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={f.commitments} onChange={(e) => setF({ ...f, commitments: e.target.checked })} /> registre OKR</label>
+            <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={f.activities} onChange={(e) => setF({ ...f, activities: e.target.checked })} /> KR / activités des équipes globales et des pays (registre, liens, analyse d’alignement)</label>
             <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={f.indicators} onChange={(e) => setF({ ...f, indicators: e.target.checked })} /> indicateurs</label>
             {f.indicators && <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={f.baselines} onChange={(e) => setF({ ...f, baselines: e.target.checked })} /> baseline = dernière valeur mesurée l’an passé</label>}
           </div>
@@ -90,8 +89,8 @@ export default function Plans() {
                           {(Object.keys(PLAN_STATUS_LABEL) as PlanStatus[]).map((s) => <option key={s} value={s}>{PLAN_STATUS_LABEL[s]}</option>)}
                         </select>
                       </td>
-                      <td className="whitespace-nowrap text-xs text-slate-600">{v.objectives.length} objectifs · {v.krs.length} KR<br />{v.globalActs.length} act. globales · {v.countryActs.length} act. pays · {v.indicators.length} indic.</td>
-                      <td className="whitespace-nowrap text-xs">{v.alignment.countryActs ? <>{Math.round(v.alignment.rate ?? 0)} % lié{v.orphans.length ? <span className="ml-1 font-semibold text-rag-red">· {v.orphans.length} orpheline(s)</span> : null}</> : '—'}</td>
+                      <td className="whitespace-nowrap text-xs text-slate-600">{v.objectives.length} objectifs · {v.krs.length} KR<br />{v.globalActs.length} KR équipes globales · {v.countryActs.length} KR pays · {v.indicators.length} indic.</td>
+                      <td className="whitespace-nowrap text-xs">{v.alignment.countryActs ? <>{Math.round(v.alignment.rate ?? 0)} % soutenus{v.orphans.length ? <span className="ml-1 font-semibold text-rag-red">· {v.orphans.length} orphelin(s)</span> : null}</> : '—'}</td>
                       <td>{v.plan.progress === null ? <RagBadge rag="none" /> : <MiniProgress value={v.plan.progress} rag={v.plan.rag} />}</td>
                       <td className="whitespace-nowrap">
                         <Button className="!min-h-[32px] !px-2.5 !py-1 text-sm" variant={p.id === ws.currentPlanId ? 'primary' : 'secondary'} onClick={() => { update((w) => ({ ...w, currentPlanId: p.id })); navigate('/'); }}>Ouvrir</Button>

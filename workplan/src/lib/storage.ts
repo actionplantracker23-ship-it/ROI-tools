@@ -8,10 +8,17 @@ import { emptyWorkspace, type Workspace } from '../types';
 export const STORAGE_KEY = 'plan-de-travail.workspace';
 const KEY = STORAGE_KEY;
 
+declare global { interface Window { __SEED__?: Partial<Workspace> } }
+
+/** Données intégrées au fichier HTML pré-rempli (npm run build:single -- --seed plan.json), utilisées au premier lancement. */
+function seed(): Workspace {
+  try { return window.__SEED__ ? normalize(window.__SEED__) : emptyWorkspace(); } catch { return emptyWorkspace(); }
+}
+
 export function loadWorkspace(): Workspace {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return emptyWorkspace();
+    if (!raw) return seed();
     return normalize(JSON.parse(raw));
   } catch {
     return emptyWorkspace();

@@ -2,13 +2,13 @@
  * Opérations (pures) sur l'espace de travail. Chaque fonction renvoie un nouvel objet Workspace.
  */
 import type {
-  Activity, ActivityStatus, AlignmentQuality, Indicator, IndicatorValue, KeyResult, Objective, Plan, Quarter, Unit, Workspace,
+  Activity, ActivityStatus, AlignStatus, Indicator, IndicatorValue, KeyResult, Objective, Plan, Quarter, Unit, Workspace,
 } from '../types';
 import { OBJECTIVE_COLORS } from '../types';
 import { latestValue } from './calc';
 import { similarity, uid } from './util';
 
-type Coll = 'objectives' | 'krs' | 'activities' | 'indicators' | 'commitments' | 'units';
+type Coll = 'objectives' | 'krs' | 'activities' | 'indicators' | 'units';
 type Item<C extends Coll> = Workspace[C][number];
 
 /** Ajoute ou remplace un élément (par id). */
@@ -26,7 +26,6 @@ export interface NewPlanOptions {
   sourcePlanId?: string | null; // null = plan vierge
   copyActivities?: boolean; // activités globales et pays (avec leurs liens)
   copyIndicators?: boolean;
-  copyCommitments?: boolean; // registre OKR
   carryBaselines?: boolean; // baseline = dernière valeur mesurée l'année précédente
 }
 
@@ -51,13 +50,10 @@ export function createPlan(ws: Workspace, o: NewPlanOptions): { ws: Workspace; p
     for (const a of srcActs) nid(a.id, 'a-');
     activities = srcActs.map((a) => ({
       ...a, id: map.get(a.id)!, planId, krId: a.krId ? map.get(a.krId) ?? null : null,
-      parentId: a.parentId ? map.get(a.parentId) ?? null : null,
+      parentIds: (a.parentIds ?? []).map((p) => map.get(p)).filter((p): p is string => !!p),
       status: 'not_started' as ActivityStatus, progress: 0, comment: '', updatedAt: null, updatedBy: null,
     }));
   }
-  const commitments = o.copyCommitments
-    ? ws.commitments.filter((c) => c.planId === src).map((c) => ({ ...c, id: uid('c-'), planId, krId: map.get(c.krId)! }))
-    : [];
   let indicators: Indicator[] = [];
   if (o.copyIndicators) {
     const valuesBy = new Map<string, IndicatorValue[]>();
@@ -70,7 +66,7 @@ export function createPlan(ws: Workspace, o: NewPlanOptions): { ws: Workspace; p
   next = {
     ...next,
     objectives: [...next.objectives, ...objectives], krs: [...next.krs, ...krs], activities: [...next.activities, ...activities],
-    commitments: [...next.commitments, ...commitments], indicators: [...next.indicators, ...indicators],
+    indicators: [...next.indicators, ...indicators],
   };
   return { ws: next, planId };
 }
@@ -87,7 +83,7 @@ export function deletePlan(ws: Workspace, planId: string): Workspace {
     ...ws, plans,
     currentPlanId: ws.currentPlanId === planId ? plans.sort((a, b) => b.year - a.year)[0]?.id ?? null : ws.currentPlanId,
     objectives: ws.objectives.filter((x) => x.planId !== planId), krs: ws.krs.filter((x) => x.planId !== planId),
-    commitments: ws.commitments.filter((x) => x.planId !== planId), activities: ws.activities.filter((x) => x.planId !== planId),
+    activities: ws.activities.filter((x) => x.planId !== planId),
     activityUpdates: ws.activityUpdates.filter((u) => !actIds.has(u.activityId)),
     indicators: ws.indicators.filter((x) => x.planId !== planId), indicatorValues: ws.indicatorValues.filter((v) => !indIds.has(v.indicatorId)),
   };
@@ -108,7 +104,8 @@ export function newKr(ws: Workspace, planId: string, objective: Objective, title
 export function newActivity(ws: Workspace, base: Pick<Activity, 'planId' | 'level' | 'unitId'> & Partial<Activity>): Activity {
   const n = ws.activities.filter((a) => a.planId === base.planId && a.unitId === base.unitId).length;
   return {
-    krId: null, parentId: null, alignment: null, code: '', title: '', owner: '', startQ: 1, endQ: 4, status: 'not_started', progress: 0,
+    krId: null, parentIds: [], alignment: null, finding: '', action: '', role: null, unitObjective: '', subTeam: '', scope: '',
+    code: '', title: '', owner: '', startQ: 1, endQ: 4, status: 'not_started', progress: 0,
     budget: null, comment: '', order: n, updatedAt: null, updatedBy: null, id: uid('a-'), ...base,
   };
 }
@@ -125,16 +122,15 @@ export function remove(ws: Workspace, coll: Coll, id: string): Workspace {
     for (const k of ws.krs.filter((x) => x.objectiveId === id)) next = remove(next, 'krs', k.id);
   }
   if (coll === 'krs') {
-    next = { ...next, activities: next.activities.map((a) => (a.krId === id ? { ...a, krId: null } : a)), commitments: next.commitments.filter((c) => c.krId !== id) };
+    next = { ...next, activities: next.activities.map((a) => (a.krId === id ? { ...a, krId: null } : a)) };
   }
   if (coll === 'activities') {
-    next = { ...next, activities: next.activities.map((a) => (a.parentId === id ? { ...a, parentId: null, alignment: null } : a)), activityUpdates: next.activityUpdates.filter((u) => u.activityId !== id) };
+    next = { ...next, activities: next.activities.map((a) => ((a.parentIds ?? []).includes(id) ? { ...a, parentIds: a.parentIds.filter((p) => p !== id) } : a)), activityUpdates: next.activityUpdates.filter((u) => u.activityId !== id) };
   }
   if (coll === 'units') {
     for (const a of ws.activities.filter((x) => x.unitId === id)) next = remove(next, 'activities', a.id);
-    next = { ...next, commitments: next.commitments.filter((c) => c.unitId !== id) };
   }
-  if (coll !== 'indicators' && coll !== 'units' && coll !== 'commitments') {
+  if (coll !== 'indicators' && coll !== 'units') {
     const gone = new Set(next.indicators.filter((i) => i.targetId === id).map((i) => i.id));
     next = { ...next, indicators: next.indicators.filter((i) => !gone.has(i.id)), indicatorValues: next.indicatorValues.filter((v) => !gone.has(v.indicatorId)) };
   }
@@ -160,15 +156,21 @@ export function addIndicatorValue(ws: Workspace, indicatorId: string, quarter: Q
   return { ...ws, indicatorValues: [...ws.indicatorValues, v] };
 }
 
-export function linkActivity(ws: Workspace, countryActId: string, parentId: string | null, alignment: AlignmentQuality | null = 'full'): Workspace {
-  return { ...ws, activities: ws.activities.map((a) => (a.id === countryActId ? { ...a, parentId, alignment: parentId ? alignment : null } : a)) };
+/** Ajoute un lien activité pays → activité globale (statut facultatif). */
+export function addLink(ws: Workspace, countryActId: string, parentId: string, alignment?: AlignStatus): Workspace {
+  return {
+    ...ws,
+    activities: ws.activities.map((a) => (a.id === countryActId
+      ? { ...a, parentIds: [...new Set([...(a.parentIds ?? []), parentId])], alignment: alignment ?? a.alignment }
+      : a)),
+  };
 }
 
 /** Propositions de rattachement d'une activité pays : activités globales du plan classées par proximité du texte. */
 export function suggestParents(ws: Workspace, act: Activity, limit = 5): { a: Activity; score: number }[] {
   return ws.activities
-    .filter((g) => g.planId === act.planId && g.level === 'global')
-    .map((g) => ({ a: g, score: similarity(g.title, act.title) + (act.krId && g.krId === act.krId ? 0.3 : 0) }))
+    .filter((g) => g.planId === act.planId && g.level === 'global' && !(act.parentIds ?? []).includes(g.id))
+    .map((g) => ({ a: g, score: similarity(g.title + ' ' + g.unitObjective, act.title + ' ' + act.unitObjective) + (act.krId && g.krId === act.krId ? 0.4 : 0) }))
     .filter((x) => x.score > 0.1)
     .sort((x, y) => y.score - x.score)
     .slice(0, limit);

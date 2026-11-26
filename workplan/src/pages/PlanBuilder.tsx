@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../AppContext';
 import { ActivityEditor, IndicatorList } from '../components/Editors';
-import { Button, Card, Field, inputCls, MiniProgress, Modal, NoPlan, OrphanBadge, PageHeader, RagBadge, RoleBadge, StatusBadge, UnitChip } from '../components/ui';
+import { AlignBadge, Button, Card, Field, inputCls, MiniProgress, Modal, NoPlan, OrphanBadge, PageHeader, RagBadge, RoleBadge, StatusBadge, UnitChip } from '../components/ui';
 import { pct } from '../lib/format';
 import { newActivity, newKr, newObjective, remove, upsert } from '../lib/ops';
 import { OBJECTIVE_COLORS, type Activity, type KeyResult, type Objective } from '../types';
@@ -39,37 +39,47 @@ function TitleEditor({ title, code, color, onSave, onDelete, onClose, label }: {
   );
 }
 
-function ActivityLine({ a, onEdit, indent }: { a: Activity; onEdit: (a: Activity) => void; indent?: boolean }) {
+function ActivityLine({ a, onEdit }: { a: Activity; onEdit: (a: Activity) => void }) {
   const { view, unit } = useApp();
-  const sc = view!.activity.get(a.id)!;
+  const v = view!;
+  const sc = v.activity.get(a.id)!;
   const u = unit(a.unitId);
-  const nInd = view!.indByTarget.get(`activity:${a.id}`)?.length ?? 0;
+  const nInd = v.indByTarget.get(`activity:${a.id}`)?.length ?? 0;
+  const parents = a.level === 'country' ? v.parentsOf.get(a.id) ?? [] : [];
+  const kids = a.level === 'global' ? v.childrenOf.get(a.id) ?? [] : [];
   return (
-    <button onClick={() => onEdit(a)} className={`grid w-full grid-cols-[auto,1fr] items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-[#f5f8fb] sm:grid-cols-[auto,1fr,auto,auto,auto] sm:items-center ${indent ? 'pl-6' : ''}`}>
-      {u && <UnitChip name={u.name} type={u.type} />}
+    <button onClick={() => onEdit(a)} className="grid w-full grid-cols-[auto,1fr] items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-[#f5f8fb] md:grid-cols-[150px,1fr,auto,auto,auto] md:items-center">
+      <span className="flex flex-wrap items-center gap-1">{u && <UnitChip name={u.name + (a.subTeam ? ` (${a.subTeam})` : '')} type={u.type} />}{a.role ? <RoleBadge role={a.role} /> : <span className="text-[11px] text-slate-500">Team KR</span>}</span>
       <span className="min-w-0 text-sm text-[#1d2327]">
-        {indent && <span className="mr-1 text-slate-400">↳</span>}{a.code && <b className="mr-1 text-brand-500">{a.code}</b>}{a.title}
-        {a.alignment === 'partial' && <span className="ml-1.5 rounded bg-[#fff3e6] px-1.5 text-[11px] text-[#9a4a00]">lien partiel</span>}
-        {a.owner && <span className="ml-1.5 text-xs text-slate-500">· {a.owner}</span>}
+        {a.title}
+        <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
+          {a.owner && <span>Lead : {a.owner} ·</span>}
+          {a.level === 'country' && (parents.length
+            ? <span>soutenu par {[...new Set(parents.map((p) => unit(p.unitId)?.name))].join(', ')}</span>
+            : <OrphanBadge />)}
+          {a.level === 'global' && <span>{kids.length ? `${kids.length} KR pays rattaché(s)` : 'aucun KR pays rattaché'}</span>}
+          <span>· {nInd} indic.</span>
+        </span>
       </span>
-      <span className="col-start-2 text-xs text-slate-500 sm:col-start-auto">Q{a.startQ}–Q{a.endQ} · {nInd} indic.</span>
-      <span className="col-start-2 sm:col-start-auto"><StatusBadge status={a.status} /></span>
-      <span className="col-start-2 sm:col-start-auto"><MiniProgress value={sc.progress} rag={sc.rag} /></span>
+      <span className="col-start-2 md:col-start-auto"><AlignBadge status={a.alignment} /></span>
+      <span className="col-start-2 md:col-start-auto"><StatusBadge status={a.status} /></span>
+      <span className="col-start-2 md:col-start-auto"><MiniProgress value={sc.progress} rag={sc.rag} /></span>
     </button>
   );
 }
 
 function KrBlock({ kr, o, filter }: { kr: KeyResult; o: Objective; filter: string }) {
-  const { ws, plan, view, update, unit } = useApp();
+  const { ws, plan, view, update } = useApp();
   const [params] = useSearchParams();
   const [open, setOpen] = useState(params.get('kr') === kr.id || !filter);
   const [edit, setEdit] = useState<Activity | null>(null);
   const [editKr, setEditKr] = useState(false);
   const v = view!;
   const sc = v.kr.get(kr.id)!;
-  const globals = (v.actsByKr.get(kr.id) ?? []).filter((g) => !filter || g.unitId === filter || (v.childrenOf.get(g.id) ?? []).some((c) => c.unitId === filter));
-  if (filter && !globals.length) return null;
-  const commits = v.commitments.filter((c) => c.krId === kr.id);
+  const globals = v.globalActs.filter((g) => g.krId === kr.id && (!filter || g.unitId === filter));
+  const countries = v.countryActs.filter((c) => c.krId === kr.id && (!filter || c.unitId === filter));
+  if (filter && !globals.length && !countries.length) return null;
+  const orph = countries.filter((c) => !(v.parentsOf.get(c.id) ?? []).length).length;
   const firstDept = ws.units.find((u) => u.type === 'department')?.id ?? '';
   const firstCountry = ws.units.find((u) => u.type === 'country')?.id ?? '';
   return (
@@ -78,33 +88,28 @@ function KrBlock({ kr, o, filter }: { kr: KeyResult; o: Objective; filter: strin
         <button onClick={() => setOpen(!open)} className="text-slate-400" aria-label={open ? 'Replier' : 'Déplier'}>{open ? '▾' : '▸'}</button>
         <button onClick={() => setEditKr(true)} className="font-titre text-xl font-semibold text-accent hover:underline">{kr.code}</button>
         <span className="min-w-0 flex-1 text-[15px] font-semibold text-brand-500">{kr.title}</span>
-        <span className="text-xs text-slate-500">{globals.length} act. globale(s)</span>
+        <span className="text-xs text-slate-500">{globals.length} KR équipes globales · {countries.length} KR pays{orph ? <b className="ml-1 text-rag-red">· {orph} orphelin(s)</b> : null}</span>
         <MiniProgress value={sc.progress} rag={sc.rag} />
       </header>
       {open && (
         <div className="space-y-3 px-3 py-3">
-          {commits.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 text-xs">
-              <span className="text-slate-500">Registre :</span>
-              {commits.map((c) => <span key={c.id} className="inline-flex items-center gap-1" title={c.unitKr}>{unit(c.unitId)?.name}<RoleBadge role={c.role} /></span>)}
+          {!kr.team && (
+            <div>
+              <div className="mb-1 text-xs font-bold uppercase tracking-wide text-brand-500">Indicateurs du KR global</div>
+              <IndicatorList type="kr" id={kr.id} compact />
             </div>
           )}
           <div>
-            <div className="mb-1 text-xs font-bold uppercase tracking-wide text-brand-500">Indicateurs du KR</div>
-            <IndicatorList type="kr" id={kr.id} compact />
+            <div className="mb-1 text-xs font-bold uppercase tracking-wide text-brand-500">Équipes globales (plan global)</div>
+            <ul className="divide-y divide-[#eef0f3]">{globals.map((g) => <li key={g.id}><ActivityLine a={g} onEdit={setEdit} /></li>)}</ul>
+            {!globals.length && <p className="px-2 text-sm text-slate-500">Aucune équipe globale sur cette Ref.</p>}
+            <button className="mt-1 text-sm font-semibold text-brand-500 hover:text-accent" onClick={() => setEdit(newActivity(ws, { planId: plan!.id, level: 'global', unitId: firstDept, krId: kr.id }))}>+ KR / activité d’équipe globale</button>
           </div>
           <div>
-            <div className="mb-1 text-xs font-bold uppercase tracking-wide text-brand-500">Activités des départements globaux → activités pays</div>
-            <ul className="divide-y divide-[#eef0f3]">
-              {globals.map((g) => (
-                <li key={g.id} className="py-1">
-                  <ActivityLine a={g} onEdit={setEdit} />
-                  {(v.childrenOf.get(g.id) ?? []).filter((c) => !filter || c.unitId === filter || g.unitId === filter).map((c) => <ActivityLine key={c.id} a={c} onEdit={setEdit} indent />)}
-                  <button className="ml-6 text-xs font-semibold text-brand-500 hover:text-accent" onClick={() => setEdit(newActivity(ws, { planId: plan!.id, level: 'country', unitId: firstCountry, parentId: g.id, alignment: 'full', krId: kr.id }))}>+ activité pays liée</button>
-                </li>
-              ))}
-            </ul>
-            <button className="mt-1 text-sm font-semibold text-brand-500 hover:text-accent" onClick={() => setEdit(newActivity(ws, { planId: plan!.id, level: 'global', unitId: firstDept, krId: kr.id }))}>+ Activité globale</button>
+            <div className="mb-1 text-xs font-bold uppercase tracking-wide text-brand-500">Pays (doivent être soutenus par le global)</div>
+            <ul className="divide-y divide-[#eef0f3]">{countries.map((c) => <li key={c.id}><ActivityLine a={c} onEdit={setEdit} /></li>)}</ul>
+            {!countries.length && <p className="px-2 text-sm text-slate-500">Aucun KR pays sur cette Ref.</p>}
+            <button className="mt-1 text-sm font-semibold text-brand-500 hover:text-accent" onClick={() => setEdit(newActivity(ws, { planId: plan!.id, level: 'country', unitId: firstCountry, krId: kr.id, parentIds: globals.map((g) => g.id) }))}>+ KR / activité pays</button>
           </div>
         </div>
       )}
@@ -131,7 +136,7 @@ export default function PlanBuilder() {
   return (
     <div className="space-y-5">
       <PageHeader eyebrow={<>{plan.name} · <span className="text-accent">avancement {pct(view.plan.progress)}</span></>} title="Plan de travail"
-        subtitle="Objectifs → KR globaux → activités des départements globaux → activités pays liées. Cliquez sur un élément pour le modifier ; ajoutez des indicateurs de mesure à chaque niveau." />
+        subtitle="Objectifs → KR globaux → KR / activités des équipes globales → KR / activités des pays, soutenus par le global. Cliquez sur un élément pour le modifier ; ajoutez des indicateurs de mesure à chaque niveau." />
 
       <Card>
         <div className="grid gap-2 sm:grid-cols-[1fr,auto,260px]">

@@ -7,8 +7,8 @@ import type { Quarter } from '../types';
 const TABS: { to: string; label: string; short?: string; icon?: string }[] = [
   { to: '/', label: 'Tableau de bord', short: 'Bilan', icon: 'M4 13h6V4H4zm0 7h6v-5H4zm10 0h6v-9h-6zm0-16v5h6V4z' },
   { to: '/plan', label: 'Plan de travail', short: 'Plan', icon: 'M3 3h7v4H3zm11 0h7v4h-7zM8 10h8v4H8zm-5 7h7v4H3zm11 0h7v4h-7z' },
-  { to: '/globales', label: 'Activités globales' },
-  { to: '/pays', label: 'Activités pays' },
+  { to: '/globales', label: 'Équipes globales' },
+  { to: '/pays', label: 'Pays' },
   { to: '/alignement', label: 'Alignement', short: 'Alignement', icon: 'M3.9 12a3.1 3.1 0 0 1 3.1-3.1h4V7H7a5 5 0 0 0 0 10h4v-1.9H7A3.1 3.1 0 0 1 3.9 12zM8 13h8v-2H8zm9-6h-4v1.9h4a3.1 3.1 0 1 1 0 6.2h-4V17h4a5 5 0 0 0 0-10z' },
   { to: '/suivi', label: 'Suivi trimestriel', short: 'Suivi', icon: 'M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z' },
   { to: '/indicateurs', label: 'Indicateurs', short: 'Indic.', icon: 'M4 19h16v2H4zM6 10h3v7H6zm5-4h3v11h-3zm5 7h3v4h-3z' },
@@ -31,7 +31,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           <span aria-hidden className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-full bg-white font-titre text-[15px] font-bold text-brand-600">PT</span>
           <h1 className="min-w-0 flex-1 truncate text-[22px] font-normal max-sm:text-lg">
             Plan de travail {plan ? <b className="font-semibold">{plan.year}</b> : null}
-            <span className="text-[16px] opacity-80 max-sm:hidden"> · global, départements et pays</span>
+            <span className="text-[16px] opacity-80 max-sm:hidden"> · OKR · équipes globales et pays</span>
           </h1>
         </div>
       </header>
