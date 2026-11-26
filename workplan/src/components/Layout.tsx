@@ -38,13 +38,13 @@ function MoreMenu({ active }: { active: (to: string) => boolean }) {
   return (
     <div ref={ref} className="relative">
       <button onClick={() => setOpen(!open)} aria-expanded={open}
-        className={`rounded-full px-4 py-1.5 text-[16px] ${current ? 'bg-brand-600 text-white' : 'text-[#4b5563] hover:bg-white'}`}>
+        className={`rounded-full px-4 py-1.5 text-[16px] ${current ? 'bg-brand-600 text-white' : 'text-[#4a4c4f] hover:bg-brand-50'}`}>
         {current ? current.label : 'Plus'} ▾
       </button>
       {open && (
-        <ul className="absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-2xl border border-[#e7e4dc] bg-white py-1 shadow-xl">
+        <ul className="absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-2xl border border-[#e5e8ec] bg-white py-1 shadow-xl">
           {MORE.map((m) => (
-            <li key={m.to}><button onClick={() => { setOpen(false); navigate(m.to); }} className={`block w-full px-4 py-2 text-left text-[16px] hover:bg-[#f6f5f1] ${active(m.to) ? 'font-semibold text-brand-600' : ''}`}>{m.label}</button></li>
+            <li key={m.to}><button onClick={() => { setOpen(false); navigate(m.to); }} className={`block w-full px-4 py-2 text-left text-[16px] hover:bg-[#ffffff] ${active(m.to) ? 'font-semibold text-brand-600' : ''}`}>{m.label}</button></li>
           ))}
         </ul>
       )}
@@ -58,14 +58,14 @@ export default function Layout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const active = (to: string) => (to === '/' ? pathname === '/' : pathname.startsWith(to));
   const plans = [...ws.plans].sort((a, b) => b.year - a.year);
-  const sel = 'min-h-[34px] rounded-full border border-white/25 bg-white/10 px-3 text-[15px] text-white focus:outline-none [&>option]:text-[#1d2327]';
+  const sel = 'min-h-[34px] rounded-full border border-[#d5dbe1] bg-white px-3 text-[15px] text-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100';
   return (
     <div className="min-h-screen pb-[84px] lg:pb-10">
-      <header className="sticky top-0 z-30 bg-brand-600 text-white">
+      <header className="sticky top-0 z-30 border-b border-[#e5e8ec] bg-white text-brand-600">
         <div className="mx-auto flex max-w-[1280px] items-center gap-3 px-5 py-2.5">
-          <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-[15px] font-bold text-brand-600">PT</span>
+          <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-600 text-[15px] font-bold text-white">PT</span>
           <span className="min-w-0 flex-1 truncate text-[21px] tracking-wide">
-            Plan de travail {plan && <span className="italic text-white/80">{plan.year}</span>}
+            Plan de travail {plan && <span className="italic text-accent">{plan.year}</span>}
           </span>
           <select aria-label="Plan annuel" value={ws.currentPlanId ?? ''} className={`${sel} max-sm:hidden`}
             onChange={(e) => (e.target.value === '__new' ? navigate('/plans') : update((w) => ({ ...w, currentPlanId: e.target.value })))}>
@@ -79,11 +79,11 @@ export default function Layout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <div className="no-print sticky top-[56px] z-20 border-b border-[#e7e4dc] bg-[#f6f5f1]/95 backdrop-blur max-lg:hidden">
+      <div className="no-print sticky top-[57px] z-20 border-b border-[#e5e8ec] bg-white/95 backdrop-blur max-lg:hidden">
         <nav className="mx-auto flex max-w-[1280px] items-center gap-1 px-5 py-2" role="tablist">
           {MAIN.map((t) => (
             <button key={t.to} role="tab" aria-selected={active(t.to)} onClick={() => navigate(t.to)}
-              className={`rounded-full px-4 py-1.5 text-[16px] transition ${active(t.to) ? 'bg-brand-600 text-white' : 'text-[#4b5563] hover:bg-white'}`}>{t.label}</button>
+              className={`rounded-full px-4 py-1.5 text-[16px] transition ${active(t.to) ? 'bg-brand-600 text-white' : 'text-[#4a4c4f] hover:bg-brand-50'}`}>{t.label}</button>
           ))}
           <span className="flex-1" />
           <MoreMenu active={active} />
@@ -102,9 +102,9 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       {notice && <div className="fixed bottom-[100px] left-1/2 z-[60] -translate-x-1/2 rounded-full bg-brand-600 px-5 py-2.5 text-white shadow-lg lg:bottom-8">{notice}</div>}
 
-      <nav className="no-print fixed inset-x-0 bottom-0 z-20 flex justify-around bg-brand-600 pb-1 pt-1.5 lg:hidden">
+      <nav className="no-print fixed inset-x-0 bottom-0 z-20 flex justify-around border-t border-[#e5e8ec] bg-white pb-1 pt-1.5 lg:hidden">
         {MAIN.map((t) => (
-          <button key={t.to} onClick={() => navigate(t.to)} className="relative flex flex-col items-center gap-0.5 px-1 pb-2 pt-1 text-[13px] text-white">
+          <button key={t.to} onClick={() => navigate(t.to)} className="relative flex flex-col items-center gap-0.5 px-1 pb-2 pt-1 text-[13px] text-brand-600">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden><path d={t.icon} /></svg>
             {t.short}
             {active(t.to) && <span className="absolute bottom-0 h-1 w-10 rounded-t bg-accent" />}

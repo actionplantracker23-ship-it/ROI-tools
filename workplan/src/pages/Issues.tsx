@@ -66,7 +66,7 @@ export default function Issues() {
         <Stat label="Ouverts" value={count('open')} color="#d64545" />
         <Stat label="En traitement" value={count('in_progress')} color="#f2b01e" />
         <Stat label="Clos" value={count('closed')} color="#2e9e4f" />
-        <Stat label="Échéance dépassée" value={<span className={lateCount ? 'text-rag-red' : ''}>{lateCount}</span>} color="#0b2e59" />
+        <Stat label="Échéance dépassée" value={<span className={lateCount ? 'text-rag-red' : ''}>{lateCount}</span>} color="#004D84" />
       </div>
       <div className="grid gap-2 rounded-lg border border-ligne bg-white p-3 sm:grid-cols-4">
         <select className={inputCls} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })} aria-label="Statut"><option value="active">Ouverts et en traitement</option><option value="">Tous</option>{(Object.keys(ISSUE_STATUS_LABEL) as IssueStatus[]).map((s) => <option key={s} value={s}>{ISSUE_STATUS_LABEL[s]}</option>)}</select>

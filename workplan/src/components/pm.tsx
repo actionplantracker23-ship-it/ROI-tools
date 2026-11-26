@@ -7,7 +7,7 @@ import { PRIORITY_LABEL, STATUS_LABEL, type Activity, type ActivityStatus, type 
 import { inputCls } from './ui';
 
 export function PriorityBadge({ p }: { p: Priority }) {
-  const cls = { high: 'text-[#a23434]', medium: 'text-[#8a5a00]', low: 'text-[#6b6f76]' }[p];
+  const cls = { high: 'text-[#a23434]', medium: 'text-[#8a5a00]', low: 'text-[#6D6E71]' }[p];
   return <span className={`inline-flex whitespace-nowrap text-[14px] ${cls}`} title={`Priorité ${PRIORITY_LABEL[p].toLowerCase()}`}>{p === 'high' ? '▲' : p === 'low' ? '▽' : '◆'}&nbsp;{PRIORITY_LABEL[p]}</span>;
 }
 
@@ -45,18 +45,18 @@ export function FilterBar({ extra }: { extra?: React.ReactNode }) {
     <div className="no-print mb-5">
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[240px] flex-1">
-          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9a9ea5]" aria-hidden>⌕</span>
+          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9aa0a6]" aria-hidden>⌕</span>
           <input className={`${inputCls} !rounded-full pl-9`} placeholder="Rechercher une tâche, une personne…" value={f.q} onChange={(e) => set({ q: e.target.value })} aria-label="Rechercher" />
         </div>
         <button onClick={() => setOpen(!open)} aria-expanded={open}
-          className={`min-h-[42px] rounded-full border px-4 text-[16px] ${n ? 'border-brand-600 bg-brand-600 text-white' : 'border-[#dcd8cf] bg-white hover:border-brand-500'}`}>
+          className={`min-h-[42px] rounded-full border px-4 text-[16px] ${n ? 'border-brand-600 bg-brand-600 text-white' : 'border-[#d5dbe1] bg-white hover:border-brand-500'}`}>
           Filtres{n ? ` · ${n}` : ''} {open ? '▴' : '▾'}
         </button>
         {isFiltered(f) && <button className="text-[15px] text-brand-500 underline-offset-2 hover:underline" onClick={() => setFilter(EMPTY_FILTER)}>Effacer</button>}
         {extra && <span className="ml-auto flex flex-wrap items-center gap-2">{extra}</span>}
       </div>
       {open && (
-        <div className="mt-3 grid gap-2 rounded-2xl border border-[#e7e4dc] bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-3 grid gap-2 rounded-2xl border border-[#e5e8ec] bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
           <select className={inputCls} value={f.unit} onChange={(e) => set({ unit: e.target.value })} aria-label="Équipe ou pays">
             <option value="">Toutes les équipes et pays</option>
             <optgroup label="Équipes globales">{ws.units.filter((u) => u.type === 'department').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
@@ -87,7 +87,7 @@ export function ViewHeader({ title, sub, actions }: { title: string; sub?: React
       <div className="min-w-0 max-w-3xl">
         <div className="mb-1 text-[14px] uppercase tracking-[.14em] text-accent">{plan?.name ?? 'Plan de travail'}</div>
         <h1 className="text-[34px] font-semibold leading-tight text-brand-600 sm:text-[38px]">{title}</h1>
-        {sub && <p className="mt-1.5 text-[17px] italic text-[#6b6f76]">{sub}</p>}
+        {sub && <p className="mt-1.5 text-[17px] italic text-[#6D6E71]">{sub}</p>}
       </div>
       {actions && <div className="no-print flex flex-wrap gap-2">{actions}</div>}
     </header>

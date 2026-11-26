@@ -10,9 +10,9 @@ export const RAG_STYLE: Record<Rag, { cls: string; label: string; icon: string }
   green: { cls: 'bg-[#eaf6ee] text-[#1f7a3d]', label: 'En bonne voie', icon: '●' },
   amber: { cls: 'bg-[#fdf5e3] text-[#8a5a00]', label: 'À surveiller', icon: '●' },
   red: { cls: 'bg-[#fbeaea] text-[#a23434]', label: 'En difficulté', icon: '●' },
-  none: { cls: 'bg-[#f1f0ec] text-[#6b6f76]', label: 'Pas encore suivi', icon: '○' },
+  none: { cls: 'bg-[#eef0f2] text-[#6D6E71]', label: 'Pas encore suivi', icon: '○' },
 };
-export const RAG_HEX: Record<Rag, string> = { green: '#2e9e4f', amber: '#e0a21b', red: '#d64545', none: '#d6d3cb' };
+export const RAG_HEX: Record<Rag, string> = { green: '#2E9E4F', amber: '#F7941D', red: '#D64545', none: '#d5dbe1' };
 
 /** Statut RAG (avancement) : pastille + libellé. */
 export function RagBadge({ rag, score, compact }: { rag: Rag; score?: number | null; compact?: boolean }) {
@@ -32,18 +32,20 @@ export function RoleBadge({ role }: { role: Role }) {
     : <span className="inline-flex items-center rounded-full bg-[#eef4fa] px-2 py-px text-[13.5px] text-brand-500">Contributes</span>;
 }
 
+/** Couleurs Living Goods des statuts et priorités (cellules pleines du tableau principal). */
+export const STATUS_HEX: Record<ActivityStatus, string> = { not_started: '#A7AAAD', in_progress: '#F7941D', done: '#2E9E4F', late: '#D64545', cancelled: '#6D6E71' };
+export const PRIORITY_HEX: Record<'high' | 'medium' | 'low', string> = { high: '#004D84', medium: '#2F80C0', low: '#4FB3E3' };
 export const STATUS_STYLE: Record<ActivityStatus, string> = {
-  not_started: 'bg-[#f1f0ec] text-[#5b6470]',
-  in_progress: 'bg-[#e8f0fa] text-[#245a96]',
-  done: 'bg-[#eaf6ee] text-[#1f7a3d]',
+  not_started: 'bg-[#eef0f2] text-[#55585b]',
+  in_progress: 'bg-[#fef1e1] text-[#9a5300]',
+  done: 'bg-[#e8f5ec] text-[#1f7a3d]',
   late: 'bg-[#fbeaea] text-[#a23434]',
-  cancelled: 'bg-[#ecebea] text-[#55595f] line-through',
+  cancelled: 'bg-[#eceeef] text-[#55585b] line-through',
 };
-const STATUS_DOT: Record<ActivityStatus, string> = { not_started: '#a7adb4', in_progress: '#2f6fb3', done: '#2e9e4f', late: '#d64545', cancelled: '#55595f' };
 export function StatusBadge({ status }: { status: ActivityStatus }) {
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[14px] ${STATUS_STYLE[status]}`}>
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: STATUS_DOT[status] }} />{STATUS_LABEL[status]}
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: STATUS_HEX[status] }} />{STATUS_LABEL[status]}
     </span>
   );
 }
@@ -60,7 +62,7 @@ export function ObjectiveChip({ o, short }: { o: Objective; short?: boolean }) {
 export function ProgressBar({ value, rag, color }: { value: number | null; rag?: Rag; color?: string }) {
   const fill = color ?? RAG_HEX[rag ?? 'none'];
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-[#ebe9e3]" role="progressbar" aria-valuenow={value ?? undefined} aria-valuemin={0} aria-valuemax={100}>
+    <div className="h-2 w-full overflow-hidden rounded-full bg-[#e8ecf0]" role="progressbar" aria-valuenow={value ?? undefined} aria-valuemin={0} aria-valuemax={100}>
       <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%`, background: fill }} />
     </div>
   );
@@ -87,7 +89,7 @@ export function Gauge({ score, size = 132 }: { score: Score; size?: number }) {
 
 export function Card({ children, className = '', title, action, style }: { children: ReactNode; className?: string; title?: ReactNode; action?: ReactNode; style?: React.CSSProperties }) {
   return (
-    <section style={style} className={`rounded-2xl border border-[#e7e4dc] bg-white px-6 py-5 shadow-[0_1px_2px_rgba(11,46,89,.04)] ${className}`}>
+    <section style={style} className={`rounded-2xl border border-[#e5e8ec] bg-white px-6 py-5 shadow-[0_1px_2px_rgba(11,46,89,.04)] ${className}`}>
       {(title || action) && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           {title && <h2 className="text-[22px] font-semibold text-brand-600">{title}</h2>}
@@ -106,7 +108,7 @@ export function PageHeader({ title, subtitle, actions, eyebrow }: { title: React
       <div className="min-w-0 max-w-3xl">
         <div className="mb-1 text-[14px] uppercase tracking-[.14em] text-accent">{eyebrow ?? 'Plan de travail'}</div>
         <h1 className="text-[34px] font-semibold leading-tight text-brand-600 sm:text-[38px]">{title}</h1>
-        {subtitle && <p className="mt-1.5 text-[17px] italic text-[#6b6f76]">{subtitle}</p>}
+        {subtitle && <p className="mt-1.5 text-[17px] italic text-[#6D6E71]">{subtitle}</p>}
       </div>
       {actions && <div className="no-print flex flex-wrap gap-2">{actions}</div>}
     </header>
@@ -118,7 +120,7 @@ export function Button({ children, onClick, variant = 'secondary', type = 'butto
 }) {
   const v = {
     primary: 'bg-brand-600 text-white shadow-sm hover:bg-brand-700 disabled:bg-slate-300',
-    secondary: 'border border-[#dcd8cf] bg-white text-[#1d2327] hover:border-brand-500 hover:text-brand-600 disabled:text-slate-400',
+    secondary: 'border border-[#d5dbe1] bg-white text-[#1d2327] hover:border-brand-500 hover:text-brand-600 disabled:text-slate-400',
     danger: 'border border-red-200 bg-white text-red-700 hover:bg-red-50',
     ghost: 'text-slate-600 hover:bg-slate-100',
   }[variant];
@@ -131,7 +133,7 @@ export function Button({ children, onClick, variant = 'secondary', type = 'butto
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-[#e7e4dc] bg-white p-12 text-center">
+    <div className="rounded-2xl border border-[#e5e8ec] bg-white p-12 text-center">
       <p className="font-semibold text-slate-700">{title}</p>
       {children && <div className="mt-2 text-sm text-slate-500">{children}</div>}
     </div>
@@ -162,7 +164,7 @@ export function Modal({ title, onClose, children, wide }: { title: ReactNode; on
 }
 
 export function Field({ label, children, className = '' }: { label: ReactNode; children: ReactNode; className?: string }) {
-  return <label className={`block text-[15px] text-[#5b6470] ${className}`}>{label}<div className="mt-1">{children}</div></label>;
+  return <label className={`block text-[15px] text-[#6D6E71] ${className}`}>{label}<div className="mt-1">{children}</div></label>;
 }
 
 /** Badge « orphelin » : tâche pays sans tâche d'équipe globale qui la soutient. */
@@ -194,21 +196,21 @@ export function UnitChip({ name, type }: { name: string; type: 'department' | 'c
 export function MiniProgress({ value, rag }: { value: number | null; rag: Rag }) {
   return (
     <span className="inline-flex w-32 items-center gap-1.5">
-      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#ebe9e3]"><span className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%`, background: RAG_HEX[rag] }} /></span>
+      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e8ecf0]"><span className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%`, background: RAG_HEX[rag] }} /></span>
       <span className="w-11 text-right text-[14px] tabular-nums text-brand-600">{pct(value)}</span>
     </span>
   );
 }
 
 /** Chiffre clé : sobre, une pastille de couleur. */
-export function Stat({ label, value, hint, color = '#0b2e59' }: { label: string; value: ReactNode; hint?: ReactNode; color?: string }) {
+export function Stat({ label, value, hint, color = '#004D84' }: { label: string; value: ReactNode; hint?: ReactNode; color?: string }) {
   return (
-    <div className="rounded-2xl border border-[#e7e4dc] bg-white px-5 py-4">
-      <div className="flex items-center gap-2 text-[14px] uppercase tracking-[.08em] text-[#6b6f76]"><span className="h-2 w-2 rounded-full" style={{ background: color }} />{label}</div>
+    <div className="rounded-2xl border border-[#e5e8ec] bg-white px-5 py-4">
+      <div className="flex items-center gap-2 text-[14px] uppercase tracking-[.08em] text-[#6D6E71]"><span className="h-2 w-2 rounded-full" style={{ background: color }} />{label}</div>
       <div className="mt-1 text-[36px] font-semibold leading-none tabular-nums text-brand-600">{value}</div>
-      {hint && <div className="mt-1.5 text-[15px] text-[#6b6f76]">{hint}</div>}
+      {hint && <div className="mt-1.5 text-[15px] text-[#6D6E71]">{hint}</div>}
     </div>
   );
 }
 
-export const inputCls = 'min-h-[42px] w-full rounded-xl border border-[#dcd8cf] bg-white px-3 py-2 text-[16px] focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100';
+export const inputCls = 'min-h-[42px] w-full rounded-xl border border-[#d5dbe1] bg-white px-3 py-2 text-[16px] focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100';

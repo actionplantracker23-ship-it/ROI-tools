@@ -4,16 +4,16 @@
 
 /* Charte : Garamond, fond clair, interface aérée */
 html { -webkit-text-size-adjust: 100%; }
-body { font-size: 17px; line-height: 1.5; font-feature-settings: 'kern', 'liga', 'onum'; background: #f6f5f1; }
+body { font-size: 17px; line-height: 1.5; font-feature-settings: 'kern', 'liga', 'onum'; background: #ffffff; color: #1d2327; }
 .tabular-nums, td, input, select { font-variant-numeric: lining-nums tabular-nums; }
 
 @layer components {
   /* Tableaux légers : en-tête discret, lignes séparées par un filet */
   table.suivi { width: 100%; border-collapse: collapse; }
-  table.suivi thead th { background: #fbfaf7; color: #5b6470; font-weight: 600; text-align: left; padding: 12px 14px; font-size: 14px;
-    letter-spacing: .04em; text-transform: uppercase; border-bottom: 1px solid #e7e4dc; position: sticky; top: 0; z-index: 1; }
-  table.suivi td { padding: 12px 14px; border-bottom: 1px solid #efede7; vertical-align: top; font-size: 16px; }
-  table.suivi tr.grp td { background: #fbfaf7; color: #0b2e59; padding: 10px 14px; font-weight: 600; border-left: 3px solid #f28c28; }
+  table.suivi thead th { background: #f7f9fb; color: #6D6E71; font-weight: 600; text-align: left; padding: 12px 14px; font-size: 14px;
+    letter-spacing: .04em; text-transform: uppercase; border-bottom: 1px solid #e5e8ec; position: sticky; top: 0; z-index: 1; }
+  table.suivi td { padding: 12px 14px; border-bottom: 1px solid #eef1f4; vertical-align: top; font-size: 16px; }
+  table.suivi tr.grp td { background: #f7f9fb; color: #004D84; padding: 10px 14px; font-weight: 600; border-left: 3px solid #F7941D; }
   /* Rapport (style diapositive) */
   .m-entete { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; font-weight: 700; letter-spacing: .08em;
     text-transform: uppercase; color: #004D84; border-bottom: 1px solid #4FB3E3; padding-bottom: 8px; margin-bottom: 18px; }

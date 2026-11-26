@@ -1,89 +1,119 @@
 /**
- * Plan de travail présenté par objectif : on choisit un objectif (cartes), ses projets (KR globaux)
- * s'affichent, chaque projet se déplie sur ses tâches — équipes globales d'abord, puis pays.
+ * Tableau principal du plan de travail, présenté par objectif, au format « tableau de gestion du travail » :
+ * un groupe par projet (KR), cellules Statut et Priorité pleines et modifiables, responsable (initiales),
+ * échéance, échéancier, synthèse des statuts en pied de groupe. Palette Living Goods.
  */
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../AppContext';
 import { ActivityEditor } from '../components/Editors';
-import { Due, FilterBar, isFiltered, useFilteredTasks, ViewHeader } from '../components/pm';
-import { Button, NoPlan, OrphanBadge, ProgressBar, STATUS_STYLE, UnitChip } from '../components/ui';
-import { today } from '../lib/dates';
+import { FilterBar, isFiltered, isOverdue, useFilteredTasks } from '../components/pm';
+import { NoPlan, PRIORITY_HEX, STATUS_HEX } from '../components/ui';
+import { fmtDate, today } from '../lib/dates';
 import { pct } from '../lib/format';
 import { newActivity, newObjective, updateActivityStatus, upsert } from '../lib/ops';
-import { STATUS_LABEL, type Activity, type ActivityStatus, type KeyResult } from '../types';
+import { PRIORITY_LABEL, STATUS_LABEL, type Activity, type ActivityStatus, type KeyResult, type Priority } from '../types';
 
-function StatusSelect({ t }: { t: Activity }) {
-  const { update } = useApp();
+/** Couleurs des groupes (palette Living Goods). */
+const GROUP = ['#004D84', '#F7941D', '#4FB3E3', '#6D6E71', '#2F80C0', '#C9700F'];
+const COLS = 'grid-cols-[minmax(340px,1fr),96px,150px,150px,130px,124px,170px]';
+const STATUS_ORDER: ActivityStatus[] = ['done', 'in_progress', 'late', 'not_started', 'cancelled'];
+const AVATAR = ['#004D84', '#F7941D', '#4FB3E3', '#6D6E71', '#2F80C0', '#C9700F', '#3a8fb7', '#8a5a00'];
+
+const initials = (name: string) => name.replace(/\[.*?\]|\(.*?\)/g, '').split(/[\s/&,]+/).filter((w) => /^[A-Za-zÀ-ÿ]/.test(w)).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?';
+const colorOf = (name: string) => { let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; return AVATAR[h % AVATAR.length]; };
+
+function Avatar({ name }: { name: string }) {
+  if (!name) return <span className="grid h-8 w-8 place-items-center rounded-full border border-dashed border-[#c5cbd2] text-[13px] text-[#9aa0a6]" title="Sans responsable">—</span>;
+  return <span className="grid h-8 w-8 place-items-center rounded-full text-[13px] font-semibold text-white" style={{ background: colorOf(name) }} title={name}>{initials(name)}</span>;
+}
+
+/** Cellule pleine colorée, liste déroulante transparente par-dessus (comme les cellules Statut / Priorité). */
+function ColorCell<T extends string>({ value, options, label, color, onChange }: { value: T; options: T[]; label: (v: T) => string; color: (v: T) => string; onChange: (v: T) => void }) {
   return (
-    <select aria-label="Statut" value={t.status} onClick={(e) => e.stopPropagation()}
-      onChange={(e) => update((w) => updateActivityStatus(w, t.id, { status: e.target.value as ActivityStatus, progress: t.progress, comment: t.comment }), 'Statut mis à jour.')}
-      className={`cursor-pointer appearance-none rounded-full border-0 px-3 py-1 text-[14.5px] focus:ring-2 focus:ring-brand-100 ${STATUS_STYLE[t.status]}`}>
-      {(Object.keys(STATUS_LABEL) as ActivityStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-    </select>
+    <span className="relative flex h-full items-center justify-center text-[15.5px] font-medium text-white" style={{ background: color(value) }}>
+      {label(value)}
+      <select aria-label={label(value)} value={value} onClick={(e) => e.stopPropagation()} onChange={(e) => onChange(e.target.value as T)} className="absolute inset-0 cursor-pointer opacity-0">
+        {options.map((o) => <option key={o} value={o}>{label(o)}</option>)}
+      </select>
+    </span>
   );
 }
 
-function TaskRow({ t, onOpen }: { t: Activity; onOpen: (t: Activity) => void }) {
-  const { view, unit } = useApp();
-  const u = unit(t.unitId);
+function Row({ t, color, onOpen }: { t: Activity; color: string; onOpen: (t: Activity) => void }) {
+  const { view, unit, update } = useApp();
+  const now = today();
+  const shown: ActivityStatus = t.status !== 'done' && t.status !== 'cancelled' && isOverdue(t, now) ? 'late' : t.status;
   const deps = view!.parentsOf.get(t.id) ?? [];
+  const orphan = t.level === 'country' && !deps.length;
   const p = t.status === 'done' ? 100 : t.progress;
+  const u = unit(t.unitId);
   return (
-    <li onClick={() => onOpen(t)} className="grid cursor-pointer grid-cols-[1fr,auto] items-center gap-x-4 gap-y-1 rounded-xl px-3 py-3 hover:bg-[#f8f7f3] md:grid-cols-[130px,1fr,120px,130px,70px]">
-      <span className="max-md:col-span-2">{u && <UnitChip name={u.name + (t.subTeam ? ` · ${t.subTeam}` : '')} type={u.type} />}</span>
-      <span className="min-w-0 max-md:col-span-2">
-        <span className="line-clamp-2 text-[16.5px] leading-snug text-[#1d2327]" title={t.title}>{t.title}</span>
-        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[14.5px] italic text-[#6b6f76]">
-          {t.owner && <span>{t.owner}</span>}
-          {t.level === 'country' && (deps.length
-            ? <span>· soutenue par {[...new Set(deps.map((d) => unit(d.unitId)?.name))].join(', ')}</span>
-            : <span className="not-italic"><OrphanBadge /></span>)}
+    <div className={`grid ${COLS} h-11 cursor-pointer gap-px bg-[#e9edf1] text-[15.5px]`} onClick={() => onOpen(t)}>
+      <span className="flex min-w-0 items-center gap-2 bg-white pl-3 pr-2 hover:bg-[#f7f9fb]" style={{ boxShadow: `inset 5px 0 0 ${color}` }}>
+        <span className="min-w-0 flex-1 truncate pl-2" title={t.title}>{t.title}</span>
+        {orphan && <span className="shrink-0 text-[#D64545]" title="Orpheline : non liée au plan global">⚠</span>}
+      </span>
+      <span className="flex items-center justify-center bg-white"><Avatar name={t.owner} /></span>
+      <span className="flex items-center justify-center truncate bg-white px-2 text-[14.5px] text-[#4a4c4f]" title={deps.length ? `Soutenue par ${[...new Set(deps.map((d) => unit(d.unitId)?.name))].join(', ')}` : undefined}>
+        {u?.name}{t.subTeam ? ` · ${t.subTeam}` : ''}
+      </span>
+      <ColorCell value={shown} options={['not_started', 'in_progress', 'done', 'late', 'cancelled'] as ActivityStatus[]} label={(v) => STATUS_LABEL[v]} color={(v) => STATUS_HEX[v]}
+        onChange={(v) => update((w) => updateActivityStatus(w, t.id, { status: v, progress: t.progress, comment: t.comment }), `« ${STATUS_LABEL[v]} »`)} />
+      <ColorCell value={t.priority} options={['high', 'medium', 'low'] as Priority[]} label={(v) => PRIORITY_LABEL[v]} color={(v) => PRIORITY_HEX[v]}
+        onChange={(v) => update((w) => upsert(w, 'activities', { ...t, priority: v }), `Priorité ${PRIORITY_LABEL[v].toLowerCase()}`)} />
+      <span className={`flex items-center justify-center bg-white text-[15px] ${shown === 'late' ? 'font-semibold text-[#D64545]' : ''}`}>
+        {t.milestone && <span className="mr-1 text-accent">◆</span>}{fmtDate(t.dueDate).replace(/ \d{4}$/, '')}
+      </span>
+      <span className="flex items-center bg-white px-3" title={`${fmtDate(t.startDate)} → ${fmtDate(t.dueDate)} · ${p} % réalisé`}>
+        <span className="relative h-5 w-full overflow-hidden rounded-full bg-[#d9dee3]">
+          <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${p}%`, background: color }} />
+          <span className={`absolute inset-0 grid place-items-center text-[13px] ${p > 45 ? 'text-white' : 'text-[#4a4c4f]'}`}>{p} %</span>
         </span>
       </span>
-      <span className="text-[15px]"><Due t={t} /></span>
-      <span><StatusSelect t={t} /></span>
-      <span className="text-right text-[15px] tabular-nums text-brand-600">{p}&nbsp;%</span>
-    </li>
+    </div>
   );
 }
 
-function Project({ kr, tasks, open, onToggle, onOpen }: { kr: KeyResult; tasks: Activity[]; open: boolean; onToggle: () => void; onOpen: (t: Activity) => void }) {
+function Group({ kr, tasks, color, onOpen }: { kr: KeyResult; tasks: Activity[]; color: string; onOpen: (t: Activity) => void }) {
   const { ws, plan, view } = useApp();
-  const sc = view!.kr.get(kr.id)!;
+  const [open, setOpen] = useState(true);
   const now = today();
-  const late = tasks.filter((t) => t.status === 'late' || (t.dueDate < now && t.status !== 'done' && t.status !== 'cancelled')).length;
-  const done = tasks.filter((t) => t.status === 'done').length;
-  const globals = tasks.filter((t) => t.level === 'global');
-  const countries = tasks.filter((t) => t.level === 'country');
+  const sc = view!.kr.get(kr.id)!;
+  const counts = STATUS_ORDER.map((s) => ({ s, n: tasks.filter((t) => (t.status !== 'done' && t.status !== 'cancelled' && isOverdue(t, now) ? 'late' : t.status) === s).length })).filter((x) => x.n);
   return (
-    <article className="overflow-hidden rounded-2xl border border-[#e7e4dc] bg-white">
-      <button onClick={onToggle} aria-expanded={open} className="grid w-full grid-cols-[1fr,auto] items-center gap-4 px-6 py-4 text-left hover:bg-[#fbfaf7]">
+    <section className="mb-8">
+      <button onClick={() => setOpen(!open)} className="mb-2 flex w-full items-start gap-2 text-left" aria-expanded={open}>
+        <span className={`mt-1.5 text-[14px] transition ${open ? '' : '-rotate-90'}`} style={{ color }}>▼</span>
         <span className="min-w-0">
-          <span className="text-[14px] uppercase tracking-[.12em] text-accent">{kr.team ? 'KR d’équipe' : 'Projet'} · {kr.code}</span>
-          <span className={`block text-[19px] leading-snug text-brand-600 ${open ? '' : 'line-clamp-2'}`}>{kr.title}</span>
-        </span>
-        <span className="flex items-center gap-5">
-          <span className="hidden text-right text-[15px] text-[#6b6f76] sm:block">
-            {done}/{tasks.length} terminée{done > 1 ? 's' : ''}{late ? <span className="block text-[#a23434]">{late} en retard</span> : null}
-          </span>
-          <span className="w-28"><ProgressBar value={sc.progress} rag={sc.rag} /><span className="mt-1 block text-right text-[15px] tabular-nums text-brand-600">{pct(sc.progress)}</span></span>
-          <span className={`text-[#9a9ea5] transition ${open ? 'rotate-180' : ''}`} aria-hidden>▾</span>
+          <span className="text-[22px] font-semibold leading-snug" style={{ color }}>{kr.code}</span>
+          <span className="ml-2 text-[19px] leading-snug" style={{ color }}>{kr.title}</span>
+          <span className="ml-3 whitespace-nowrap text-[15px] text-[#6D6E71]">{tasks.length} tâche{tasks.length > 1 ? 's' : ''} · {pct(sc.progress)}</span>
         </span>
       </button>
       {open && (
-        <div className="border-t border-[#efede7] px-3 pb-3 pt-2">
-          {[['Équipes globales', globals], ['Pays', countries]].map(([label, list]) => (list as Activity[]).length ? (
-            <section key={label as string} className="mt-1">
-              <h4 className="px-3 pb-1 pt-2 text-[14px] uppercase tracking-[.12em] text-[#8b8f96]">{label as string}</h4>
-              <ul className="divide-y divide-[#f1efea]">{(list as Activity[]).map((t) => <TaskRow key={t.id} t={t} onOpen={onOpen} />)}</ul>
-            </section>
-          ) : null)}
-          {!tasks.length && <p className="px-3 py-3 italic text-[#6b6f76]">Aucune tâche pour ce projet.</p>}
-          <button className="mt-2 px-3 text-[15.5px] text-brand-500 hover:text-accent" onClick={() => onOpen(newActivity(ws, { planId: plan!.id, level: 'global', unitId: ws.units.find((u) => u.type === 'department')?.id ?? '', krId: kr.id }))}>+ Ajouter une tâche</button>
+        <div className="overflow-x-auto">
+          <div className="min-w-[1120px] overflow-hidden rounded-lg border border-[#e5e8ec]">
+            <div className={`grid ${COLS} gap-px bg-[#e9edf1] text-center text-[14.5px] text-[#6D6E71]`}>
+              {['Tâche', 'Responsable', 'Équipe / pays', 'Statut', 'Priorité', 'Échéance', 'Échéancier'].map((h, i) => (
+                <span key={h} className={`bg-white py-2 ${i === 0 ? 'pl-6 text-left' : ''}`} style={i === 0 ? { boxShadow: `inset 5px 0 0 ${color}` } : undefined}>{h}</span>
+              ))}
+            </div>
+            {tasks.map((t) => <Row key={t.id} t={t} color={color} onOpen={onOpen} />)}
+            <div className={`grid ${COLS} gap-px border-t border-[#e9edf1] bg-[#e9edf1]`}>
+              <button className="bg-white py-2.5 pl-6 text-left text-[15px] text-[#6D6E71] hover:text-brand-600" style={{ boxShadow: `inset 5px 0 0 ${color}40` }}
+                onClick={() => onOpen(newActivity(ws, { planId: plan!.id, level: 'global', unitId: ws.units.find((u) => u.type === 'department')?.id ?? '', krId: kr.id }))}>+ Ajouter une tâche</button>
+              <span className="bg-white" /><span className="bg-white" />
+              <span className="flex items-center bg-white px-2" title={counts.map((c) => `${STATUS_LABEL[c.s]} : ${c.n}`).join('\n')}>
+                <span className="flex h-6 w-full overflow-hidden rounded">{counts.map((c) => <span key={c.s} style={{ width: `${(c.n / Math.max(1, tasks.length)) * 100}%`, background: STATUS_HEX[c.s] }} />)}</span>
+              </span>
+              <span className="bg-white" /><span className="bg-white" />
+              <span className="flex items-center bg-white px-3 text-[14px] text-[#6D6E71]">{tasks.filter((t) => t.status === 'done').length}/{tasks.length} terminées</span>
+            </div>
+          </div>
         </div>
       )}
-    </article>
+    </section>
   );
 }
 
@@ -91,81 +121,48 @@ export default function WorkPlan() {
   const { plan, view, update, filter } = useApp();
   const tasks = useFilteredTasks();
   const [params, setParams] = useSearchParams();
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
   const [edit, setEdit] = useState<Activity | null>(null);
-  const objId = params.get('o') ?? view?.objectives[0]?.id ?? '';
-  const objective = view?.objectives.find((o) => o.id === objId) ?? view?.objectives[0];
   const byKr = useMemo(() => {
     const m = new Map<string, Activity[]>();
     for (const t of tasks) if (t.krId) { const l = m.get(t.krId); if (l) l.push(t); else m.set(t.krId, [t]); }
     for (const l of m.values()) l.sort((a, b) => (a.level === b.level ? a.order - b.order : a.level === 'global' ? -1 : 1));
     return m;
   }, [tasks]);
-  useEffect(() => setOpenIds(new Set()), [objId]);
-  if (!plan || !view) return <><ViewHeader title="Plan de travail" /><NoPlan /></>;
-  const now = today();
-  // sans filtre : tous les projets de l'objectif ; avec filtre : seulement ceux qui ont des tâches correspondantes
+  if (!plan || !view) return <NoPlan />;
+  const objId = params.get('o') ?? view.objectives[0]?.id ?? '';
+  const objective = view.objectives.find((o) => o.id === objId) ?? view.objectives[0];
   const krs = view.krs.filter((k) => k.objectiveId === objective?.id && (!isFiltered(filter) || byKr.get(k.id)?.length));
-  const objTasks = krs.flatMap((k) => byKr.get(k.id) ?? []);
-  const sc = objective ? view.objective.get(objective.id)! : null;
 
   return (
     <div>
-      <ViewHeader title="Plan de travail" sub="Présenté par objectif : choisissez un objectif, puis dépliez un projet pour voir ses tâches."
-        actions={<Button variant="primary" onClick={() => update((w) => upsert(w, 'objectives', newObjective(w, plan.id, 'Nouvel objectif')), 'Objectif ajouté.')}>+ Objectif</Button>} />
-      <FilterBar />
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <h1 className="text-[40px] font-semibold leading-tight text-[#1d2327]">Plan de travail {plan.year}</h1>
+        <button className="rounded-full bg-brand-600 px-4 py-2 text-[16px] text-white hover:bg-brand-700" onClick={() => update((w) => upsert(w, 'objectives', newObjective(w, plan.id, 'Nouvel objectif')), 'Objectif ajouté.')}>+ Objectif</button>
+      </div>
+      <div className="mb-5 flex flex-wrap items-center gap-6 border-b border-[#e5e8ec] text-[16px]">
+        <span className="-mb-px border-b-2 border-brand-600 pb-2 font-semibold text-brand-600">▦ Tableau principal</span>
+        <Link to="/gantt" className="pb-2 text-[#4a4c4f] hover:text-brand-600">☰ Gantt</Link>
+        <Link to="/kanban" className="pb-2 text-[#4a4c4f] hover:text-brand-600">▥ Kanban</Link>
+      </div>
 
-      <div className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <nav className="mb-4 flex flex-wrap gap-2" aria-label="Objectifs">
         {view.objectives.map((o) => {
           const s = view.objective.get(o.id)!;
-          const ids = new Set(view.krs.filter((k) => k.objectiveId === o.id).map((k) => k.id));
-          const ts = tasks.filter((t) => ids.has(t.krId ?? ''));
-          const late = ts.filter((t) => t.status === 'late' || (t.dueDate < now && t.status !== 'done' && t.status !== 'cancelled')).length;
           const sel = o.id === objective?.id;
           return (
-            <button key={o.id} onClick={() => setParams({ o: o.id })} aria-pressed={sel}
-              className={`flex flex-col rounded-2xl border bg-white p-5 text-left transition ${sel ? 'border-transparent shadow-lg ring-2' : 'border-[#e7e4dc] opacity-80 hover:opacity-100 hover:shadow-md'}`}
-              style={sel ? { ['--tw-ring-color' as string]: o.color } : undefined}>
-              <span className="flex items-baseline gap-3">
-                <span className="text-[46px] font-semibold leading-none" style={{ color: o.color }}>{o.code}</span>
-                <span className="text-[14px] uppercase tracking-[.12em] text-[#8b8f96]">Objectif</span>
-              </span>
-              <span className="mt-2 line-clamp-3 min-h-[4.2em] text-[16.5px] leading-snug text-[#1d2327]">{o.title}</span>
-              <span className="mt-3"><ProgressBar value={s.progress} rag={s.rag} /></span>
-              <span className="mt-1.5 flex justify-between text-[14.5px] text-[#6b6f76]">
-                <span>{ids.size} projets · {ts.length} tâches</span>
-                <span className={late ? 'text-[#a23434]' : ''}>{late ? `${late} en retard` : pct(s.progress)}</span>
-              </span>
+            <button key={o.id} onClick={() => setParams({ o: o.id })} aria-pressed={sel} title={o.title}
+              className={`flex max-w-[300px] items-center gap-2 rounded-full border px-4 py-1.5 text-left text-[16px] transition ${sel ? 'border-transparent bg-brand-600 text-white' : 'border-[#d5dbe1] bg-white text-[#4a4c4f] hover:border-brand-500'}`}>
+              <b className="whitespace-nowrap">Objectif {o.code}</b><span className={`truncate ${sel ? 'text-white/85' : 'text-[#6D6E71]'}`}>{o.title}</span>
+              {s.progress !== null && <span className="text-[14px]">{pct(s.progress)}</span>}
             </button>
           );
         })}
-      </div>
+      </nav>
+      {objective && <p className="mb-5 max-w-5xl text-[19px] italic leading-snug text-[#4a4c4f]">{objective.title}</p>}
 
-      {objective && sc && (
-        <section>
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-4 border-b border-[#e7e4dc] pb-4">
-            <div className="max-w-4xl">
-              <div className="text-[14px] uppercase tracking-[.14em]" style={{ color: objective.color }}>Objectif {objective.code}</div>
-              <h2 className="text-[28px] font-semibold leading-tight text-brand-600">{objective.title}</h2>
-            </div>
-            <div className="flex gap-6 text-right">
-              <div><div className="text-[30px] font-semibold leading-none text-brand-600">{pct(sc.progress)}</div><div className="text-[14px] text-[#6b6f76]">avancement</div></div>
-              <div><div className="text-[30px] font-semibold leading-none text-brand-600">{objTasks.filter((t) => t.status === 'done').length}<span className="text-[20px] text-[#9a9ea5]">/{objTasks.length}</span></div><div className="text-[14px] text-[#6b6f76]">tâches terminées</div></div>
-            </div>
-          </div>
-          <div className="mb-3 flex justify-end gap-3 text-[15.5px]">
-            <button className="text-brand-500 hover:text-accent" onClick={() => setOpenIds(new Set(krs.map((k) => k.id)))}>Tout déplier</button>
-            <button className="text-brand-500 hover:text-accent" onClick={() => setOpenIds(new Set())}>Tout replier</button>
-          </div>
-          <div className="space-y-3">
-            {krs.map((k) => (
-              <Project key={k.id} kr={k} tasks={byKr.get(k.id) ?? []} open={openIds.has(k.id)} onOpen={setEdit}
-                onToggle={() => setOpenIds((s) => { const n = new Set(s); if (n.has(k.id)) n.delete(k.id); else n.add(k.id); return n; })} />
-            ))}
-            {!krs.length && <p className="rounded-2xl border border-[#e7e4dc] bg-white p-8 text-center italic text-[#6b6f76]">Aucune tâche ne correspond aux filtres dans cet objectif.</p>}
-          </div>
-        </section>
-      )}
+      <FilterBar />
+      {krs.map((k, i) => <Group key={k.id} kr={k} tasks={byKr.get(k.id) ?? []} color={GROUP[i % GROUP.length]} onOpen={setEdit} />)}
+      {!krs.length && <p className="rounded-2xl border border-[#e5e8ec] p-8 text-center italic text-[#6D6E71]">Aucune tâche ne correspond aux filtres dans cet objectif.</p>}
       {edit && <ActivityEditor act={edit} onClose={() => setEdit(null)} />}
     </div>
   );

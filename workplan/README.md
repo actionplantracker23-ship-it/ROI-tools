@@ -5,12 +5,12 @@ Outil de gestion de projet pour le plan de travail annuel. Hiérarchie (WBS) :
 BDAC, Finance, DT, P&C) et des pays. Chaque tâche pays **dépend** de tâches d'équipes globales ;
 sans dépendance, elle est signalée **« orpheline, non liée au global »**. Une tâche globale sans pays est normale.
 
-Interface en police **Garamond** (EB Garamond, repli Garamond / Georgia), épurée : six vues principales
+Palette Living Goods (bleu #004D84, orange #F7941D, bleu ciel #4FB3E3, gris #6D6E71) sur fond blanc, police **Garamond** (EB Garamond, repli Garamond / Georgia), interface épurée : six vues principales
 (Tableau de bord, Plan de travail, Gantt, Kanban, Échéancier, Risques & actions), les autres dans « Plus ».
 
 | Vue | Contenu |
 |---|---|
-| Plan de travail | Présenté **par objectif** : cartes des objectifs, puis projets dépliables, tâches des équipes globales puis des pays |
+| Plan de travail | Tableau principal **par objectif** : un groupe par projet, cellules Statut et Priorité colorées modifiables d’un clic, responsable, échéance, échéancier, synthèse des statuts |
 | Tableau de bord | Avancement, tâches terminées / en cours / en retard, échéances à 30 jours, échéances par mois, objectifs, équipes et pays, risques ouverts |
 | Tableau détaillé (WBS) | Tableau numéroté 1 / 1.1 / 1.1.1, repliable ; responsable, début, échéance, durée, statut et % modifiables, priorité, dépendances (numéros WBS), alignement ; export Excel |
 | Gantt | Barres sur l'année (zoom semaine / mois / trimestre), % réalisé, jalons, aujourd'hui, retards |

@@ -197,7 +197,8 @@ export const ALIGN_HELP: Record<AlignStatus, string> = {
 
 export const PLAN_STATUS_LABEL: Record<PlanStatus, string> = { draft: 'Brouillon', active: 'En cours', closed: 'Clôturé' };
 export const KIND_LABEL: Record<IndicatorKind, string> = { number: 'Nombre', percent: 'Pourcentage', yesno: 'Oui / Non' };
-export const OBJECTIVE_COLORS = ['#2563eb', '#0d9488', '#7c3aed', '#c2410c', '#0891b2', '#4f46e5'];
+/** Couleurs des objectifs : palette Living Goods (bleu, orange, bleu ciel, gris…). */
+export const OBJECTIVE_COLORS = ['#004D84', '#F7941D', '#4FB3E3', '#6D6E71', '#2F80C0', '#C9700F'];
 
 /** Unités de départ (modifiables dans Paramètres). */
 export const DEFAULT_UNITS: Omit<Unit, 'order'>[] = [

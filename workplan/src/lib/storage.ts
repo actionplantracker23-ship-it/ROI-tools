@@ -3,7 +3,9 @@
  * Les données ne quittent pas l'ordinateur. Pour un usage partagé, exporter / importer le fichier JSON,
  * ou brancher un backend (voir README).
  */
-import { emptyWorkspace, type Workspace } from '../types';
+import { emptyWorkspace, OBJECTIVE_COLORS, type Workspace } from '../types';
+
+const OLD_COLORS = ['#2563eb', '#0d9488', '#7c3aed', '#c2410c', '#0891b2', '#4f46e5'];
 
 export const STORAGE_KEY = 'plan-de-travail.workspace';
 const KEY = STORAGE_KEY;
@@ -41,6 +43,8 @@ export function normalize(data: Partial<Workspace>): Workspace {
   const y = (planId: string) => data.plans?.find((p) => p.id === planId)?.year ?? new Date().getFullYear();
   return {
     ...base, ...data, issues: data.issues ?? [],
+    // anciennes couleurs d'objectif → palette Living Goods
+    objectives: (data.objectives ?? []).map((o) => (OLD_COLORS.includes(o.color.toLowerCase()) ? { ...o, color: OBJECTIVE_COLORS[(Number(o.code) - 1 + OBJECTIVE_COLORS.length) % OBJECTIVE_COLORS.length] ?? OBJECTIVE_COLORS[0] } : o)),
     // anciennes sauvegardes : dates déduites des trimestres
     activities: (data.activities ?? []).map((a) => ({
       ...a,

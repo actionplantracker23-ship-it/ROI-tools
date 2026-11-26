@@ -1,14 +1,14 @@
 /** @type {import('tailwindcss').Config} */
-// Charte : bleu marine, orange, bleu ciel ; police Garamond ; interface aérée.
+// Palette Living Goods : bleu #004D84, orange #F7941D, bleu ciel #4FB3E3, gris #6D6E71 ; fond blanc ; police Garamond.
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        brand: { 50: '#e6f4fb', 100: '#bfe3f5', 300: '#4FB3E3', 500: '#004D84', 600: '#0b2e59', 700: '#071f3d', 900: '#071f3d' },
-        accent: { DEFAULT: '#f28c28', 500: '#F7941D' },
-        ligne: '#dfe3e8',
-        fond: '#f4f5f7',
+        brand: { 50: '#e8f1f8', 100: '#cfe3f1', 300: '#4FB3E3', 500: '#004D84', 600: '#004D84', 700: '#003a63', 900: '#00294a' },
+        accent: { DEFAULT: '#F7941D', 500: '#F7941D' },
+        ligne: '#e5e8ec',
+        fond: '#ffffff',
         rag: { green: '#2e9e4f', amber: '#f2b01e', red: '#d64545', grey: '#a7adb4' },
       },
       // Police Garamond sur toute l'application (EB Garamond, repli Garamond installée puis Georgia)

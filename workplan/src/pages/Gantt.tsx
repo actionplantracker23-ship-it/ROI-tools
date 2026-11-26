@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../AppContext';
 import { ActivityEditor } from '../components/Editors';
 import { FilterBar, isFiltered, isOverdue, useFilteredTasks, ViewHeader } from '../components/pm';
-import { NoPlan } from '../components/ui';
+import { NoPlan, STATUS_HEX } from '../components/ui';
 import { fmtDate, iso, today } from '../lib/dates';
 import { pct } from '../lib/format';
 import { buildWbs } from '../lib/wbs';
@@ -11,7 +11,7 @@ import { STATUS_LABEL, type Activity } from '../types';
 
 const ZOOM = { semaine: 9, mois: 3, trimestre: 1.6 } as const;
 const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
-const BAR: Record<string, string> = { not_started: '#a7adb4', in_progress: '#2f6fb3', done: '#2e9e4f', late: '#d64545', cancelled: '#2f3640' };
+const BAR: Record<string, string> = STATUS_HEX;
 const LEFT = 400;
 
 export default function Gantt() {
@@ -56,13 +56,13 @@ export default function Gantt() {
         <span className="inline-flex items-center gap-1"><span className="h-3 w-0.5 bg-accent" /> Aujourd’hui</span>
         <span>Partie foncée de la barre = % réalisé</span>
       </div>
-      <div className="max-h-[75vh] overflow-auto rounded-2xl border border-[#e7e4dc] bg-white">
+      <div className="max-h-[75vh] overflow-auto rounded-2xl border border-[#e5e8ec] bg-white">
         <div style={{ width: LEFT + width }} className="relative">
           {/* en-tête des mois */}
-          <div className="sticky top-0 z-20 flex border-b border-[#e7e4dc] bg-[#fbfaf7] text-[14px] uppercase tracking-[.06em] text-[#5b6470]">
-            <div className="sticky left-0 z-30 shrink-0 bg-[#fbfaf7] px-3 py-2 font-semibold" style={{ width: LEFT }}>Tâche</div>
+          <div className="sticky top-0 z-20 flex border-b border-[#e5e8ec] bg-[#f7f9fb] text-[14px] uppercase tracking-[.06em] text-[#6D6E71]">
+            <div className="sticky left-0 z-30 shrink-0 bg-[#f7f9fb] px-3 py-2 font-semibold" style={{ width: LEFT }}>Tâche</div>
             <div className="relative h-8" style={{ width }}>
-              {months.map((m) => <div key={m.x} className="absolute top-0 h-full border-l border-[#e7e4dc] px-1.5 pt-2" style={{ left: m.x, width: m.w }}>{m.w > 30 ? m.label : ''}</div>)}
+              {months.map((m) => <div key={m.x} className="absolute top-0 h-full border-l border-[#e5e8ec] px-1.5 pt-2" style={{ left: m.x, width: m.w }}>{m.w > 30 ? m.label : ''}</div>)}
             </div>
           </div>
           {wbs.rows.map((r) => {
@@ -78,7 +78,7 @@ export default function Gantt() {
             const late = t && isOverdue(t, now);
             const label = r.kind === 'objective' ? `Objectif ${r.objective.code} · ${r.objective.title}` : r.kind === 'project' ? `${r.kr!.code} · ${r.kr!.title}` : t!.title;
             return (
-              <div key={r.wbs} className={`flex border-b border-[#f1efea] ${r.kind === 'objective' ? 'bg-[#f6f5f1]' : r.kind === 'project' ? 'bg-[#fbfaf7]' : 'bg-white hover:bg-[#fbfaf7]'}`} style={{ height: r.kind === 'task' ? 34 : 30 }}>
+              <div key={r.wbs} className={`flex border-b border-[#eef1f4] ${r.kind === 'objective' ? 'bg-[#ffffff]' : r.kind === 'project' ? 'bg-[#f7f9fb]' : 'bg-white hover:bg-[#f7f9fb]'}`} style={{ height: r.kind === 'task' ? 34 : 30 }}>
                 <div className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 overflow-hidden border-r border-ligne bg-inherit px-2 text-xs" style={{ width: LEFT, paddingLeft: 8 + r.depth * 14, background: 'inherit' }}>
                   {summary && <button onClick={() => toggle(r.wbs)} className="text-slate-400" aria-label="Replier ou déplier">{closed.has(r.wbs) ? '▸' : '▾'}</button>}
                   <span className="shrink-0 text-slate-400">{r.wbs}</span>
@@ -93,7 +93,7 @@ export default function Gantt() {
                       <div className="h-full rounded-sm bg-accent" style={{ width: `${Math.max(0, Math.min(100, prog ?? 0))}%` }} />
                     </div>
                   ) : milestone ? (
-                    <button onClick={() => setEdit(t!)} className="absolute top-[7px] z-[6] h-4 w-4 rotate-45 border-2 border-white shadow" style={{ left: x + w - 8, background: late ? '#d64545' : t!.status === 'done' ? '#2e9e4f' : '#f28c28' }}
+                    <button onClick={() => setEdit(t!)} className="absolute top-[7px] z-[6] h-4 w-4 rotate-45 border-2 border-white shadow" style={{ left: x + w - 8, background: late ? '#d64545' : t!.status === 'done' ? '#2e9e4f' : '#F7941D' }}
                       title={`Jalon · ${fmtDate(e)} · ${STATUS_LABEL[t!.status]}\n${t!.title}`} aria-label={`Jalon ${t!.title}`} />
                   ) : (
                     <button onClick={() => setEdit(t!)} className={`absolute top-[8px] h-[18px] overflow-hidden rounded ${late ? 'ring-2 ring-rag-red' : ''}`}

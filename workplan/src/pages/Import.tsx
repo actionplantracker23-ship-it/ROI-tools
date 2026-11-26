@@ -67,8 +67,8 @@ export default function Import() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <Stat label="Objectifs" value={file.objectives.size} />
             <Stat label="Ref (KR globaux)" value={preview.krs} hint="nouveaux, dont groupes Team KR" />
-            <Stat label="KR équipes globales" value={preview.globalActivities} hint={preview.updated ? `${preview.updated} mis à jour` : undefined} color="#5bc0eb" />
-            <Stat label="KR pays" value={preview.countryActivities} color="#f28c28" />
+            <Stat label="KR équipes globales" value={preview.globalActivities} hint={preview.updated ? `${preview.updated} mis à jour` : undefined} color="#4FB3E3" />
+            <Stat label="KR pays" value={preview.countryActivities} color="#F7941D" />
             <Stat label="Soutenus par le global" value={preview.linked} color="#2e9e4f" />
             <Stat label="Orphelins" value={<span className={preview.orphans ? 'text-rag-red' : ''}>{preview.orphans}</span>} color="#d64545" />
           </div>

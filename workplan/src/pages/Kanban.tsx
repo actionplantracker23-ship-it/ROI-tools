@@ -3,14 +3,12 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../AppContext';
 import { ActivityEditor } from '../components/Editors';
 import { Due, FilterBar, isOverdue, PriorityBadge, useFilteredTasks, ViewHeader } from '../components/pm';
-import { NoPlan, OrphanBadge, UnitChip } from '../components/ui';
+import { NoPlan, OrphanBadge, STATUS_HEX, UnitChip } from '../components/ui';
 import { today } from '../lib/dates';
 import { updateActivityStatus } from '../lib/ops';
 import { STATUS_LABEL, type Activity, type ActivityStatus } from '../types';
 
-const COLS: { s: ActivityStatus; color: string }[] = [
-  { s: 'not_started', color: '#a7adb4' }, { s: 'in_progress', color: '#2f6fb3' }, { s: 'late', color: '#d64545' }, { s: 'done', color: '#2e9e4f' }, { s: 'cancelled', color: '#2f3640' },
-];
+const COLS: { s: ActivityStatus; color: string }[] = (['not_started', 'in_progress', 'late', 'done', 'cancelled'] as ActivityStatus[]).map((s) => ({ s, color: STATUS_HEX[s] }));
 const PAGE = 40;
 
 export default function Kanban() {
@@ -51,7 +49,7 @@ export default function Kanban() {
         </div>
         <p className="line-clamp-3 text-[15.5px] leading-snug text-[#1d2327]" title={t.title}>{t.title}</p>
         {orphan && <div className="mt-1"><OrphanBadge /></div>}
-        <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-[#ebe9e3]"><div className="h-full rounded-full bg-brand-500" style={{ width: `${p}%` }} /></div>
+        <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-[#e8ecf0]"><div className="h-full rounded-full bg-brand-500" style={{ width: `${p}%` }} /></div>
         <div className="mt-1.5 flex items-center justify-between gap-2 text-[13.5px] text-slate-500">
           <span className="truncate">{t.owner || 'sans responsable'}</span><Due t={t} />
         </div>
@@ -64,9 +62,9 @@ export default function Kanban() {
     return (
       <div key={key} onDragOver={(e) => { e.preventDefault(); setOver(c.s); }} onDragLeave={() => setOver(null)}
         onDrop={(e) => { e.preventDefault(); setOver(null); move(e.dataTransfer.getData('text/plain'), c.s); }}
-        className={`flex min-w-[220px] flex-1 flex-col rounded-2xl bg-[#efede7] ${over === c.s ? 'ring-2 ring-accent' : ''}`}>
+        className={`flex min-w-[220px] flex-1 flex-col rounded-2xl bg-[#eef1f4] ${over === c.s ? 'ring-2 ring-accent' : ''}`}>
         <div className="flex items-center gap-2 px-4 pb-1 pt-3 text-[16px] font-semibold text-brand-600">
-          <span className="h-2.5 w-2.5 rounded-full" style={{ background: c.color }} />{STATUS_LABEL[c.s]} <span className="ml-auto text-[15px] font-normal text-[#6b6f76]">{list.length}</span>
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: c.color }} />{STATUS_LABEL[c.s]} <span className="ml-auto text-[15px] font-normal text-[#6D6E71]">{list.length}</span>
         </div>
         <div className="flex flex-col gap-2 p-2">
           {list.slice(0, n).map(card)}
