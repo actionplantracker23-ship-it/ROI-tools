@@ -49,9 +49,9 @@ export default function Dashboard() {
       </div>
 
       {view.orphans.length > 0 && (
-        <Link to="/alignement" className="block rounded-2xl border border-[#f3d0d0] bg-[#fdf3f3] px-5 py-3 text-[16px] text-[#8a2b2b] hover:border-[#d64545]">
+        <Link to="/alignement" className="block rounded-2xl bg-[#E30613] px-5 py-3 text-[16.5px] text-white shadow-sm hover:bg-[#c00510]">
           <b>{view.orphans.length} tâche{view.orphans.length > 1 ? 's' : ''} pays non liée{view.orphans.length > 1 ? 's' : ''} au plan global</b>
-          <span className="italic"> — {view.orphans.map((o) => `${unit(o.unitId)?.name} ${view.krs.find((k) => k.id === o.krId)?.code ?? ''}`).join(', ')}</span> · rattacher →
+          <span className="italic text-white/90"> — {view.orphans.map((o) => `${unit(o.unitId)?.name} ${view.krs.find((k) => k.id === o.krId)?.code ?? ''}`).join(', ')}</span> · rattacher →
         </Link>
       )}
 

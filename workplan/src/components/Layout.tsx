@@ -58,12 +58,12 @@ export default function Layout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const active = (to: string) => (to === '/' ? pathname === '/' : pathname.startsWith(to));
   const plans = [...ws.plans].sort((a, b) => b.year - a.year);
-  const sel = 'min-h-[34px] rounded-full border border-[#d5dbe1] bg-white px-3 text-[15px] text-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100';
+  const sel = 'min-h-[34px] rounded-full border border-white/30 bg-white/10 px-3 text-[15px] text-white focus:outline-none focus:ring-2 focus:ring-white/40 [&>option]:text-[#1d2327]';
   return (
     <div className="min-h-screen pb-[84px] lg:pb-10">
-      <header className="sticky top-0 z-30 border-b border-[#e5e8ec] bg-white text-brand-600">
+      <header className="sticky top-0 z-30 bg-brand-600 text-white">
         <div className="mx-auto flex max-w-[1280px] items-center gap-3 px-5 py-2.5">
-          <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-600 text-[15px] font-bold text-white">PT</span>
+          <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-[15px] font-bold text-brand-600">PT</span>
           <span className="min-w-0 flex-1 truncate text-[21px] tracking-wide">
             Plan de travail {plan && <span className="italic text-accent">{plan.year}</span>}
           </span>
