@@ -4,9 +4,12 @@
  * GlobalObjective (4)
  *  └─ GlobalKR (20)
  *      └─ Contribution (lien) : { entity, role: Lead | Contributes, weight }
- *          └─ EntityKR (KR pays ou équipe, ~100)
- *              ├─ EntityObjective (objectif propre au pays / à l'équipe)
- *              └─ Initiative (1..n)
+ *          └─ EntityKR (KR d'un département global ou d'un pays, ~100)
+ *              ├─ EntityObjective (objectif propre au pays / au département)
+ *              ├─ departmentId : département global auquel répond le KR pays (cascade)
+ *              ├─ Indicator (1..n) : indicateurs de mesure du KR
+ *              │   └─ IndicatorValue (Q1..Q4) + historique
+ *              └─ Initiative (1..n) : activités
  *                  └─ Milestone (Q1..Q4) + historique des check-ins
  *
  * Les identifiants sont stables (dérivés du contenu) : un réimport de l'Excel
@@ -21,6 +24,8 @@ export type MetricType = 'Numeric' | 'Percentage' | 'Yes/No' | 'Date' | 'Other';
 export type Quarter = 1 | 2 | 3 | 4;
 export type MilestoneStatus = 'not_started' | 'in_progress' | 'achieved' | 'late' | 'cancelled';
 export type Rag = 'green' | 'amber' | 'red' | 'none';
+/** Mode de calcul de l'avancement d'un KR : jalons des activités, indicateurs, ou moyenne des deux. */
+export type KrMethod = 'mix' | 'milestones' | 'indicators';
 export type UserRole = 'admin' | 'country_lead' | 'team_lead' | 'viewer';
 
 export interface Entity {
@@ -62,6 +67,12 @@ export interface EntityKR {
   teamUnit?: string;
   /** true si le KR n'existe que dans le registre (aucune ligne dans l'onglet de plan). */
   registerOnly?: boolean;
+  /**
+   * Cascade : département global auquel répond ce KR pays (null pour un KR de département).
+   * Déduit de la colonne Team/Unit, sinon du département Lead du même KR global ; modifiable.
+   */
+  departmentId: string | null;
+  departmentSource?: 'unit' | 'ref' | 'manual';
 }
 
 export interface Contribution {
@@ -85,8 +96,6 @@ export interface Initiative {
   lead: string;
   teamUnit?: string;
   baseline: string; // texte brut de "Current Baseline"
-  baselineValue: number | null; // valeur numérique extraite si possible
-  target: number | null; // cible numérique (extraite du jalon Q4, modifiable)
   metric: MetricType;
   evidenceRule: string;
   budget: string; // texte brut de "Indicative Budget"
@@ -103,7 +112,6 @@ export interface Milestone {
   quarter: Quarter;
   description: string;
   status: MilestoneStatus;
-  actualValue: number | null;
   evidenceUrl: string;
   comment: string;
   updatedAt: string | null;
@@ -115,7 +123,42 @@ export interface MilestoneUpdate {
   id: string;
   milestoneId: string;
   status: MilestoneStatus;
-  actualValue: number | null;
+  evidenceUrl: string;
+  comment: string;
+  at: string;
+  by: string;
+}
+
+/**
+ * Indicateur de mesure d'un KR. Avancement = (valeur − baseline) / (cible − baseline),
+ * ce qui gère aussi les indicateurs à faire baisser (cible < baseline).
+ * Oui/Non : baseline 0, cible 1. Créé à l'import (colonnes Metric, Current Baseline,
+ * Evidence Source and Rule, cibles chiffrées des jalons) ou ajouté à la main.
+ */
+export interface Indicator {
+  id: string;
+  entityKrId: string;
+  entityId: string;
+  initiativeId: string | null; // ligne d'origine dans l'onglet de plan
+  name: string;
+  metric: MetricType;
+  unit: string;
+  baseline: number | null;
+  baselineText: string;
+  target: number | null; // cible de fin d'année
+  quarterTargets: (number | null)[]; // cibles Q1..Q4 (facultatives)
+  source: string; // source de vérification et règle de preuve
+  frequency: string;
+  origin: 'import' | 'manual';
+  order: number;
+}
+
+/** Valeur mesurée d'un indicateur pour un trimestre (historique : la plus récente fait foi). */
+export interface IndicatorValue {
+  id: string;
+  indicatorId: string;
+  quarter: Quarter;
+  value: number | null;
   evidenceUrl: string;
   comment: string;
   at: string;
@@ -134,6 +177,7 @@ export interface Settings {
   /** Score d'un jalon « En retard » dans la moyenne (0 par défaut, le jalon est aussi signalé). */
   lateScore: number;
   currentQuarter: Quarter;
+  krMethod: KrMethod;
 }
 
 export interface AppUser {
@@ -167,6 +211,7 @@ export interface ImportReport {
     initiatives: number;
     milestones: number;
     contributions: number;
+    indicators: number;
   };
   checks: { label: string; ok: boolean; detail: string }[];
   warnings: string[];
@@ -183,6 +228,8 @@ export interface Dataset {
   initiatives: Initiative[];
   milestones: Milestone[];
   updates: MilestoneUpdate[];
+  indicators: Indicator[];
+  indicatorValues: IndicatorValue[];
   annexes: AnnexTable[];
   settings: Settings;
   lastImport: ImportReport | null;
@@ -193,6 +240,13 @@ export const DEFAULT_SETTINGS: Settings = {
   rag: { green: 70, amber: 40 },
   lateScore: 0,
   currentQuarter: 1,
+  krMethod: 'mix',
+};
+
+export const KR_METHOD_LABEL: Record<KrMethod, string> = {
+  mix: 'Moyenne jalons + indicateurs',
+  milestones: 'Jalons des activités uniquement',
+  indicators: 'Indicateurs uniquement',
 };
 
 export const STATUS_LABEL: Record<MilestoneStatus, string> = {
@@ -222,6 +276,8 @@ export function emptyDataset(): Dataset {
     initiatives: [],
     milestones: [],
     updates: [],
+    indicators: [],
+    indicatorValues: [],
     annexes: [],
     settings: { ...DEFAULT_SETTINGS, weights: { ...DEFAULT_SETTINGS.weights }, rag: { ...DEFAULT_SETTINGS.rag } },
     lastImport: null,

@@ -23,7 +23,8 @@ for (let o = 1; o <= 4; o++) {
 }
 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ref), 'Ref Global OKRs');
 
-const reg: string[][] = [['Ref', 'Global Key Result', 'Country/Team', 'Role', 'Country/Team Objective', 'Country/Team Key Result', 'KR Lead', 'Scope']];
+const regRows: string[][] = [];
+const DEPTS = ['DHGP', 'GSE', 'PEI', 'PSE', 'Finance', 'BDAC'];
 const sheets: [string, string, string[]][] = [
   ['2 Kenya', 'Kenya', ['']], ['3 Burkina Faso', 'Burkina Faso', ['']], ['4 Uganda', 'Uganda', ['']], ['4b Benin', 'Benin', ['']], ['4c Zambia', 'Zambia', ['']],
   ['5 Global Programs', 'Global Programs', ['Innovations', 'PEI', 'PSE']], ['6 GSE', 'GSE', ['']], ['7 DHGP', 'DHGP', ['']], ['8 BDAC', 'BDAC', ['']],
@@ -47,20 +48,31 @@ for (const [sheet, ent, units] of sheets) {
       const kr = `${name} KR ${k + 1}: reach ${60 + k}% of target${k % 5 === 0 ? ' [X]' : ''}`;
       const lead = `Lead ${name} ${k % 3}`;
       const target = country ? ent : k % 2 ? 'Kenya and Uganda' : 'all countries';
+      const rowUnit = country ? DEPTS[(n + k) % DEPTS.length] : unit; // l'équipe pays répond à un département
       for (let i = 0; i < 1 + (k % 3); i++) {
         rows.push([
-          i ? '' : g, i ? '' : `Test global KR ${g.slice(2)}`, i ? '' : unit, i ? '' : `${name} objective ${obj}`, i ? '' : kr, i ? '' : lead,
+          i ? '' : g, i ? '' : `Test global KR ${g.slice(2)}`, i ? '' : rowUnit, i ? '' : `${name} objective ${obj}`, i ? '' : kr, i ? '' : lead,
           `Initiative ${k + 1}.${i + 1} support ${target}`, `IL ${i}`, i % 2 ? '40%' : '1,200', i % 2 ? 'Percentage' : 'Numeric',
           'Quarterly report signed by lead', 'Plan validated', `Pilot reaching ${50 + i}`, i === 2 ? '' : 'Scale up',
           i % 2 ? 'Reach 80% by 2027' : '2,400 CHWs', i ? '' : `$${(k + 1) * 10}k`,
         ]);
       }
-      reg.push([g, `Test global KR ${g.slice(2)}`, unit ? `Global Programs – ${unit}` : ent, (n + k) % 4 === 0 ? 'Lead' : 'Contributes',
-        `${name} objective ${obj}`, kr, lead, country ? 'Pays' : 'Global']);
+      regRows.push([g, `Test global KR ${g.slice(2)}`, unit ? `Global Programs – ${unit}` : ent, (n + k) % 4 === 0 ? 'Lead' : 'Contributes',
+        `${name} objective ${obj}`, kr, lead, country ? 'Pays' : 'Global', sheet]);
     }
     n++;
   }
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), sheet);
+}
+// registre au format de la source : sections « OBJECTIVE X · … », colonne « Go to plan »
+const reg: string[][] = [['Ref', 'Global Key Result', 'Country / Team', 'Role', 'Country/Team Objective', 'Country/Team Key Result', 'KR Lead', 'Scope', 'Go to plan']];
+const krNum = (r: string) => r.slice(2).split('.').map(Number);
+regRows.sort((a, b) => krNum(a[0])[0] - krNum(b[0])[0] || krNum(a[0])[1] - krNum(b[0])[1]);
+let lastO = 0;
+for (const r of regRows) {
+  const o = krNum(r[0])[0];
+  if (o !== lastO) { reg.push([`OBJECTIVE ${o}  ·  Test global objective number ${o} (fictitious)`]); lastO = o; }
+  reg.push(r);
 }
 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(reg), '1 OKR Register');
 XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Product', 'Description'], ['Test product A', 'Fictitious annex row']]), 'Annex A Product Annexes');

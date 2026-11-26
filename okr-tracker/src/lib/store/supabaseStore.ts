@@ -5,7 +5,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   DEFAULT_SETTINGS, emptyDataset, type Contribution, type Dataset, type Entity, type EntityKR,
-  type Initiative, type Milestone, type MilestoneUpdate,
+  type Indicator, type IndicatorValue, type Initiative, type Milestone, type MilestoneUpdate,
 } from '../../types';
 import type { Store } from './types';
 
@@ -15,6 +15,12 @@ const snake = (s: string) => s.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 const camel = (s: string) => s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
 const toRow = (o: object): Row => Object.fromEntries(Object.entries(o).map(([k, v]) => [snake(k), v ?? null]));
 const fromRow = <T>(r: Row): T => Object.fromEntries(Object.entries(r).map(([k, v]) => [camel(k), v])) as T;
+const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+const indicatorRow = (i: Indicator) => toRow({ ...i, initiativeId: i.initiativeId ?? null, quarterTargets: i.quarterTargets });
+const indicatorFromRow = (r: Row): Indicator => ({
+  ...fromRow<Indicator>(r), baseline: num(r.baseline), target: num(r.target),
+  quarterTargets: (r.quarter_targets ?? [null, null, null, null]).map(num),
+});
 
 /** Lecture paginée (Supabase renvoie 1000 lignes maximum par requête). */
 async function fetchAll(sb: SupabaseClient, table: string): Promise<Row[]> {
@@ -38,10 +44,11 @@ export function toImportPayload(ds: Dataset) {
     global_objectives: ds.globalObjectives.map(toRow),
     global_krs: ds.globalKrs.map(toRow),
     entity_objectives: ds.entityObjectives.map(toRow),
-    entity_krs: ds.entityKrs.map((k) => toRow({ registerOnly: false, teamUnit: null, ...k })),
+    entity_krs: ds.entityKrs.map((k) => toRow({ registerOnly: false, teamUnit: null, departmentSource: null, ...k })),
     contributions: ds.contributions.map((c) => toRow({ inferred: false, ...c })),
     initiatives: ds.initiatives.map((i) => toRow({ teamUnit: null, ...i })),
     milestones: ds.milestones.map(toRow),
+    indicators: ds.indicators.map(indicatorRow),
     annex_tables: ds.annexes.map(toRow),
     report: ds.lastImport,
   };
@@ -53,10 +60,12 @@ export function createSupabaseStore(url: string, anonKey: string): Store {
     mode: 'supabase',
     async load() {
       const ds = emptyDataset();
-      const [ent, go, gk, eo, ek, co, ini, ms, up, an, st] = await Promise.all(
+      const [ent, go, gk, eo, ek, co, ini, ms, up, an, st, ind, iv] = await Promise.all(
         ['entities', 'global_objectives', 'global_krs', 'entity_objectives', 'entity_krs', 'contributions',
-          'initiatives', 'milestones', 'milestone_updates', 'annex_tables', 'settings'].map((t) => fetchAll(sb, t)),
+          'initiatives', 'milestones', 'milestone_updates', 'annex_tables', 'settings', 'indicators', 'indicator_values'].map((t) => fetchAll(sb, t)),
       );
+      ds.indicators = ind.map(indicatorFromRow);
+      ds.indicatorValues = iv.map((r) => ({ ...fromRow<IndicatorValue>(r), value: num(r.value), at: r.created_at, by: r.author }));
       ds.entities = ent.map((r) => fromRow<Entity>(r));
       ds.globalObjectives = go.map((r) => fromRow(r));
       ds.globalKrs = gk.map((r) => fromRow(r));
@@ -74,6 +83,7 @@ export function createSupabaseStore(url: string, anonKey: string): Store {
           rag: { green: Number(s.rag_green), amber: Number(s.rag_amber) },
           lateScore: Number(s.late_score),
           currentQuarter: s.current_quarter,
+          krMethod: s.kr_method ?? 'mix',
         };
         ds.lastImport = s.last_import;
       } else ds.settings = DEFAULT_SETTINGS;
@@ -85,14 +95,14 @@ export function createSupabaseStore(url: string, anonKey: string): Store {
     async checkIn(u) {
       // le trigger apply_milestone_update recopie l'état dans milestones
       check(await sb.from('milestone_updates').insert({
-        milestone_id: u.milestoneId, status: u.status, actual_value: u.actualValue, evidence_url: u.evidenceUrl,
+        milestone_id: u.milestoneId, status: u.status, evidence_url: u.evidenceUrl,
         comment: u.comment, created_at: u.at, author: u.by,
       }));
     },
     async updateSettings(s) {
       check(await sb.from('settings').update({
         weight_lead: s.weights.Lead, weight_contrib: s.weights.Contributes, rag_green: s.rag.green,
-        rag_amber: s.rag.amber, late_score: s.lateScore, current_quarter: s.currentQuarter,
+        rag_amber: s.rag.amber, late_score: s.lateScore, current_quarter: s.currentQuarter, kr_method: s.krMethod,
       }).eq('id', 1));
     },
     async updateContributionWeight(id, weight) {
@@ -100,6 +110,21 @@ export function createSupabaseStore(url: string, anonKey: string): Store {
     },
     async updateInitiative(id, patch) {
       check(await sb.from('initiatives').update(toRow(patch)).eq('id', id));
+    },
+    async setKrDepartment(krId, departmentId) {
+      check(await sb.from('entity_krs').update({ department_id: departmentId, department_source: 'manual' }).eq('id', krId));
+    },
+    async saveIndicator(ind) {
+      check(await sb.from('indicators').upsert(indicatorRow(ind)));
+    },
+    async deleteIndicator(id) {
+      check(await sb.from('indicators').delete().eq('id', id));
+    },
+    async addIndicatorValue(v) {
+      check(await sb.from('indicator_values').insert({
+        indicator_id: v.indicatorId, quarter: v.quarter, value: v.value, evidence_url: v.evidenceUrl,
+        comment: v.comment, created_at: v.at, author: v.by,
+      }));
     },
     async currentUser() {
       const { data } = await sb.auth.getUser();

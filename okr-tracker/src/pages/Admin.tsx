@@ -5,7 +5,11 @@ import { applyDemoQ1 } from '../lib/demo';
 import { parseFile, type ParseResult } from '../lib/import/excel';
 import { contributionWeight } from '../lib/progress';
 import { isAdmin } from '../lib/permissions';
-import { ROLE_LABEL, type AppUser, type Dataset, type ImportReport, type Quarter, type Settings, type UserRole } from '../types';
+import * as XLSX from 'xlsx';
+import { exportRows } from '../lib/export';
+import { indicatorTemplateRows, parseIndicatorTemplate, type IndicatorImportResult } from '../lib/indicatorsIO';
+import { canEditEntity } from '../lib/permissions';
+import { KR_METHOD_LABEL, ROLE_LABEL, type KrMethod, type AppUser, type Dataset, type ImportReport, type Quarter, type Settings, type UserRole } from '../types';
 
 function ReportView({ r }: { r: ImportReport }) {
   return (
@@ -78,7 +82,10 @@ function ImportSection() {
     try {
       const next = applyDemoQ1(ds);
       if (store.mode === 'local') await store.saveDataset(next);
-      else for (const u of next.updates.filter((x) => x.id.startsWith('demo-'))) await store.checkIn(u);
+      else {
+        for (const u of next.updates.filter((x) => x.id.startsWith('demo-'))) await store.checkIn(u);
+        for (const v of next.indicatorValues.filter((x) => x.id.startsWith('demo-'))) await store.addIndicatorValue(v);
+      }
       await reload();
       notify('Statuts Q1 fictifs appliqués.');
     } finally {
@@ -147,6 +154,55 @@ function ImportSection() {
   );
 }
 
+/** Modèle Excel des indicateurs : export, saisie en masse, réimport (admin et Leads, dans leur périmètre). */
+export function IndicatorsSection() {
+  const { ds, user, store, reload, notify, setError } = useApp();
+  const [pending, setPending] = useState<IndicatorImportResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const read = async (f: File | undefined) => {
+    if (!f) return;
+    try {
+      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+      setPending(parseIndicatorTemplate(wb, ds, user?.name || user?.email || 'import', (e) => canEditEntity(user, e)));
+    } catch (e) { setError(`Lecture impossible : ${(e as Error).message}`); }
+  };
+  const apply = async () => {
+    if (!pending) return;
+    setBusy(true);
+    try {
+      for (const i of pending.indicators) await store.saveIndicator(i);
+      for (const v of pending.values) await store.addIndicatorValue(v);
+      await reload();
+      notify(`${pending.indicators.length} indicateur(s) et ${pending.values.length} valeur(s) enregistrés.`);
+      setPending(null);
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  };
+  const withInd = new Set(ds.indicators.map((i) => i.entityKrId));
+  return (
+    <Card title="Indicateurs de mesure : modèle Excel">
+      <p className="mb-3 text-sm text-slate-600">
+        {ds.indicators.length} indicateur(s) · {ds.entityKrs.filter((k) => withInd.has(k.id)).length}/{ds.entityKrs.length} KR mesurés.
+        Téléchargez le modèle (une ligne par indicateur, une ligne vide par KR sans indicateur), complétez intitulés, baselines, cibles
+        et valeurs trimestrielles, puis réimportez-le. Les valeurs déjà saisies identiques sont ignorées ; l’historique est conservé.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={() => exportRows(indicatorTemplateRows(ds), 'OKR-2027-indicateurs', 'xlsx')}>Télécharger le modèle</Button>
+        <label className="inline-flex min-h-[40px] cursor-pointer items-center rounded-md bg-brand-600 px-3.5 text-[15px] text-white hover:bg-brand-700">
+          Importer le modèle rempli
+          <input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { void read(e.target.files?.[0]); e.target.value = ''; }} />
+        </label>
+      </div>
+      {pending && (
+        <div className="mt-3 space-y-2 rounded-md border border-[#bfe3f5] bg-brand-50 p-3 text-sm">
+          <p><b>{pending.indicators.length}</b> indicateur(s) à créer ou modifier · <b>{pending.values.length}</b> nouvelle(s) valeur(s).</p>
+          {pending.errors.length > 0 && <ul className="list-disc pl-5 text-xs text-rag-red">{pending.errors.slice(0, 20).map((e) => <li key={e}>{e}</li>)}</ul>}
+          <div className="flex gap-2"><Button variant="primary" disabled={busy || (!pending.indicators.length && !pending.values.length)} onClick={apply}>Appliquer</Button><Button onClick={() => setPending(null)}>Annuler</Button></div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function SettingsSection() {
   const { ds, updateSettings } = useApp();
   const [s, setS] = useState<Settings>(ds.settings);
@@ -160,6 +216,11 @@ function SettingsSection() {
         <label className="text-xs font-medium text-slate-600">Poids Contributes<input type="number" min={0} step={0.5} className={`${inputCls} mt-1`} value={s.weights.Contributes} onChange={(e) => setS({ ...s, weights: { ...s.weights, Contributes: num(e.target.value) } })} /></label>
         <label className="text-xs font-medium text-slate-600">Vert à partir de (%)<input type="number" min={0} max={100} className={`${inputCls} mt-1`} value={s.rag.green} onChange={(e) => setS({ ...s, rag: { ...s.rag, green: num(e.target.value) } })} /></label>
         <label className="text-xs font-medium text-slate-600">Ambre à partir de (%)<input type="number" min={0} max={100} className={`${inputCls} mt-1`} value={s.rag.amber} onChange={(e) => setS({ ...s, rag: { ...s.rag, amber: num(e.target.value) } })} /></label>
+        <label className="text-xs font-medium text-slate-600 sm:col-span-3 lg:col-span-2">Calcul de l’avancement d’un KR
+          <select className={`${inputCls} mt-1`} value={s.krMethod} onChange={(e) => setS({ ...s, krMethod: e.target.value as KrMethod })}>
+            {(Object.keys(KR_METHOD_LABEL) as KrMethod[]).map((m) => <option key={m} value={m}>{KR_METHOD_LABEL[m]}</option>)}
+          </select>
+        </label>
         <label className="text-xs font-medium text-slate-600">Score d’un jalon en retard (%)<input type="number" min={0} max={100} className={`${inputCls} mt-1`} value={s.lateScore} onChange={(e) => setS({ ...s, lateScore: num(e.target.value) })} /></label>
         <label className="text-xs font-medium text-slate-600">Trimestre courant
           <select className={`${inputCls} mt-1`} value={s.currentQuarter} onChange={(e) => setS({ ...s, currentQuarter: Number(e.target.value) as Quarter })}>
@@ -324,9 +385,15 @@ export default function Admin() {
           <ImportSection />
           {ds.globalKrs.length > 0 && <SettingsSection />}
           {ds.contributions.length > 0 && <WeightsSection />}
+          <IndicatorsSection />
           <UsersSection />
         </>
-      ) : <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-600">Ces réglages sont réservés à l’administrateur (équipe Strategy/PMO).</p>}
+      ) : (
+        <>
+          {(user?.role === 'country_lead' || user?.role === 'team_lead') && ds.globalKrs.length > 0 && <IndicatorsSection />}
+          <p className="rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-600">Import, paramètres et utilisateurs sont réservés à l’administrateur (équipe Strategy/PMO).</p>
+        </>
+      )}
     </div>
   );
 }

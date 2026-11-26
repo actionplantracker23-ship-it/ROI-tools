@@ -18,18 +18,21 @@ export function buildFixture(): XLSX.WorkBook {
   }
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ref), 'Ref Global OKRs');
 
-  const reg = [['OKR Register'], ['Ref', 'Global Key Result', 'Country/Team', 'Role', 'Country/Team Objective', 'Country/Team Key Result', 'KR Lead', 'Scope']];
+  const reg = [['OKR Register'], ['Ref', 'Global Key Result', 'Country / Team', 'Role', 'Country/Team Objective', 'Country/Team Key Result', 'KR Lead', 'Scope', 'Go to plan']];
+  reg.push(['OBJECTIVE 1  ·  Embed and scale high performing eCHIS in Kenya and Burkina Faso.']);
   reg.push(['KR1.1', 'Test global key result 1.1', 'Kenya', 'Lead', 'Kenya obj A', 'Kenya KR alpha reach 80% coverage', 'Lead K', 'Pays']);
   reg.push(['', '', 'Global Programs – PEI', 'Contributes', 'PEI obj', 'PEI KR support countries', 'Lead P', 'Global']);
   reg.push(['KR1.2', 'Test global key result 1.2', 'Kenya', 'Contributes', 'Kenya obj A', 'Kenya KR beta [X] households', 'Lead K2', 'Pays']);
-  reg.push(['KR2.1', 'Test global key result 2.1', 'GSE', 'Lead', 'GSE obj', 'GSE KR only in register', 'Lead G', 'Global']);
+  reg.push(['KR1.1', 'Test global key result 1.1', 'DHGP', 'Lead', 'DHGP obj', 'DHGP KR eCHIS', 'Lead D', 'Global', '7 DHGP']);
+  reg.push(['OBJECTIVE 2  ·  Second test objective']);
+  reg.push(['KR2.1', 'Test global key result 2.1', 'GSE', 'Lead', 'GSE obj', 'GSE KR only in register', 'Lead G', 'Global', '6 GSE']);
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(reg), '1 OKR Register');
 
   const ke = [['Kenya 2027 plan'], PLAN_HEADER,
     ['OBJECTIVE 1 · Test objective 1'],
     ['KR1.1', 'Test global key result 1.1', 'Ops', 'Kenya obj A', 'Kenya KR alpha reach 80% coverage', 'Lead K', 'Init 1', 'IL1', '50%', 'Percentage', 'DHIS2 report', 'Plan', 'Pilot 60%', 'Scale 70%', 'Reach 80% by 2027', '$120k'],
     ['', '', '', '', '', '', 'Init 2', 'IL2', 'n/a', 'Yes/No', 'Memo', 'Draft', '', 'Validate', 'Done', ''],
-    ['KR1.2', 'Test global key result 1.2', 'Ops', '', 'Kenya KR beta [X] households', 'Lead K2', 'Init 3', 'IL3', '1,000', 'Numeric', 'Survey', 'Survey', 'Q2', 'Q3', '2,000 households', '45,000'],
+    ['KR1.2', 'Test global key result 1.2', 'Finance', '', 'Kenya KR beta [X] households', 'Lead K2', 'Init 3', 'IL3', '1,000', 'Numeric', 'Survey', 'Survey', 'Q2', 'Q3', '2,000 households', '45,000'],
   ];
   const wsKe = XLSX.utils.aoa_to_sheet(ke);
   wsKe['!merges'] = [{ s: { r: 3, c: 3 }, e: { r: 5, c: 3 } }]; // objectif fusionné sur 3 lignes

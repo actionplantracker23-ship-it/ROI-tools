@@ -7,7 +7,8 @@ import { heatCell, milestoneStats } from '../lib/selectors';
 import { Card, Gauge, NoData, PageHeader, ProgressBar, RAG_HEX, RAG_STYLE, RagBadge, Stat } from '../components/ui';
 
 const ALERT_LABEL: Record<Alert['kind'], string> = {
-  late: 'Jalons en retard', no_data: 'KR sans données', placeholder: 'Cibles non définies', no_lead: 'KR globaux sans Lead', no_initiative: 'KR sans initiative',
+  late: 'Jalons en retard', indicator_missing: 'Indicateurs non renseignés', no_indicator: 'KR sans indicateur', no_data: 'KR sans données',
+  placeholder: 'Cibles non définies', no_lead: 'KR globaux sans Lead', no_department: 'KR pays non rattachés', no_initiative: 'KR sans activité',
 };
 
 export default function Dashboard() {
@@ -17,6 +18,7 @@ export default function Dashboard() {
   if (!ds.globalKrs.length) return <><PageHeader title="Tableau de bord global" /><NoData /></>;
 
   const stats = milestoneStats(ds, quarter);
+  const indFilled = ds.indicators.filter((i) => computed.indicator.get(i.id)?.valueQuarter === quarter).length;
   const entities = ds.entities.filter((e) => ds.contributions.some((c) => c.entityId === e.id));
   const shown = kind === 'all' ? allAlerts : allAlerts.filter((a) => a.kind === kind);
   const counts = Object.fromEntries(Object.keys(ALERT_LABEL).map((k) => [k, allAlerts.filter((a) => a.kind === k).length]));
@@ -29,8 +31,8 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <Stat label="KR globaux" value={ds.globalKrs.length} hint={`${ds.globalObjectives.length} objectifs`} />
-        <Stat label="KR pays/équipes" value={ds.entityKrs.length} color="#5bc0eb" />
-        <Stat label="Initiatives" value={ds.initiatives.length} color="#f28c28" />
+        <Stat label="KR départements / pays" value={ds.entityKrs.length} color="#5bc0eb" />
+        <Stat label={`Indicateurs saisis Q${quarter}`} value={<>{indFilled}<small className="text-base font-normal text-slate-500"> / {ds.indicators.length}</small></>} hint={`${ds.initiatives.length} activités`} color="#f28c28" />
         <Stat label={`Jalons atteints (≤ Q${quarter})`} value={<>{stats.achieved}<small className="text-base font-normal text-slate-500"> / {stats.due}</small></>} hint={`${stats.inProgress} en cours`} color="#2e9e4f" />
         <Stat label="Jalons en retard" value={<span className={stats.late ? 'text-rag-red' : ''}>{stats.late}</span>} color="#d64545" />
       </div>

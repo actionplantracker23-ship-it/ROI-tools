@@ -17,7 +17,7 @@
  */
 import * as XLSX from 'xlsx';
 import type {
-  AnnexTable, Contribution, Dataset, Entity, EntityKR, EntityObjective, GlobalKR,
+  AnnexTable, Contribution, Dataset, Entity, EntityKR, EntityObjective, GlobalKR, Indicator,
   ImportReport, Initiative, Quarter, Role, Scope, SheetReport,
 } from '../../types';
 import { emptyDataset } from '../../types';
@@ -291,6 +291,17 @@ export function parseWorkbook(wb: XLSX.WorkBook, fileName = 'classeur.xlsx'): Pa
     }
   }
 
+  // Titres des lignes de section du registre ("OBJECTIVE 1 · Embed and scale…") : prioritaires sur ceux des onglets
+  if (registerName) {
+    const regTitles = new Map<number, string>();
+    for (const row of sheetToGrid(wb.Sheets[registerName])) {
+      const first = row.find(Boolean) ?? '';
+      const m = isSectionHeader(first) ? first.match(/OBJECTIVE\s*(\d+)\s*[·:.\-–—|]?\s*(.*)$/i) : null;
+      if (m && m[2] && !regTitles.has(Number(m[1]))) regTitles.set(Number(m[1]), clean(m[2]));
+    }
+    for (const [n, t] of regTitles) sectionTitles.set(n, t);
+  }
+
   // Objectifs et KR globaux (fallback : titres des en-têtes de section "OBJECTIVE X · …")
   const objNums = new Set<number>([...ref.objectives.keys(), ...[...ref.krs.keys()].map((k) => Number(k.slice(2).split('.')[0]))]);
   for (const n of [...objNums].sort((a, b) => a - b)) {
@@ -334,6 +345,7 @@ export function parseWorkbook(wb: XLSX.WorkBook, fileName = 'classeur.xlsx'): Pa
   const krRefs = new Map<string, Set<string>>(); // liens issus de la colonne Ref
   const initiatives = new Map<string, Initiative>();
   const initKeys = new Set<string>();
+  const indicators = new Map<string, Indicator>();
   const krId = (entityId: string, title: string) => `${entityId}-kr-${hash(key(title))}`;
   const repBySheet = new Map(sheetReports.map((r) => [r.sheet, r]));
   const krsBySheet = new Map<string, Set<string>>();
@@ -345,7 +357,7 @@ export function parseWorkbook(wb: XLSX.WorkBook, fileName = 'classeur.xlsx'): Pa
     if (!krs.has(id)) {
       krs.set(id, {
         id, entityId: ent.id, objectiveId: ensureObjective(ent.id, row.objective), title: row.kr, lead: row.krLead,
-        teamUnit: row.teamUnit || undefined,
+        teamUnit: row.teamUnit || undefined, departmentId: null,
       });
     }
     if (!krsBySheet.has(row.sheet)) krsBySheet.set(row.sheet, new Set());
@@ -370,7 +382,6 @@ export function parseWorkbook(wb: XLSX.WorkBook, fileName = 'classeur.xlsx'): Pa
     let iid = `${id}-i-${hash(key(row.initiative))}`;
     for (let n = 2; initiatives.has(iid); n++) iid = `${id}-i-${hash(key(row.initiative))}-${n}`;
     const metric = parseMetric(row.metric);
-    const numeric = metric === 'Numeric' || metric === 'Percentage';
     const order = [...initiatives.values()].filter((i) => i.entityKrId === id).length;
     const targetCountries = ent.type === 'GlobalTeam'
       ? detectCountries([row.teamUnit, row.kr, row.initiative, ...row.q].join(' \n '))
@@ -378,8 +389,7 @@ export function parseWorkbook(wb: XLSX.WorkBook, fileName = 'classeur.xlsx'): Pa
     initiatives.set(iid, {
       id: iid, entityKrId: id, entityId: ent.id,
       title: row.initiative || `Initiative ${order + 1}`, lead: row.initiativeLead || row.krLead, teamUnit: row.teamUnit || undefined,
-      baseline: row.baseline, baselineValue: numeric ? numberNotYear(row.baseline, false) : null,
-      target: numeric ? numberNotYear(row.q[3], true) : null,
+      baseline: row.baseline,
       metric, evidenceRule: row.evidence, budget: row.budget, budgetValue: parseBudget(row.budget),
       targetCountryIds: targetCountries, order,
     });
@@ -388,10 +398,29 @@ export function parseWorkbook(wb: XLSX.WorkBook, fileName = 'classeur.xlsx'): Pa
       if (!desc) return;
       ds.milestones.push({
         id: `${iid}-q${qi + 1}`, initiativeId: iid, entityId: ent.id, quarter: (qi + 1) as Quarter, description: desc,
-        status: 'not_started', actualValue: null, evidenceUrl: '', comment: '', updatedAt: null, updatedBy: null,
+        status: 'not_started', evidenceUrl: '', comment: '', updatedAt: null, updatedBy: null,
       });
       rep.milestones++;
     });
+
+    // Indicateur de mesure : colonnes Metric / Current Baseline / Evidence Source and Rule + cibles chiffrées des jalons
+    if (row.metric || row.baseline) {
+      const name = row.initiative || row.kr;
+      const indId = `${id}-ind-${hash(key(name))}`;
+      if (!indicators.has(indId)) {
+        const numeric = metric === 'Numeric' || metric === 'Percentage';
+        const yesNo = metric === 'Yes/No';
+        const qt = row.q.map((x) => (numeric ? numberNotYear(x, true) : null));
+        indicators.set(indId, {
+          id: indId, entityKrId: id, entityId: ent.id, initiativeId: iid, name, metric,
+          unit: metric === 'Percentage' ? '%' : yesNo ? 'Oui/Non' : metric === 'Date' ? 'Date' : '',
+          baseline: yesNo ? 0 : numeric ? numberNotYear(row.baseline, false) : null, baselineText: row.baseline,
+          target: yesNo ? 1 : qt[3], quarterTargets: yesNo ? [null, null, null, null] : qt,
+          source: row.evidence, frequency: 'Trimestrielle', origin: 'import',
+          order: [...indicators.values()].filter((x) => x.entityKrId === id).length,
+        });
+      }
+    }
   }
   for (const rep of sheetReports) rep.krs = krsBySheet.get(rep.sheet)?.size ?? 0;
 
@@ -436,7 +465,7 @@ export function parseWorkbook(wb: XLSX.WorkBook, fileName = 'classeur.xlsx'): Pa
         }
         if (!match || best < 0.6) {
           const id = krId(ent.id, v.kr);
-          match = krs.get(id) ?? { id, entityId: ent.id, objectiveId: ensureObjective(ent.id, v.objective), title: v.kr, lead: v.krLead, registerOnly: true };
+          match = krs.get(id) ?? { id, entityId: ent.id, objectiveId: ensureObjective(ent.id, v.objective), title: v.kr, lead: v.krLead, registerOnly: true, departmentId: null };
           krs.set(id, match);
         }
         if (!match.lead && v.krLead) match.lead = v.krLead;
@@ -470,6 +499,20 @@ export function parseWorkbook(wb: XLSX.WorkBook, fileName = 'classeur.xlsx'): Pa
       inferred++;
     }
   }
+  // Cascade : département global auquel répond chaque KR pays
+  //  1) la colonne Team/Unit nomme un département (« Finance », « DHGP »…) ;
+  //  2) sinon, le département Lead (à défaut contributeur) du même KR global.
+  const entityType = new Map([...entities.values()].map((e) => [e.id, e.type]));
+  for (const k of krs.values()) {
+    if (entityType.get(k.entityId) !== 'Country') continue;
+    const unit = k.teamUnit ? resolveEntity(k.teamUnit) : null;
+    if (unit && unit.type === 'GlobalTeam') { k.departmentId = unit.id; k.departmentSource = 'unit'; continue; }
+    const refs = [...contributions.values()].filter((c) => c.entityKrId === k.id).map((c) => c.globalKrId);
+    const deps = [...contributions.values()].filter((c) => refs.includes(c.globalKrId) && entityType.get(c.entityId) === 'GlobalTeam');
+    const dep = deps.find((c) => c.role === 'Lead') ?? deps[0];
+    if (dep) { k.departmentId = dep.entityId; k.departmentSource = 'ref'; }
+  }
+
   if (inferred) warnings.push(`${inferred} lien(s) KR global ↔ KR d'entité trouvés dans les onglets mais absents du registre : ajoutés en « Contributes ».`);
 
   // 4. Annexes ---------------------------------------------------------------------------------
@@ -484,17 +527,23 @@ export function parseWorkbook(wb: XLSX.WorkBook, fileName = 'classeur.xlsx'): Pa
   // les entités connues apparaissent toujours (même sans onglet), dans un ordre stable
   for (const def of KNOWN_ENTITIES) ensureEntity(def);
   const order = new Map(KNOWN_ENTITIES.map((e, i) => [e.id, i]));
-  ds.entities = [...entities.values()].sort((a, b) => (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99));
+  // le global d'abord (départements), puis les pays qui lui répondent
+  ds.entities = [...entities.values()].sort((a, b) => (a.type === b.type ? 0 : a.type === 'GlobalTeam' ? -1 : 1) || (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99));
   ds.entityObjectives = [...objectives.values()];
   ds.entityKrs = [...krs.values()];
   ds.initiatives = [...initiatives.values()];
   ds.contributions = [...contributions.values()];
+  ds.indicators = [...indicators.values()];
   ds.annexes = annexes;
 
   const totals = {
     globalObjectives: ds.globalObjectives.length, globalKrs: ds.globalKrs.length, entityKrs: ds.entityKrs.length,
     initiatives: ds.initiatives.length, milestones: ds.milestones.length, contributions: ds.contributions.length,
+    indicators: ds.indicators.length,
   };
+  const withoutIndicator = ds.entityKrs.filter((k) => !ds.indicators.some((i) => i.entityKrId === k.id));
+  const countryKrs = ds.entityKrs.filter((k) => entityType.get(k.entityId) === 'Country');
+  const noDept = countryKrs.filter((k) => !k.departmentId);
   const leadless = ds.globalKrs.filter((g) => !ds.contributions.some((c) => c.globalKrId === g.id && c.role === 'Lead'));
   const registerOnly = ds.entityKrs.filter((k) => k.registerOnly);
   const report: ImportReport = {
@@ -507,6 +556,8 @@ export function parseWorkbook(wb: XLSX.WorkBook, fileName = 'classeur.xlsx'): Pa
       { label: '20 KR globaux', ok: totals.globalKrs === 20, detail: `${totals.globalKrs} trouvé(s)` },
       { label: '≈ 100 KR pays/équipes', ok: totals.entityKrs >= 80 && totals.entityKrs <= 130, detail: `${totals.entityKrs} trouvé(s)` },
       { label: 'Chaque KR global a un Lead', ok: leadless.length === 0, detail: leadless.length ? `Sans Lead : ${leadless.map((g) => g.id).join(', ')}` : 'OK' },
+      { label: 'Chaque KR a au moins un indicateur', ok: withoutIndicator.length === 0, detail: withoutIndicator.length ? `${withoutIndicator.length} KR sans indicateur (à compléter)` : 'OK' },
+      { label: 'Chaque KR pays répond à un département', ok: noDept.length === 0, detail: noDept.length ? `${noDept.length} KR pays sans département (à rattacher)` : 'OK' },
       { label: 'KR du registre retrouvés dans les onglets', ok: registerOnly.length === 0, detail: registerOnly.length ? `${registerOnly.length} KR présents uniquement dans le registre` : 'OK' },
     ],
     warnings,

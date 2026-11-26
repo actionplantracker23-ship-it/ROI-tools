@@ -3,14 +3,14 @@ import { Link, useParams } from 'react-router-dom';
 import { useApp } from '../AppContext';
 import { InitiativeRow, KrBlock } from '../components/Okr';
 import { Button, Card, EmptyState, Gauge, NoData, PageHeader, ProgressBar, RagBadge, Stat } from '../components/ui';
-import { exportPdf, exportRows } from '../lib/export';
+import { exportPdf, exportSheets } from '../lib/export';
 import { pct } from '../lib/format';
 import { milestoneStats, supportToCountry } from '../lib/selectors';
 import { STATUS_LABEL } from '../types';
 
 export default function CountryView() {
   const { id = '' } = useParams();
-  const { ds, computed, quarter } = useApp();
+  const { ds, idx, computed, quarter } = useApp();
   const ref = useRef<HTMLDivElement>(null);
   const country = ds.entities.find((e) => e.id === id);
   if (!ds.globalKrs.length) return <NoData />;
@@ -24,22 +24,36 @@ export default function CountryView() {
   const support = supportToCountry(ds, id);
   const supportTeams = [...new Set(support.map((i) => i.entityId))];
 
+  const inds = krs.flatMap((k) => idx.indByKr.get(k.id) ?? []);
+  const filled = inds.filter((i) => computed.indicator.get(i.id)?.valueQuarter === quarter).length;
   const exportXlsx = () => {
-    const rows = ds.initiatives.filter((i) => i.entityId === id).flatMap((i) => {
-      const kr = krs.find((k) => k.id === i.entityKrId);
-      return ds.milestones.filter((m) => m.initiativeId === i.id).map((m) => ({
-        'Objectif pays': objectives.find((o) => o.id === kr?.objectiveId)?.title ?? '',
-        'KR pays': kr?.title ?? '',
-        'KR globaux': ds.contributions.filter((c) => c.entityKrId === kr?.id).map((c) => `${c.globalKrId} (${c.role})`).join(', '),
-        Initiative: i.title, 'Initiative Lead': i.lead, Trimestre: `Q${m.quarter}`, Jalon: m.description,
-        Statut: STATUS_LABEL[m.status], 'Valeur réelle': m.actualValue ?? '', Preuve: m.evidenceUrl, Commentaire: m.comment,
-      }));
+    const common = (krId: string) => {
+      const kr = idx.kr.get(krId)!;
+      return {
+        'Objectif pays': objectives.find((o) => o.id === kr.objectiveId)?.title ?? '', 'KR pays': kr.title,
+        'KR globaux': (idx.linksByKr.get(kr.id) ?? []).map((c) => `${c.globalKrId} (${c.role})`).join(', '),
+        'Répond à': kr.departmentId ? idx.entity.get(kr.departmentId)?.name ?? '' : '',
+      };
+    };
+    const msRows = ds.initiatives.filter((i) => i.entityId === id).flatMap((i) => (idx.msByInit.get(i.id) ?? []).map((m) => ({
+      ...common(i.entityKrId), Activité: i.title, 'Initiative Lead': i.lead, Trimestre: `Q${m.quarter}`, Jalon: m.description,
+      Statut: STATUS_LABEL[m.status], Preuve: m.evidenceUrl, Commentaire: m.comment,
+    })));
+    const indRows = inds.map((i) => {
+      const vals = idx.valuesByInd.get(i.id) ?? [];
+      const last = (q: number) => vals.filter((v) => v.quarter === q).sort((a, b) => b.at.localeCompare(a.at))[0]?.value ?? '';
+      return {
+        ...common(i.entityKrId), Indicateur: i.name, Unité: i.unit, Baseline: i.baseline ?? i.baselineText,
+        'Cible Q1': i.quarterTargets[0] ?? '', 'Valeur Q1': last(1), 'Cible Q2': i.quarterTargets[1] ?? '', 'Valeur Q2': last(2),
+        'Cible Q3': i.quarterTargets[2] ?? '', 'Valeur Q3': last(3), 'Cible Q4': i.quarterTargets[3] ?? '', 'Valeur Q4': last(4),
+        'Cible finale': i.target ?? '', [`Avancement Q${quarter}`]: pct(computed.indicator.get(i.id)?.progress), Source: i.source,
+      };
     });
-    exportRows(rows, `OKR-2027-${country.name}`, 'xlsx');
+    exportSheets({ Jalons: msRows, Indicateurs: indRows }, `OKR-2027-${country.name}-Q${quarter}`);
   };
 
   return (
-    <div ref={ref} className="space-y-5 bg-slate-50">
+    <div ref={ref} className="space-y-5 ">
       <PageHeader eyebrow="Vue pays" title={country.name} subtitle={`Avancement à fin Q${quarter} 2027. Le pays porte la livraison ; les équipes globales sont en appui.`}
         actions={<>
           <Button onClick={exportXlsx}>Export Excel</Button>
@@ -56,7 +70,7 @@ export default function CountryView() {
           <Stat label="Objectifs pays" value={objectives.length} />
           <Stat label="KR pays" value={krs.length} />
           <Stat label={`Jalons échus (≤ Q${quarter})`} value={stats.due} hint={`${stats.achieved} atteints`} />
-          <Stat label="En retard" value={<span className={stats.late ? 'text-red-700' : ''}>{stats.late}</span>} />
+          <Stat label="Indicateurs saisis" value={<>{filled}<small className="text-base font-normal text-slate-500"> / {inds.length}</small></>} hint={`Q${quarter} · ${stats.late} jalon(s) en retard`} color="#5bc0eb" />
           <Card className="col-span-2 sm:col-span-4" title="Objectifs du pays">
             <ul className="space-y-2">
               {objectives.map((o) => {

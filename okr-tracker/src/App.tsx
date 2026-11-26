@@ -8,12 +8,14 @@ import CheckIn from './pages/CheckIn';
 import Register from './pages/Register';
 import Admin from './pages/Admin';
 import Annexes from './pages/Annexes';
+import Cascade from './pages/Cascade';
 
 export default function App() {
   return (
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/plan" element={<Cascade />} />
         <Route path="/pays/:id" element={<CountryView />} />
         <Route path="/equipe/:id" element={<TeamView />} />
         <Route path="/kr/:id" element={<GlobalKRView />} />

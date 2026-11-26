@@ -38,7 +38,15 @@ export function createLocalStore(): Store {
   return {
     mode: 'local',
     async load() {
-      ds = { ...emptyDataset(), ...read(K_DATA, emptyDataset()) };
+      const raw = read<Partial<Dataset>>(K_DATA, emptyDataset());
+      const base = emptyDataset();
+      // compatibilité avec une sauvegarde antérieure (sans indicateurs ni rattachement)
+      ds = {
+        ...base, ...raw,
+        indicators: raw.indicators ?? [], indicatorValues: raw.indicatorValues ?? [],
+        entityKrs: (raw.entityKrs ?? []).map((k) => ({ ...k, departmentId: k.departmentId ?? null })),
+        settings: { ...base.settings, ...(raw.settings ?? {}) },
+      } as Dataset;
       return ds;
     },
     async saveDataset(next) {
@@ -50,7 +58,7 @@ export function createLocalStore(): Store {
         ...ds,
         updates: [...ds.updates, u],
         milestones: ds.milestones.map((m) => (m.id === u.milestoneId
-          ? { ...m, status: u.status, actualValue: u.actualValue, evidenceUrl: u.evidenceUrl, comment: u.comment, updatedAt: u.at, updatedBy: u.by }
+          ? { ...m, status: u.status, evidenceUrl: u.evidenceUrl, comment: u.comment, updatedAt: u.at, updatedBy: u.by }
           : m)),
       };
       save();
@@ -65,6 +73,23 @@ export function createLocalStore(): Store {
     },
     async updateInitiative(id, patch) {
       ds = { ...ds, initiatives: ds.initiatives.map((i) => (i.id === id ? { ...i, ...patch } : i)) };
+      save();
+    },
+    async setKrDepartment(krId, departmentId) {
+      ds = { ...ds, entityKrs: ds.entityKrs.map((k) => (k.id === krId ? { ...k, departmentId, departmentSource: 'manual' as const } : k)) };
+      save();
+    },
+    async saveIndicator(ind) {
+      const exists = ds.indicators.some((i) => i.id === ind.id);
+      ds = { ...ds, indicators: exists ? ds.indicators.map((i) => (i.id === ind.id ? ind : i)) : [...ds.indicators, ind] };
+      save();
+    },
+    async deleteIndicator(id) {
+      ds = { ...ds, indicators: ds.indicators.filter((i) => i.id !== id), indicatorValues: ds.indicatorValues.filter((v) => v.indicatorId !== id) };
+      save();
+    },
+    async addIndicatorValue(v) {
+      ds = { ...ds, indicatorValues: [...ds.indicatorValues, v] };
       save();
     },
     async currentUser() {

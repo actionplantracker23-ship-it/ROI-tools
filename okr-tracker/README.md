@@ -1,7 +1,9 @@
 # OKR Tracker 2027 – Living Goods
 
-Application web de suivi des OKR 2027 : 4 objectifs globaux, 20 KR globaux, ~100 KR pays/équipes,
-leurs initiatives et jalons trimestriels. Interface en français ; les intitulés des OKR restent en
+Application web de suivi des OKR 2027 : 4 objectifs globaux, 20 KR globaux, ~100 KR des départements
+globaux et des pays, leurs **indicateurs de mesure**, leurs activités et jalons trimestriels.
+La **cascade** est suivie de bout en bout : plan global → départements globaux → équipes pays qui
+répondent à chaque département. Interface en français ; les intitulés des OKR restent en
 anglais, comme dans le fichier source *2027 OKR Consolidated Plans_V2.xlsx*.
 
 Architecture, modèle de données, règles d'import et de calcul : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -31,8 +33,11 @@ Sans configuration, l'application démarre en **mode local** : les données rest
 2. Lire le **rapport d'import** : KR, initiatives et jalons par onglet, remarques, contrôles
    (20 KR globaux, ~100 KR pays/équipes, KR globaux sans Lead…).
 3. Cliquer sur **Appliquer l'import**.
-4. Facultatif : **Générer des statuts Q1 fictifs (démo)** pour voir le tableau de bord rempli.
-   Ces statuts sont marqués « [DÉMO] » et « Démo (fictif) » dans l'historique.
+4. Facultatif : **Générer des statuts Q1 fictifs (démo)** pour voir le tableau de bord rempli
+   (jalons et valeurs d'indicateurs). Marqués « [DÉMO] » et « Démo (fictif) » dans l'historique.
+5. **Indicateurs** : l'import en crée un par ligne de plan (Metric, Current Baseline, cibles chiffrées des
+   jalons, Evidence Source and Rule). Complétez-les dans **Mise à jour**, ou en masse avec
+   **Administration → Indicateurs de mesure : modèle Excel** (télécharger, remplir, réimporter).
 
 Un **réimport** met à jour la structure et conserve les check-ins, l'historique et les poids des KR et
 initiatives dont l'intitulé n'a pas changé. Faire une **sauvegarde JSON** avant (mode local).

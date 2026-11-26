@@ -1,4 +1,4 @@
-import type { AppUser, Dataset, Initiative, MilestoneUpdate, Settings } from '../../types';
+import type { AppUser, Dataset, Indicator, IndicatorValue, Initiative, MilestoneUpdate, Settings } from '../../types';
 
 /** Interface commune aux deux modes de stockage : localStorage (v1) et Supabase. */
 export interface Store {
@@ -10,7 +10,13 @@ export interface Store {
   checkIn(u: MilestoneUpdate): Promise<void>;
   updateSettings(s: Settings): Promise<void>;
   updateContributionWeight(id: string, weight: number | null): Promise<void>;
-  updateInitiative(id: string, patch: Partial<Pick<Initiative, 'target' | 'targetCountryIds'>>): Promise<void>;
+  updateInitiative(id: string, patch: Partial<Pick<Initiative, 'targetCountryIds'>>): Promise<void>;
+  /** Cascade : rattache un KR pays à un département global (null = aucun). */
+  setKrDepartment(krId: string, departmentId: string | null): Promise<void>;
+  /** Indicateurs de mesure : création / modification, suppression, saisie d'une valeur trimestrielle. */
+  saveIndicator(ind: Indicator): Promise<void>;
+  deleteIndicator(id: string): Promise<void>;
+  addIndicatorValue(v: IndicatorValue): Promise<void>;
 
   currentUser(): Promise<AppUser | null>;
   signIn(email: string, password?: string): Promise<string | null>; // message d'information ou null

@@ -53,11 +53,12 @@ function LoginScreen() {
 
 const TABS: { to: string; label: string; match: string; short: string; icon: string }[] = [
   { to: '/', label: 'Tableau de bord', match: '/', short: 'Bilan', icon: 'M4 13h6V4H4zm0 7h6v-5H4zm10 0h6v-9h-6zm0-16v5h6V4z' },
+  { to: '/plan', label: 'Plan global', match: '/plan', short: 'Plan', icon: 'M3 3h7v4H3zm11 0h7v4h-7zM8 10h8v4H8zm-5 7h7v4H3zm11 0h7v4h-7z' },
   { to: '/pays', label: 'Pays', match: '/pays', short: 'Pays', icon: 'M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z' },
-  { to: '/equipe', label: 'Équipes globales', match: '/equipe', short: 'Équipes', icon: 'M16 11a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm-8 0a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm0 2c-2.7 0-8 1.3-8 4v3h16v-3c0-2.7-5.3-4-8-4zm8 0h-1a4.7 4.7 0 0 1 2 4v3h7v-3c0-2.7-5.3-4-8-4z' },
+  { to: '/equipe', label: 'Départements', match: '/equipe', short: 'Dépts', icon: 'M16 11a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm-8 0a3 3 0 1 0-3-3 3 3 0 0 0 3 3zm0 2c-2.7 0-8 1.3-8 4v3h16v-3c0-2.7-5.3-4-8-4zm8 0h-1a4.7 4.7 0 0 1 2 4v3h7v-3c0-2.7-5.3-4-8-4z' },
   { to: '/kr', label: 'KR globaux', match: '/kr', short: 'KR', icon: 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 16a6 6 0 1 1 6-6 6 6 0 0 1-6 6zm0-9a3 3 0 1 0 3 3 3 3 0 0 0-3-3z' },
   { to: '/check-in', label: 'Mise à jour', match: '/check-in', short: 'Check-in', icon: 'M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z' },
-  { to: '/registre', label: 'Registre OKR', match: '/registre', short: 'Registre', icon: 'M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z' },
+  { to: '/registre', label: 'Registre OKR', match: '/registre', short: 'Registre', icon: '' },
   { to: '/annexes', label: 'Annexes', match: '/annexes', short: 'Annexes', icon: '' },
   { to: '/admin', label: 'Administration', match: '/admin', short: 'Admin', icon: '' },
 ];

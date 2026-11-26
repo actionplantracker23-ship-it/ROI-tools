@@ -23,16 +23,37 @@
 ## 2. Modèle de données
 
 ```
-GlobalObjective (4)                    global_objectives
- └─ GlobalKR (20)                      global_krs
-     └─ Contribution                   contributions   {entity, role Lead|Contributes, weight, scope}
-         └─ EntityKR (~100)            entity_krs      (KR pays ou équipe)
-             ├─ EntityObjective        entity_objectives
-             └─ Initiative (1..n)      initiatives     lead, baseline, metric, evidence rule, budget, pays visés
-                 └─ Milestone (Q1–Q4)  milestones      statut, réel, preuve, commentaire
+GlobalObjective (4)                     global_objectives
+ └─ GlobalKR (20)                       global_krs
+     └─ Contribution                    contributions   {entity, role Lead|Contributes, weight, scope}
+         └─ EntityKR (~100)             entity_krs      KR d'un département global ou d'un pays
+             ├─ department_id           cascade : département global auquel répond le KR pays
+             ├─ EntityObjective         entity_objectives
+             ├─ Indicator (1..n)        indicators      baseline, cibles Q1–Q4 et finale, unité, source de preuve
+             │   └─ IndicatorValue      indicator_values valeur par trimestre (historique, insertion seule)
+             └─ Initiative (1..n)       initiatives     activités : lead, metric, evidence rule, budget, pays visés
+                 └─ Milestone (Q1–Q4)   milestones      statut, preuve, commentaire
                      └─ MilestoneUpdate milestone_updates (historique, insertion seule)
-Entity                                 entities        Country | GlobalTeam, group (Global Programs)
+Entity                                  entities        GlobalTeam (départements) | Country, group (Global Programs)
 ```
+
+### Organisation et cascade
+
+* Le **plan global** est porté par les **départements globaux** (GSE, DHGP, BDAC, Finance, DT, P&C,
+  Innovations / PEI / PSE).
+* Chaque **équipe pays répond à un département** : ses KR concourent aux KR globaux et aux activités de ce
+  département. Le rattachement (`entity_krs.department_id`) est déduit à l'import :
+  1. la colonne **Team/Unit** de l'onglet pays nomme un département (« Finance », « DHGP »…) ;
+  2. sinon, le département **Lead** (à défaut contributeur) du même KR global dans le registre.
+  L'admin peut le corriger (crayon sur « Répond à »), et un réimport ne l'écrase pas.
+
+### Indicateurs de mesure
+
+Chaque KR se mesure par un ou plusieurs indicateurs. À l'import, chaque ligne de plan qui a une
+`Metric` ou une `Current Baseline` crée un indicateur : baseline (premier nombre), cibles trimestrielles
+(dernier nombre de chaque jalon Q1–Q4), cible finale (Q4), source = `Evidence Source and Rule`.
+Oui/Non : baseline 0, cible 1. Les Leads complètent dans **Mise à jour** (ou en masse avec le
+**modèle Excel des indicateurs**, Administration) : intitulé, cibles, valeurs trimestrielles, preuve.
 
 Détails des types : `src/types.ts`. Schéma SQL : `supabase/migrations/001_schema.sql`.
 
@@ -72,8 +93,9 @@ Rapport : lignes, en-têtes de section, KR, initiatives, jalons et remarques par
 | Niveau | Règle |
 |---|---|
 | Jalon | Non démarré 0 · En cours 50 · Atteint 100 · En retard = `lateScore` (0 par défaut) + signalé · Annulé exclu |
-| Initiative | Moyenne des jalons échus (Q ≤ trimestre choisi). Quantitatif en plus : (réel − baseline) / (cible − baseline) |
-| KR pays/équipe | Moyenne des initiatives (+ moyenne des avancements quantitatifs, affichée à part) |
+| Initiative | Moyenne des jalons échus (Q ≤ trimestre choisi) |
+| Indicateur | Dernière valeur (≤ trimestre) : (valeur − baseline) / (cible − baseline), borné 0–100 % (marche aussi pour une cible à la baisse) ; Oui/Non = 0 ou 100 %. Comparaison à la cible du trimestre (en avance / en retard) |
+| KR pays/département | Réglable : moyenne [jalons, indicateurs] (défaut), jalons seuls, ou indicateurs seuls |
 | Objectif pays/équipe | Moyenne de ses KR ; avancement de l'entité = moyenne de ses objectifs |
 | KR global | Moyenne pondérée des KR liés : Lead 2, Contributes 1, poids par lien modifiable |
 | Objectif global | Moyenne de ses KR globaux |
@@ -81,8 +103,12 @@ Rapport : lignes, en-têtes de section, KR, initiatives, jalons et remarques par
 RAG : Vert ≥ 70 %, Ambre 40–69 %, Rouge < 40 % **ou** au moins un jalon en retard dans le périmètre ;
 gris = aucune donnée. Seuils et poids réglables (Administration).
 
-Alertes : jalons en retard, KR sans données au trimestre, KR sans initiative, valeurs à compléter
+Alertes : jalons en retard, indicateurs non renseignés au trimestre, KR sans indicateur, KR pays non
+rattachés à un département, KR sans données, KR sans activité, valeurs à compléter
 (`[X]`, `[Y]`, `TBC`, `TBD`, `xx`), KR globaux sans Lead.
+
+Performance : tous les calculs passent par des index (Map), en temps linéaire ; 5 000 jalons et
+2 000 indicateurs se recalculent en moins de 100 ms (test automatique).
 
 ## 5. Droits
 
@@ -100,11 +126,12 @@ les actions interdites. En mode local, les droits ne sont qu'une simulation.
 
 | Route | Page |
 |---|---|
-| `/` | Tableau de bord global : cartes objectifs (jauge), heatmap KR globaux × entités, alertes, filtre trimestre |
+| `/` | Tableau de bord global : vue d'ensemble par objectif, cartes objectifs (jauge), heatmap KR globaux × entités, alertes, filtre trimestre |
+| `/plan` | Plan global (cascade) : matrice départements × pays, puis objectif → KR global → départements → pays qui concourent |
 | `/pays/:id` | Vue pays : objectif pays, KR + KR global soutenu, initiatives, timeline Q1–Q4, appui des équipes globales, export Excel/PDF |
 | `/equipe/:id` | Vue équipe : KR, initiatives, KR globaux soutenus, pays bénéficiaires, budget indicatif |
 | `/kr/:id` | Vue KR global : graphique de contribution par entité, arbre KR → entités → initiatives → jalons |
-| `/check-in` | Mise à jour trimestrielle (mobile) : statut, réel, preuve, commentaire, historique |
-| `/registre` | Registre OKR filtrable, triable, export Excel/CSV |
+| `/check-in` | Mise à jour trimestrielle par KR (mobile) : valeurs des indicateurs, statut des jalons, preuve, commentaire, historique ; filtre « reste à saisir » |
+| `/registre` | Registre au format « 1 OKR Register » (Ref … Scope, Go to plan, sections OBJECTIVE X) + Répond à, indicateurs, avancement ; export Excel/CSV |
 | `/annexes` | Annex A et Annex B |
 | `/admin` | Import/réimport, statuts Q1 fictifs (démo), sauvegarde, utilisateurs, poids, seuils |

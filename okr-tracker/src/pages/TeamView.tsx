@@ -1,14 +1,15 @@
+import { Fragment } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useApp } from '../AppContext';
-import { KrBlock } from '../components/Okr';
+import { KrBlock, MiniProgress } from '../components/Okr';
 import { Card, EmptyState, Gauge, NoData, PageHeader, RagBadge, RoleBadge, Stat } from '../components/ui';
 import { money, pct } from '../lib/format';
 import { milestoneStats } from '../lib/selectors';
 
 export default function TeamView() {
   const { id = '' } = useParams();
-  const { ds, computed, quarter } = useApp();
+  const { ds, idx, computed, quarter } = useApp();
   const team = ds.entities.find((e) => e.id === id);
   if (!ds.globalKrs.length) return <NoData />;
   if (!team) return <EmptyState title="Équipe introuvable" />;
@@ -24,11 +25,12 @@ export default function TeamView() {
   const countries = ds.entities.filter((e) => e.type === 'Country');
   const beneficiaries = countries.map((c) => ({ name: c.name, id: c.id, initiatives: inits.filter((i) => i.targetCountryIds.includes(c.id)).length }));
   const stats = milestoneStats(ds, quarter, id);
+  const responding = idx.krByDepartment.get(id) ?? [];
 
   return (
     <div className="space-y-5">
-      <PageHeader eyebrow={team.group ? `Équipe globale · ${team.group}` : 'Équipe globale'} title={team.name}
-        subtitle="Fonction d’appui : contribue aux KR globaux et aux objectifs des pays." />
+      <PageHeader eyebrow={team.group ? `Département global · ${team.group}` : 'Département global'} title={team.name}
+        subtitle="Département global : porte une partie du plan global ; les équipes pays qui lui répondent concourent à ses activités." />
 
       <div className="grid gap-4 md:grid-cols-[auto,1fr]">
         <Card className="flex flex-col items-center justify-center gap-2 md:w-60">
@@ -62,6 +64,38 @@ export default function TeamView() {
           </Card>
         </div>
       </div>
+
+      <Card title={`Pays qui répondent à ${team.name} (${responding.length} KR pays)`}>
+        <p className="mb-3 text-xs text-slate-500">KR des équipes pays rattachés à ce département (colonne Team/Unit, ou département Lead du même KR global ; modifiable par l’admin). Leurs activités concourent à celles du département.</p>
+        {responding.length === 0 ? <p className="text-sm text-slate-500">Aucun KR pays rattaché.</p> : (
+          <div className="overflow-x-auto">
+            <table className="suivi min-w-[720px]">
+              <thead><tr><th>Pays</th><th>KR pays</th><th>KR globaux</th><th>Indicateurs</th><th className="w-40">Avancement</th></tr></thead>
+              <tbody>
+                {countries.filter((c) => responding.some((k) => k.entityId === c.id)).map((c) => (
+                  <Fragment key={c.id}>
+                    <tr className="grp"><td colSpan={5}><Link to={`/pays/${c.id}`} className="font-semibold hover:text-accent">{c.name}</Link>
+                      <span className="ml-2 text-xs text-[#4a6584]">avancement pays {pct(computed.entity.get(c.id)?.progress)}</span></td></tr>
+                    {responding.filter((k) => k.entityId === c.id).map((k) => {
+                      const ks = computed.entityKr.get(k.id)!;
+                      const nInd = idx.indByKr.get(k.id)?.length ?? 0;
+                      return (
+                        <tr key={k.id}>
+                          <td className="text-slate-500">{c.name}</td>
+                          <td><Link to={`/pays/${c.id}?kr=${encodeURIComponent(k.id)}`} className="hover:text-accent">{k.title}</Link><div className="text-xs text-slate-500">KR Lead : {k.lead || '—'}</div></td>
+                          <td className="whitespace-nowrap text-xs">{(idx.linksByKr.get(k.id) ?? []).map((l) => `${l.globalKrId} (${l.role === 'Lead' ? 'L' : 'C'})`).join(', ')}</td>
+                          <td className="text-xs">{nInd || <span className="font-semibold text-[#9a4a00]">aucun</span>}</td>
+                          <td><MiniProgress value={ks.progress} rag={ks.rag} /></td>
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       <Card title="Pays bénéficiaires (initiatives qui les visent)">
         <div className="h-56">

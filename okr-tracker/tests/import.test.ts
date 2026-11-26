@@ -48,15 +48,21 @@ describe('import du classeur', () => {
     expect(beta.objectiveId).toBe(alpha.objectiveId);
   });
 
-  it('extrait baseline, cible et budget', () => {
+  it('crée les indicateurs de mesure (baseline, cibles trimestrielles, source) et le budget', () => {
     const i1 = ds.initiatives.find((i) => i.title === 'Init 1')!;
     expect(i1.metric).toBe('Percentage');
-    expect(i1.baselineValue).toBe(50);
-    expect(i1.target).toBe(80); // l'année 2027 est ignorée
     expect(i1.budgetValue).toBe(120000);
-    const i3 = ds.initiatives.find((i) => i.title === 'Init 3')!;
-    expect(i3.baselineValue).toBe(1000);
-    expect(i3.target).toBe(2000);
+    const ind1 = ds.indicators.find((i) => i.initiativeId === i1.id)!;
+    expect(ind1.unit).toBe('%');
+    expect(ind1.baseline).toBe(50);
+    expect(ind1.target).toBe(80); // l'année 2027 est ignorée
+    expect(ind1.quarterTargets).toEqual([null, 60, 70, 80]);
+    expect(ind1.source).toBe('DHIS2 report');
+    const ind3 = ds.indicators.find((i) => i.name === 'Init 3')!;
+    expect(ind3.baseline).toBe(1000);
+    expect(ind3.target).toBe(2000);
+    const yn = ds.indicators.find((i) => i.name === 'Init 2')!;
+    expect([yn.metric, yn.baseline, yn.target]).toEqual(['Yes/No', 0, 1]);
     // pas de jalon pour une cellule vide
     const i2 = ds.initiatives.find((i) => i.title === 'Init 2')!;
     expect(ds.milestones.filter((m) => m.initiativeId === i2.id).map((m) => m.quarter)).toEqual([1, 3, 4]);
@@ -76,12 +82,23 @@ describe('import du classeur', () => {
     const pei = ds.contributions.find((c) => c.globalKrId === 'KR1.1' && c.entityId === 'gp-pei')!;
     expect(pei.role).toBe('Contributes'); // Ref fusionnée/vide propagée depuis la ligne du dessus
     expect(ds.entityKrs.find((k) => k.title === 'GSE KR only in register')?.registerOnly).toBe(true);
+    // titre de l'objectif pris dans la ligne de section du registre
+    expect(ds.globalObjectives[0].title).toBe('Test objective 1'); // la feuille Ref fait foi
+  });
+
+  it('rattache chaque KR pays à un département global (cascade)', () => {
+    const alpha = ds.entityKrs.find((k) => k.title.startsWith('Kenya KR alpha'))!;
+    expect([alpha.departmentId, alpha.departmentSource]).toEqual(['dhgp', 'ref']); // DHGP Lead de KR1.1
+    const beta = ds.entityKrs.find((k) => k.title.startsWith('Kenya KR beta'))!;
+    expect([beta.departmentId, beta.departmentSource]).toEqual(['finance', 'unit']); // colonne Team/Unit
+    expect(ds.entityKrs.find((k) => k.entityId === 'gp-pei')!.departmentId).toBeNull();
     // lien seulement dans l'onglet Global Programs → déduit
     expect(ds.contributions.find((c) => c.globalKrId === 'KR3.1')?.inferred).toBe(true);
   });
 
   it('produit un rapport et des annexes', () => {
     expect(report.checks.find((c) => c.label === '20 KR globaux')?.ok).toBe(true);
+    expect(report.totals.indicators).toBe(ds.indicators.length);
     expect(ds.annexes[0].rows[1]).toEqual(['Uptime', '99%']);
   });
 
@@ -93,5 +110,21 @@ describe('import du classeur', () => {
     const merged = mergeDataset(prev, again);
     expect(merged.milestones.find((x) => x.id === m.id)?.status).toBe('achieved');
     expect(merged.updates).toHaveLength(1);
+  });
+
+  it('conserve indicateurs manuels, valeurs et rattachements lors d’un réimport', () => {
+    const kr = ds.entityKrs[0];
+    const manual = { ...ds.indicators[0], id: 'manual-1', name: 'Indicateur ajouté', origin: 'manual' as const, entityKrId: kr.id };
+    const prev = {
+      ...ds,
+      indicators: [...ds.indicators.map((i, n) => (n === 0 ? { ...i, target: 999 } : i)), manual],
+      indicatorValues: [{ id: 'v1', indicatorId: 'manual-1', quarter: 1 as const, value: 5, evidenceUrl: '', comment: '', at: '', by: '' }],
+      entityKrs: ds.entityKrs.map((k) => (k.id === kr.id ? { ...k, departmentId: 'bdac', departmentSource: 'manual' as const } : k)),
+    };
+    const merged = mergeDataset(prev, parseWorkbook(roundTrip(buildFixture())).dataset);
+    expect(merged.indicators.find((i) => i.id === 'manual-1')).toBeTruthy();
+    expect(merged.indicators[0].target).toBe(999);
+    expect(merged.indicatorValues).toHaveLength(1);
+    expect(merged.entityKrs.find((k) => k.id === kr.id)?.departmentId).toBe('bdac');
   });
 });

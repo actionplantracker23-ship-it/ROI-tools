@@ -8,6 +8,13 @@ export function exportRows(rows: Record<string, unknown>[], fileName: string, fo
   XLSX.writeFile(wb, `${fileName}.${format}`, { bookType: format });
 }
 
+/** Classeur à plusieurs onglets. */
+export function exportSheets(sheets: Record<string, Record<string, unknown>[]>, fileName: string) {
+  const wb = XLSX.utils.book_new();
+  for (const [name, rows] of Object.entries(sheets)) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{}]), name.slice(0, 31));
+  XLSX.writeFile(wb, `${fileName}.xlsx`);
+}
+
 export async function exportPdf(el: HTMLElement, fileName: string) {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
   const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', ignoreElements: (n) => n.classList?.contains('no-print') });
