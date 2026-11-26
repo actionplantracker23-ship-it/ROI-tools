@@ -1,5 +1,5 @@
 /** Composants communs aux vues de gestion de projet : filtres partagés, priorité, échéance, en-tête de vue. */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useApp } from '../AppContext';
 import { daysBetween, fmtDate, today } from '../lib/dates';
 import { EMPTY_FILTER, matches, owners } from '../lib/wbs';
@@ -7,8 +7,8 @@ import { PRIORITY_LABEL, STATUS_LABEL, type Activity, type ActivityStatus, type 
 import { inputCls } from './ui';
 
 export function PriorityBadge({ p }: { p: Priority }) {
-  const cls = { high: 'border-[#f3c2c8] bg-[#fdecee] text-[#8a1c2b]', medium: 'border-[#f7d27a] bg-[#fffaf0] text-[#7a5600]', low: 'border-ligne bg-white text-slate-500' }[p];
-  return <span className={`inline-flex whitespace-nowrap rounded border px-1.5 py-px text-[11px] font-semibold ${cls}`}>{p === 'high' ? '▲' : p === 'low' ? '▽' : '◆'} {PRIORITY_LABEL[p]}</span>;
+  const cls = { high: 'text-[#a23434]', medium: 'text-[#8a5a00]', low: 'text-[#6b6f76]' }[p];
+  return <span className={`inline-flex whitespace-nowrap text-[14px] ${cls}`} title={`Priorité ${PRIORITY_LABEL[p].toLowerCase()}`}>{p === 'high' ? '▲' : p === 'low' ? '▽' : '◆'}&nbsp;{PRIORITY_LABEL[p]}</span>;
 }
 
 export const isOverdue = (t: Activity, now = today()) => t.status === 'late' || (t.dueDate < now && t.status !== 'done' && t.status !== 'cancelled');
@@ -34,49 +34,62 @@ export function useFilteredTasks(): Activity[] {
 
 export const isFiltered = (f: typeof EMPTY_FILTER) => JSON.stringify(f) !== JSON.stringify(EMPTY_FILTER);
 
-/** Barre de filtres commune (liste, Gantt, Kanban, échéancier). */
+/** Barre de filtres commune (plan, Gantt, Kanban, échéancier) : recherche visible, autres filtres repliables. */
 export function FilterBar({ extra }: { extra?: React.ReactNode }) {
   const { ws, view, filter: f, setFilter } = useApp();
+  const [open, setOpen] = useState(false);
   if (!view) return null;
   const set = (patch: Partial<typeof f>) => setFilter({ ...f, ...patch });
+  const n = [f.unit, f.owner, f.status, f.priority, f.overdue, f.orphans].filter(Boolean).length;
   return (
-    <div className="no-print mb-3 rounded-lg border border-ligne bg-white p-3">
-      <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-[1.4fr,1fr,1fr,1fr,1fr]">
-        <input className={inputCls} placeholder="Rechercher une tâche, un responsable…" value={f.q} onChange={(e) => set({ q: e.target.value })} aria-label="Rechercher" />
-        <select className={inputCls} value={f.unit} onChange={(e) => set({ unit: e.target.value })} aria-label="Équipe ou pays">
-          <option value="">Toutes les équipes et pays</option>
-          <optgroup label="Équipes globales">{ws.units.filter((u) => u.type === 'department').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
-          <optgroup label="Pays">{ws.units.filter((u) => u.type === 'country').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
-        </select>
-        <select className={inputCls} value={f.owner} onChange={(e) => set({ owner: e.target.value })} aria-label="Responsable">
-          <option value="">Tous les responsables</option>{owners(view).map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-        <select className={inputCls} value={f.status} onChange={(e) => set({ status: e.target.value })} aria-label="Statut">
-          <option value="">Tous les statuts</option>{(Object.keys(STATUS_LABEL) as ActivityStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-        </select>
-        <select className={inputCls} value={f.priority} onChange={(e) => set({ priority: e.target.value })} aria-label="Priorité">
-          <option value="">Toutes priorités</option>{(Object.keys(PRIORITY_LABEL) as Priority[]).map((p) => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
-        </select>
+    <div className="no-print mb-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[240px] flex-1">
+          <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#9a9ea5]" aria-hidden>⌕</span>
+          <input className={`${inputCls} !rounded-full pl-9`} placeholder="Rechercher une tâche, une personne…" value={f.q} onChange={(e) => set({ q: e.target.value })} aria-label="Rechercher" />
+        </div>
+        <button onClick={() => setOpen(!open)} aria-expanded={open}
+          className={`min-h-[42px] rounded-full border px-4 text-[16px] ${n ? 'border-brand-600 bg-brand-600 text-white' : 'border-[#dcd8cf] bg-white hover:border-brand-500'}`}>
+          Filtres{n ? ` · ${n}` : ''} {open ? '▴' : '▾'}
+        </button>
+        {isFiltered(f) && <button className="text-[15px] text-brand-500 underline-offset-2 hover:underline" onClick={() => setFilter(EMPTY_FILTER)}>Effacer</button>}
+        {extra && <span className="ml-auto flex flex-wrap items-center gap-2">{extra}</span>}
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-slate-600">
-        <label className="flex items-center gap-1.5"><input type="checkbox" checked={f.overdue} onChange={(e) => set({ overdue: e.target.checked })} /> En retard</label>
-        <label className="flex items-center gap-1.5"><input type="checkbox" checked={f.orphans} onChange={(e) => set({ orphans: e.target.checked })} /> Orphelines (non liées au global)</label>
-        {isFiltered(f) && <button className="font-semibold text-brand-500 hover:text-accent" onClick={() => setFilter(EMPTY_FILTER)}>Effacer les filtres</button>}
-        <span className="ml-auto flex flex-wrap items-center gap-2">{extra}</span>
-      </div>
+      {open && (
+        <div className="mt-3 grid gap-2 rounded-2xl border border-[#e7e4dc] bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <select className={inputCls} value={f.unit} onChange={(e) => set({ unit: e.target.value })} aria-label="Équipe ou pays">
+            <option value="">Toutes les équipes et pays</option>
+            <optgroup label="Équipes globales">{ws.units.filter((u) => u.type === 'department').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
+            <optgroup label="Pays">{ws.units.filter((u) => u.type === 'country').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>
+          </select>
+          <select className={inputCls} value={f.owner} onChange={(e) => set({ owner: e.target.value })} aria-label="Responsable">
+            <option value="">Tous les responsables</option>{owners(view).map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+          <select className={inputCls} value={f.status} onChange={(e) => set({ status: e.target.value })} aria-label="Statut">
+            <option value="">Tous les statuts</option>{(Object.keys(STATUS_LABEL) as ActivityStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+          </select>
+          <select className={inputCls} value={f.priority} onChange={(e) => set({ priority: e.target.value })} aria-label="Priorité">
+            <option value="">Toutes priorités</option>{(Object.keys(PRIORITY_LABEL) as Priority[]).map((p) => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
+          </select>
+          <label className="flex items-center gap-2 text-[16px]"><input type="checkbox" checked={f.overdue} onChange={(e) => set({ overdue: e.target.checked })} /> Seulement les tâches en retard</label>
+          <label className="flex items-center gap-2 text-[16px]"><input type="checkbox" checked={f.orphans} onChange={(e) => set({ orphans: e.target.checked })} /> Seulement les orphelines</label>
+        </div>
+      )}
     </div>
   );
 }
 
-/** En-tête compact des vues de projet. */
+/** En-tête des vues (même style que les pages). */
 export function ViewHeader({ title, sub, actions }: { title: string; sub?: React.ReactNode; actions?: React.ReactNode }) {
+  const { plan } = useApp();
   return (
-    <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h2 className="font-titre text-[26px] font-semibold leading-tight text-brand-600">{title}</h2>
-        {sub && <p className="text-sm text-slate-500">{sub}</p>}
+    <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
+      <div className="min-w-0 max-w-3xl">
+        <div className="mb-1 text-[14px] uppercase tracking-[.14em] text-accent">{plan?.name ?? 'Plan de travail'}</div>
+        <h1 className="text-[34px] font-semibold leading-tight text-brand-600 sm:text-[38px]">{title}</h1>
+        {sub && <p className="mt-1.5 text-[17px] italic text-[#6b6f76]">{sub}</p>}
       </div>
       {actions && <div className="no-print flex flex-wrap gap-2">{actions}</div>}
-    </div>
+    </header>
   );
 }

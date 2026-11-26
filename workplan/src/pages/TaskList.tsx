@@ -87,7 +87,7 @@ export default function TaskList() {
                     <td className="font-semibold text-brand-500">{r.wbs}</td>
                     <td colSpan={2} className="min-w-[380px]" style={{ paddingLeft: 12 + r.depth * 16 }} title={isObj ? r.objective.title : r.kr!.title}>
                       <button className="mr-1.5 text-slate-400" onClick={() => toggle(r.wbs)} aria-label={closed.has(r.wbs) ? 'Déplier' : 'Replier'}>{closed.has(r.wbs) ? '▸' : '▾'}</button>
-                      {isObj ? <b className="line-clamp-2 inline text-[15px]" style={{ color: r.objective.color }}>Objectif {r.objective.code} · <span className="text-brand-600">{r.objective.title}</span></b>
+                      {isObj ? <b className="line-clamp-2 inline text-[16px]" style={{ color: r.objective.color }}>Objectif {r.objective.code} · <span className="text-brand-600">{r.objective.title}</span></b>
                         : <b className="line-clamp-2 inline text-brand-600"><span className="text-accent">{r.kr!.code}</span> · {r.kr!.title}</b>}
                     </td>
                     <td />

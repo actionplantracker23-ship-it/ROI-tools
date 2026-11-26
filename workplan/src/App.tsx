@@ -13,6 +13,7 @@ import Plans from './pages/Plans';
 import Schedule from './pages/Schedule';
 import Settings from './pages/Settings';
 import TaskList from './pages/TaskList';
+import WorkPlan from './pages/WorkPlan';
 
 export default function App() {
   const { ws } = useApp();
@@ -32,7 +33,7 @@ export default function App() {
         <Route path="/import" element={<Import />} />
         <Route path="/plans" element={<Plans />} />
         <Route path="/parametres" element={<Settings />} />
-        <Route path="/plan" element={<Navigate to="/taches" replace />} />
+        <Route path="/plan" element={<WorkPlan />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>

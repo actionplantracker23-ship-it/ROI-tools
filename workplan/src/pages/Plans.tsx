@@ -109,7 +109,7 @@ export default function Plans() {
         <p className="mb-3 text-sm text-slate-600">Les données sont enregistrées automatiquement dans ce navigateur. Exportez régulièrement une sauvegarde (fichier JSON) pour la partager ou la conserver.</p>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => downloadJson(ws, `plan-de-travail-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`)}>Exporter la sauvegarde</Button>
-          <label className="inline-flex min-h-[40px] cursor-pointer items-center rounded-md border border-[#c9ced4] bg-white px-3.5 text-[15px] hover:border-accent">
+          <label className="inline-flex min-h-[40px] cursor-pointer items-center rounded-md border border-[#c9ced4] bg-white px-3.5 text-[16px] hover:border-accent">
             Restaurer une sauvegarde<input type="file" accept=".json" className="hidden" onChange={(e) => { void restore(e.target.files?.[0]); e.target.value = ''; }} />
           </label>
         </div>

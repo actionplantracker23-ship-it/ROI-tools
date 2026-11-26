@@ -42,7 +42,7 @@ export default function Import() {
       <PageHeader eyebrow={plan ? `Import dans : ${plan.name}` : 'Import'} title="Import du fichier OKR"
         subtitle="Le classeur contient le registre OKR (Ref, Global Key Result, Country / Team, Role, …, Scope, Go to plan) et l’analyse d’alignement (A · KR pays → équipes globales ; B · KR équipes globales → pays). Les deux feuilles sont reconnues automatiquement." />
       <Card title="1. Fichier">
-        <label className="inline-flex min-h-[40px] cursor-pointer items-center rounded-md bg-brand-600 px-3.5 text-[15px] text-white hover:bg-brand-700">
+        <label className="inline-flex min-h-[40px] cursor-pointer items-center rounded-md bg-brand-600 px-3.5 text-[16px] text-white hover:bg-brand-700">
           Choisir le fichier Excel<input type="file" accept=".xlsx,.xlsm,.xls" className="hidden" onChange={(e) => { void onFile(e.target.files?.[0]); e.target.value = ''; }} />
         </label>
         {name && <span className="ml-3 text-sm text-slate-600">{name}</span>}

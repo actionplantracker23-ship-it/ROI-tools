@@ -56,13 +56,13 @@ export default function Gantt() {
         <span className="inline-flex items-center gap-1"><span className="h-3 w-0.5 bg-accent" /> Aujourd’hui</span>
         <span>Partie foncée de la barre = % réalisé</span>
       </div>
-      <div className="max-h-[75vh] overflow-auto rounded-lg border border-ligne bg-white">
+      <div className="max-h-[75vh] overflow-auto rounded-2xl border border-[#e7e4dc] bg-white">
         <div style={{ width: LEFT + width }} className="relative">
           {/* en-tête des mois */}
-          <div className="sticky top-0 z-20 flex border-b border-ligne bg-brand-600 text-xs text-white">
-            <div className="sticky left-0 z-30 shrink-0 bg-brand-600 px-3 py-2 font-semibold" style={{ width: LEFT }}>Tâche</div>
+          <div className="sticky top-0 z-20 flex border-b border-[#e7e4dc] bg-[#fbfaf7] text-[14px] uppercase tracking-[.06em] text-[#5b6470]">
+            <div className="sticky left-0 z-30 shrink-0 bg-[#fbfaf7] px-3 py-2 font-semibold" style={{ width: LEFT }}>Tâche</div>
             <div className="relative h-8" style={{ width }}>
-              {months.map((m) => <div key={m.x} className="absolute top-0 h-full border-l border-white/20 px-1.5 pt-2" style={{ left: m.x, width: m.w }}>{m.w > 30 ? m.label : ''}</div>)}
+              {months.map((m) => <div key={m.x} className="absolute top-0 h-full border-l border-[#e7e4dc] px-1.5 pt-2" style={{ left: m.x, width: m.w }}>{m.w > 30 ? m.label : ''}</div>)}
             </div>
           </div>
           {wbs.rows.map((r) => {
@@ -78,11 +78,11 @@ export default function Gantt() {
             const late = t && isOverdue(t, now);
             const label = r.kind === 'objective' ? `Objectif ${r.objective.code} · ${r.objective.title}` : r.kind === 'project' ? `${r.kr!.code} · ${r.kr!.title}` : t!.title;
             return (
-              <div key={r.wbs} className={`flex border-b border-[#eef0f3] ${r.kind === 'objective' ? 'bg-brand-50' : r.kind === 'project' ? 'bg-[#f7f9fb]' : 'hover:bg-[#fafbfc]'}`} style={{ height: r.kind === 'task' ? 34 : 30 }}>
+              <div key={r.wbs} className={`flex border-b border-[#f1efea] ${r.kind === 'objective' ? 'bg-[#f6f5f1]' : r.kind === 'project' ? 'bg-[#fbfaf7]' : 'bg-white hover:bg-[#fbfaf7]'}`} style={{ height: r.kind === 'task' ? 34 : 30 }}>
                 <div className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 overflow-hidden border-r border-ligne bg-inherit px-2 text-xs" style={{ width: LEFT, paddingLeft: 8 + r.depth * 14, background: 'inherit' }}>
                   {summary && <button onClick={() => toggle(r.wbs)} className="text-slate-400" aria-label="Replier ou déplier">{closed.has(r.wbs) ? '▸' : '▾'}</button>}
                   <span className="shrink-0 text-slate-400">{r.wbs}</span>
-                  {t && <span className="shrink-0 rounded bg-slate-100 px-1 text-[10px] font-semibold text-slate-600">{unit(t.unitId)?.name}</span>}
+                  {t && <span className="shrink-0 rounded bg-slate-100 px-1 text-[13.5px] font-semibold text-slate-600">{unit(t.unitId)?.name}</span>}
                   <button className={`truncate text-left ${summary ? 'font-semibold text-brand-600' : 'text-[#1d2327] hover:text-accent'}`} title={label} onClick={() => t && setEdit(t)}>{label}</button>
                 </div>
                 <div className="relative" style={{ width }}>

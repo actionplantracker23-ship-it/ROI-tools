@@ -105,9 +105,9 @@ export function IndicatorList({ type, id, compact }: { type: TargetType; id: str
                 <button onClick={() => setEdit(i)} className="grid w-full grid-cols-[1fr,auto] items-center gap-2 rounded-md border border-[#dce3ea] bg-white px-2.5 py-1.5 text-left hover:border-accent">
                   <span className="min-w-0">
                     <span className="block truncate text-sm text-[#1d2327]">{i.name}</span>
-                    {!compact && <span className="text-[11px] text-slate-500">Baseline {fmt(i, i.baseline)} · cible Q{view.quarter} {fmt(i, sc.quarterTarget)} · finale {fmt(i, i.target)} · dernière valeur <b className={sc.onTrack === false ? 'text-rag-red' : sc.onTrack ? 'text-rag-green' : ''}>{fmt(i, sc.value)}</b>{sc.valueQuarter && sc.valueQuarter !== view.quarter ? ` (Q${sc.valueQuarter})` : ''}</span>}
+                    {!compact && <span className="text-[13.5px] text-slate-500">Baseline {fmt(i, i.baseline)} · cible Q{view.quarter} {fmt(i, sc.quarterTarget)} · finale {fmt(i, i.target)} · dernière valeur <b className={sc.onTrack === false ? 'text-rag-red' : sc.onTrack ? 'text-rag-green' : ''}>{fmt(i, sc.value)}</b>{sc.valueQuarter && sc.valueQuarter !== view.quarter ? ` (Q${sc.valueQuarter})` : ''}</span>}
                   </span>
-                  <span className="w-28"><ProgressBar value={sc.progress} rag={sc.rag} /><span className="block text-right text-[11px] font-semibold text-brand-500">{pct(sc.progress)}</span></span>
+                  <span className="w-28"><ProgressBar value={sc.progress} rag={sc.rag} /><span className="block text-right text-[13.5px] font-semibold text-brand-500">{pct(sc.progress)}</span></span>
                 </button>
               </li>
             );

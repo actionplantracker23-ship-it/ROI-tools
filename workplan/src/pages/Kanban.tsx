@@ -43,16 +43,16 @@ export default function Kanban() {
     const p = t.status === 'done' ? 100 : t.progress;
     return (
       <div key={t.id} draggable onDragStart={(e) => e.dataTransfer.setData('text/plain', t.id)} onClick={() => setEdit(t)}
-        className="cursor-grab rounded-md border border-ligne bg-white p-2.5 text-sm shadow-sm hover:border-accent active:cursor-grabbing">
+        className="cursor-grab rounded-xl bg-white p-3.5 shadow-[0_1px_2px_rgba(0,0,0,.06)] transition hover:shadow-md active:cursor-grabbing">
         <div className="mb-1 flex flex-wrap items-center gap-1">
           {u && <UnitChip name={u.name} type={u.type} />}
-          <span className="text-[11px] font-semibold text-accent">{view.krs.find((k) => k.id === t.krId)?.code}</span>
+          <span className="text-[13.5px] font-semibold text-accent">{view.krs.find((k) => k.id === t.krId)?.code}</span>
           <span className="ml-auto"><PriorityBadge p={t.priority} /></span>
         </div>
-        <p className="line-clamp-3 text-[13px] text-[#1d2327]" title={t.title}>{t.title}</p>
+        <p className="line-clamp-3 text-[15.5px] leading-snug text-[#1d2327]" title={t.title}>{t.title}</p>
         {orphan && <div className="mt-1"><OrphanBadge /></div>}
-        <div className="mt-2 h-1.5 overflow-hidden rounded bg-[#EEF0F2]"><div className="h-full bg-brand-500" style={{ width: `${p}%` }} /></div>
-        <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+        <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-[#ebe9e3]"><div className="h-full rounded-full bg-brand-500" style={{ width: `${p}%` }} /></div>
+        <div className="mt-1.5 flex items-center justify-between gap-2 text-[13.5px] text-slate-500">
           <span className="truncate">{t.owner || 'sans responsable'}</span><Due t={t} />
         </div>
       </div>
@@ -64,9 +64,9 @@ export default function Kanban() {
     return (
       <div key={key} onDragOver={(e) => { e.preventDefault(); setOver(c.s); }} onDragLeave={() => setOver(null)}
         onDrop={(e) => { e.preventDefault(); setOver(null); move(e.dataTransfer.getData('text/plain'), c.s); }}
-        className={`flex min-w-[220px] flex-1 flex-col rounded-lg bg-[#eef1f4] ${over === c.s ? 'ring-2 ring-accent' : ''}`}>
-        <div className="flex items-center gap-2 rounded-t-lg px-3 py-2 text-sm font-semibold text-white" style={{ background: c.color }}>
-          {STATUS_LABEL[c.s]} <span className="ml-auto rounded-full bg-white/25 px-2 text-xs">{list.length}</span>
+        className={`flex min-w-[220px] flex-1 flex-col rounded-2xl bg-[#efede7] ${over === c.s ? 'ring-2 ring-accent' : ''}`}>
+        <div className="flex items-center gap-2 px-4 pb-1 pt-3 text-[16px] font-semibold text-brand-600">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: c.color }} />{STATUS_LABEL[c.s]} <span className="ml-auto text-[15px] font-normal text-[#6b6f76]">{list.length}</span>
         </div>
         <div className="flex flex-col gap-2 p-2">
           {list.slice(0, n).map(card)}

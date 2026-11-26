@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-// Charte reprise du tableau de bord « Big Wins » : bleu marine, orange, bleu ciel ; Oswald + Source Sans 3.
+// Charte : bleu marine, orange, bleu ciel ; police Garamond ; interface aérée.
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
@@ -11,9 +11,15 @@ export default {
         fond: '#f4f5f7',
         rag: { green: '#2e9e4f', amber: '#f2b01e', red: '#d64545', grey: '#a7adb4' },
       },
+      // Police Garamond sur toute l'application (EB Garamond, repli Garamond installée puis Georgia)
       fontFamily: {
-        sans: ['"Source Sans 3"', '"Segoe UI"', 'Roboto', 'sans-serif'],
-        titre: ['Oswald', '"Arial Narrow"', 'sans-serif'],
+        sans: ['"EB Garamond"', 'Garamond', '"Garamond Premier Pro"', 'Georgia', 'serif'],
+        serif: ['"EB Garamond"', 'Garamond', 'Georgia', 'serif'],
+        titre: ['"EB Garamond"', 'Garamond', 'Georgia', 'serif'],
+      },
+      // Garamond est plus petite à l'œil : tailles relevées
+      fontSize: {
+        xs: ['13px', '1.4'], sm: ['15px', '1.5'], base: ['17px', '1.55'], lg: ['19px', '1.45'], xl: ['22px', '1.35'],
       },
     },
   },

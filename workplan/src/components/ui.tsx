@@ -5,21 +5,21 @@ import { pct } from '../lib/format';
 import type { Score } from '../lib/calc';
 import { ALIGN_HELP, ALIGN_LABEL, STATUS_LABEL, type ActivityStatus, type AlignStatus, type Objective, type Rag, type Role } from '../types';
 
-// Couleurs de statut du tableau de bord Big Wins
+// Statuts : pastille colorée + libellé sur fond pâle (lisible, jamais la couleur seule)
 export const RAG_STYLE: Record<Rag, { cls: string; label: string; icon: string }> = {
-  green: { cls: 'bg-rag-green text-white', label: 'Vert', icon: '●' },
-  amber: { cls: 'bg-rag-amber text-[#2b2100]', label: 'Ambre', icon: '▲' },
-  red: { cls: 'bg-rag-red text-white', label: 'Rouge', icon: '■' },
-  none: { cls: 'bg-rag-grey text-white', label: 'Sans donnée', icon: '○' },
+  green: { cls: 'bg-[#eaf6ee] text-[#1f7a3d]', label: 'En bonne voie', icon: '●' },
+  amber: { cls: 'bg-[#fdf5e3] text-[#8a5a00]', label: 'À surveiller', icon: '●' },
+  red: { cls: 'bg-[#fbeaea] text-[#a23434]', label: 'En difficulté', icon: '●' },
+  none: { cls: 'bg-[#f1f0ec] text-[#6b6f76]', label: 'Pas encore suivi', icon: '○' },
 };
-export const RAG_HEX: Record<Rag, string> = { green: '#2e9e4f', amber: '#f2b01e', red: '#d64545', none: '#cfd4da' };
+export const RAG_HEX: Record<Rag, string> = { green: '#2e9e4f', amber: '#e0a21b', red: '#d64545', none: '#d6d3cb' };
 
-/** Statut RAG : badge plein (style Big Wins) avec forme + libellé, jamais la couleur seule. */
+/** Statut RAG (avancement) : pastille + libellé. */
 export function RagBadge({ rag, score, compact }: { rag: Rag; score?: number | null; compact?: boolean }) {
   const s = RAG_STYLE[rag];
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-2 py-0.5 text-[13px] ${s.cls}`}>
-      <span aria-hidden>{s.icon}</span>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[14px] ${s.cls}`} title={s.label}>
+      <span aria-hidden style={{ color: RAG_HEX[rag] }}>{s.icon}</span>
       {compact ? null : s.label}
       {score !== undefined && <span className="tabular-nums">{pct(score)}</span>}
     </span>
@@ -27,22 +27,25 @@ export function RagBadge({ rag, score, compact }: { rag: Rag; score?: number | n
 }
 
 export function RoleBadge({ role }: { role: Role }) {
-  return role === 'Lead' ? (
-    <span className="inline-flex items-center rounded-full border border-[#f7c08b] bg-[#fff3e6] px-2 py-px text-[12px] font-semibold text-[#9a4a00]">Lead</span>
-  ) : (
-    <span className="inline-flex items-center rounded-full border border-[#9ed8f2] bg-[#eaf7fd] px-2 py-px text-[12px] text-brand-500">Contributes</span>
-  );
+  return role === 'Lead'
+    ? <span className="inline-flex items-center rounded-full bg-[#fff3e6] px-2 py-px text-[13.5px] font-semibold text-[#9a4a00]">Lead</span>
+    : <span className="inline-flex items-center rounded-full bg-[#eef4fa] px-2 py-px text-[13.5px] text-brand-500">Contributes</span>;
 }
 
 export const STATUS_STYLE: Record<ActivityStatus, string> = {
-  not_started: 'bg-rag-grey text-white',
-  in_progress: 'bg-rag-amber text-[#2b2100]',
-  done: 'bg-rag-green text-white',
-  late: 'bg-rag-red text-white',
-  cancelled: 'bg-[#2f3640] text-white',
+  not_started: 'bg-[#f1f0ec] text-[#5b6470]',
+  in_progress: 'bg-[#e8f0fa] text-[#245a96]',
+  done: 'bg-[#eaf6ee] text-[#1f7a3d]',
+  late: 'bg-[#fbeaea] text-[#a23434]',
+  cancelled: 'bg-[#ecebea] text-[#55595f] line-through',
 };
+const STATUS_DOT: Record<ActivityStatus, string> = { not_started: '#a7adb4', in_progress: '#2f6fb3', done: '#2e9e4f', late: '#d64545', cancelled: '#55595f' };
 export function StatusBadge({ status }: { status: ActivityStatus }) {
-  return <span className={`inline-flex whitespace-nowrap rounded px-2.5 py-0.5 text-[13px] ${STATUS_STYLE[status]}`}>{STATUS_LABEL[status]}</span>;
+  return (
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[14px] ${STATUS_STYLE[status]}`}>
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: STATUS_DOT[status] }} />{STATUS_LABEL[status]}
+    </span>
+  );
 }
 
 export function ObjectiveChip({ o, short }: { o: Objective; short?: boolean }) {
@@ -57,8 +60,8 @@ export function ObjectiveChip({ o, short }: { o: Objective; short?: boolean }) {
 export function ProgressBar({ value, rag, color }: { value: number | null; rag?: Rag; color?: string }) {
   const fill = color ?? RAG_HEX[rag ?? 'none'];
   return (
-    <div className="h-3 w-full overflow-hidden bg-[#EEF0F2]" role="progressbar" aria-valuenow={value ?? undefined} aria-valuemin={0} aria-valuemax={100}>
-      <div className="h-full transition-all" style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%`, background: fill }} />
+    <div className="h-2 w-full overflow-hidden rounded-full bg-[#ebe9e3]" role="progressbar" aria-valuenow={value ?? undefined} aria-valuemin={0} aria-valuemax={100}>
+      <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%`, background: fill }} />
     </div>
   );
 }
@@ -84,10 +87,10 @@ export function Gauge({ score, size = 132 }: { score: Score; size?: number }) {
 
 export function Card({ children, className = '', title, action, style }: { children: ReactNode; className?: string; title?: ReactNode; action?: ReactNode; style?: React.CSSProperties }) {
   return (
-    <section style={style} className={`rounded-lg border border-ligne bg-white px-5 py-[18px] ${className}`}>
+    <section style={style} className={`rounded-2xl border border-[#e7e4dc] bg-white px-6 py-5 shadow-[0_1px_2px_rgba(11,46,89,.04)] ${className}`}>
       {(title || action) && (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          {title && <h2 className="font-titre text-xl font-semibold text-[#1d2327]">{title}</h2>}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          {title && <h2 className="text-[22px] font-semibold text-brand-600">{title}</h2>}
           {action}
         </div>
       )}
@@ -96,12 +99,16 @@ export function Card({ children, className = '', title, action, style }: { child
   );
 }
 
+/** En-tête de page : titre Garamond, sur-titre discret, sans cadre. */
 export function PageHeader({ title, subtitle, actions, eyebrow }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; eyebrow?: ReactNode }) {
   return (
-    <header className="mb-5 rounded-md border border-ligne bg-white px-5 pb-5 pt-4 font-serif sm:px-8">
-      <div className="m-entete"><span>{eyebrow ?? 'Plan de travail'}</span>{actions && <div className="no-print flex flex-wrap gap-2 font-sans normal-case tracking-normal">{actions}</div>}</div>
-      <h1 className="text-[26px] font-bold leading-tight text-brand-500 sm:text-[30px]">{title}</h1>
-      {subtitle && <p className="mt-2 text-[14.5px] text-[#6D6E71]">{subtitle}</p>}
+    <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="min-w-0 max-w-3xl">
+        <div className="mb-1 text-[14px] uppercase tracking-[.14em] text-accent">{eyebrow ?? 'Plan de travail'}</div>
+        <h1 className="text-[34px] font-semibold leading-tight text-brand-600 sm:text-[38px]">{title}</h1>
+        {subtitle && <p className="mt-1.5 text-[17px] italic text-[#6b6f76]">{subtitle}</p>}
+      </div>
+      {actions && <div className="no-print flex flex-wrap gap-2">{actions}</div>}
     </header>
   );
 }
@@ -110,13 +117,13 @@ export function Button({ children, onClick, variant = 'secondary', type = 'butto
   children: ReactNode; onClick?: () => void; variant?: 'primary' | 'secondary' | 'danger' | 'ghost'; type?: 'button' | 'submit'; disabled?: boolean; className?: string;
 }) {
   const v = {
-    primary: 'bg-brand-600 text-white hover:bg-brand-700 disabled:bg-slate-300',
-    secondary: 'border border-[#c9ced4] bg-white text-[#1d2327] hover:border-accent hover:text-brand-600 disabled:text-slate-400',
+    primary: 'bg-brand-600 text-white shadow-sm hover:bg-brand-700 disabled:bg-slate-300',
+    secondary: 'border border-[#dcd8cf] bg-white text-[#1d2327] hover:border-brand-500 hover:text-brand-600 disabled:text-slate-400',
     danger: 'border border-red-200 bg-white text-red-700 hover:bg-red-50',
     ghost: 'text-slate-600 hover:bg-slate-100',
   }[variant];
   return (
-    <button type={type} onClick={onClick} disabled={disabled} className={`inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-md px-3.5 py-2 text-[15px] transition ${v} ${className}`}>
+    <button type={type} onClick={onClick} disabled={disabled} className={`inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-full px-4 py-2 text-[16px] transition ${v} ${className}`}>
       {children}
     </button>
   );
@@ -124,7 +131,7 @@ export function Button({ children, onClick, variant = 'secondary', type = 'butto
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-ligne bg-white p-10 text-center">
+    <div className="rounded-2xl border border-[#e7e4dc] bg-white p-12 text-center">
       <p className="font-semibold text-slate-700">{title}</p>
       {children && <div className="mt-2 text-sm text-slate-500">{children}</div>}
     </div>
@@ -143,9 +150,9 @@ export function NoPlan() {
 export function Modal({ title, onClose, children, wide }: { title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/35 p-3 sm:p-8" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" className={`w-full rounded-xl bg-white shadow-2xl ${wide ? 'max-w-4xl' : 'max-w-2xl'}`}>
+      <div role="dialog" aria-modal="true" className={`w-full rounded-2xl bg-white shadow-2xl ${wide ? 'max-w-4xl' : 'max-w-2xl'}`}>
         <div className="flex items-center justify-between gap-3 border-b border-ligne px-5 py-3">
-          <h3 className="font-titre text-xl font-semibold text-brand-600">{title}</h3>
+          <h3 className="text-[24px] font-semibold text-brand-600">{title}</h3>
           <button onClick={onClose} className="rounded-md px-2 text-2xl leading-none text-slate-500 hover:bg-slate-100" aria-label="Fermer">×</button>
         </div>
         <div className="max-h-[80vh] overflow-y-auto px-5 py-4">{children}</div>
@@ -155,53 +162,53 @@ export function Modal({ title, onClose, children, wide }: { title: ReactNode; on
 }
 
 export function Field({ label, children, className = '' }: { label: ReactNode; children: ReactNode; className?: string }) {
-  return <label className={`block text-xs font-medium text-slate-600 ${className}`}>{label}<div className="mt-1">{children}</div></label>;
+  return <label className={`block text-[15px] text-[#5b6470] ${className}`}>{label}<div className="mt-1">{children}</div></label>;
 }
 
-/** Badge « orphelin » : KR / activité pays sans appui d'une équipe globale. */
+/** Badge « orphelin » : tâche pays sans tâche d'équipe globale qui la soutient. */
 export function OrphanBadge() {
-  return <span className="inline-flex whitespace-nowrap rounded bg-[#d64545] px-2 py-0.5 text-[12px] font-semibold text-white" title="Aucune équipe globale n’a de KR / d’activité qui le soutient">Orphelin · non lié au global</span>;
+  return <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#fbeaea] px-2.5 py-0.5 text-[13.5px] font-semibold text-[#a23434]" title="Aucune équipe globale n’a de tâche qui la soutient"><span aria-hidden>⚠</span> Orpheline · non liée au global</span>;
 }
 
 export const ALIGN_STYLE: Record<AlignStatus, string> = {
-  aligned: 'bg-rag-green text-white',
-  partial: 'bg-rag-amber text-[#2b2100]',
-  conflict: 'bg-[#7c3aed] text-white',
-  gap: 'bg-rag-red text-white',
-  global_only: 'bg-[#5b7b9a] text-white',
+  aligned: 'bg-[#eaf6ee] text-[#1f7a3d]',
+  partial: 'bg-[#fdf5e3] text-[#8a5a00]',
+  conflict: 'bg-[#f1ebfb] text-[#5b2bb5]',
+  gap: 'bg-[#fbeaea] text-[#a23434]',
+  global_only: 'bg-[#eef2f6] text-[#46607a]',
 };
 export const ALIGN_HEX: Record<AlignStatus, string> = { aligned: '#2e9e4f', partial: '#f2b01e', conflict: '#7c3aed', gap: '#d64545', global_only: '#5b7b9a' };
 
 /** Statut de l'analyse d'alignement (Aligned, Partial, Conflict, Gap, Global only). */
 export function AlignBadge({ status }: { status: AlignStatus | null }) {
   if (!status) return <span className="text-xs text-slate-400">non analysé</span>;
-  return <span title={ALIGN_HELP[status]} className={`inline-flex whitespace-nowrap rounded px-2 py-0.5 text-[12px] font-semibold ${ALIGN_STYLE[status]}`}>{ALIGN_LABEL[status]}</span>;
+  return <span title={ALIGN_HELP[status]} className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[13.5px] font-semibold ${ALIGN_STYLE[status]}`}>{ALIGN_LABEL[status]}</span>;
 }
 
 export function UnitChip({ name, type }: { name: string; type: 'department' | 'country' }) {
   return (
-    <span className={`inline-flex whitespace-nowrap rounded-full border px-2 py-px text-[12px] ${type === 'department' ? 'border-[#9ed8f2] bg-[#eaf7fd] text-brand-500' : 'border-[#f7c08b] bg-[#fff3e6] text-[#9a4a00]'}`}>{name}</span>
+    <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-px text-[14px] ${type === 'department' ? 'bg-[#eef4fa] text-brand-500' : 'bg-[#fdf1e4] text-[#8a4b00]'}`}>{name}</span>
   );
 }
 
 export function MiniProgress({ value, rag }: { value: number | null; rag: Rag }) {
   return (
     <span className="inline-flex w-32 items-center gap-1.5">
-      <span className="h-2 flex-1 overflow-hidden bg-[#EEF0F2]"><span className="block h-full" style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%`, background: RAG_HEX[rag] }} /></span>
-      <span className="w-10 text-right text-xs font-semibold tabular-nums text-brand-500">{pct(value)}</span>
+      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#ebe9e3]"><span className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%`, background: RAG_HEX[rag] }} /></span>
+      <span className="w-11 text-right text-[14px] tabular-nums text-brand-600">{pct(value)}</span>
     </span>
   );
 }
 
-/** Indicateur clé (carte KPI Big Wins : bordure haute colorée, chiffre en Oswald). */
+/** Chiffre clé : sobre, une pastille de couleur. */
 export function Stat({ label, value, hint, color = '#0b2e59' }: { label: string; value: ReactNode; hint?: ReactNode; color?: string }) {
   return (
-    <div className="rounded-lg border border-ligne bg-white px-4 py-3.5" style={{ borderTop: `4px solid ${color}` }}>
-      <div className="text-[13px] uppercase tracking-[.03em] text-slate-500">{label}</div>
-      <div className="font-titre text-[30px] font-semibold leading-tight tabular-nums">{value}</div>
-      {hint && <div className="text-[13px] text-slate-500">{hint}</div>}
+    <div className="rounded-2xl border border-[#e7e4dc] bg-white px-5 py-4">
+      <div className="flex items-center gap-2 text-[14px] uppercase tracking-[.08em] text-[#6b6f76]"><span className="h-2 w-2 rounded-full" style={{ background: color }} />{label}</div>
+      <div className="mt-1 text-[36px] font-semibold leading-none tabular-nums text-brand-600">{value}</div>
+      {hint && <div className="mt-1.5 text-[15px] text-[#6b6f76]">{hint}</div>}
     </div>
   );
 }
 
-export const inputCls = 'min-h-[40px] w-full rounded-md border border-[#c9ced4] bg-white px-2.5 py-2 text-[15px] focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100';
+export const inputCls = 'min-h-[42px] w-full rounded-xl border border-[#dcd8cf] bg-white px-3 py-2 text-[16px] focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100';

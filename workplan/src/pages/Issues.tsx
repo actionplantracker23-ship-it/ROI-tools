@@ -82,7 +82,7 @@ export default function Issues() {
               const a = actOf(i);
               return (
                 <tr key={i.id} className="cursor-pointer hover:bg-[#fafbfc]" onClick={() => setEdit(i)}>
-                  <td><span className={`rounded px-2 py-0.5 text-xs font-semibold ${i.kind === 'issue' ? 'bg-rag-red text-white' : 'bg-rag-amber text-[#2b2100]'}`}>{ISSUE_KIND_LABEL[i.kind]}</span><div className="mt-1 text-[11px] text-slate-500">{i.source}</div></td>
+                  <td><span className={`rounded-full px-2.5 py-0.5 text-[14px] ${i.kind === 'issue' ? 'bg-[#fbeaea] text-[#a23434]' : 'bg-[#fdf5e3] text-[#8a5a00]'}`}>{ISSUE_KIND_LABEL[i.kind]}</span><div className="mt-1 text-[13.5px] text-slate-500">{i.source}</div></td>
                   <td className="max-w-[260px]">{a ? <>
                     <UnitChip name={unit(a.unitId)?.name ?? ''} type={unit(a.unitId)?.type ?? 'department'} /> <b className="text-accent">{view.krs.find((k) => k.id === a.krId)?.code}</b>
                     <button className="mt-0.5 block text-left text-xs text-slate-600 hover:text-accent" onClick={(e) => { e.stopPropagation(); setTask(a); }}><span className="line-clamp-2">{a.title}</span></button></> : '—'}</td>

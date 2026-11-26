@@ -142,7 +142,7 @@ export default function Alignment() {
                     const ps = view.parentsOf.get(a.id) ?? [];
                     return (
                       <tr key={a.id} className="cursor-pointer hover:bg-[#fafbfc]" onClick={() => setEdit(a)}>
-                        <td className="whitespace-nowrap">{c.name}{a.subTeam && <div className="text-[11px] text-slate-500">{a.subTeam}</div>}</td>
+                        <td className="whitespace-nowrap">{c.name}{a.subTeam && <div className="text-[13.5px] text-slate-500">{a.subTeam}</div>}</td>
                         <td>O{obj(a)}</td><td className="whitespace-nowrap font-semibold text-brand-500">{code(a)}</td>
                         <td>{a.title}</td><td className="text-slate-600">{a.owner}</td>
                         <td>{ps.length ? <span className="flex flex-wrap gap-1">{names(ps).map((id) => <UnitChip key={id} name={unit(id)?.name ?? ''} type="department" />)}<span className="text-xs text-slate-500">({ps.length})</span></span> : <OrphanBadge />}</td>

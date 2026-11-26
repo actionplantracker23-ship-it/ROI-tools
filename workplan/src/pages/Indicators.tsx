@@ -70,7 +70,7 @@ export default function Indicators() {
                     const v = valueAt(i, qq);
                     const t = i.quarterTargets[qq - 1];
                     const ok = v === null || t === null ? null : (i.target ?? 0) >= (i.baseline ?? 0) ? v >= t : v <= t;
-                    return <td key={qq} className={`whitespace-nowrap ${qq === view.quarter ? 'bg-[#f5f8fb]' : ''}`}><b className={ok === false ? 'text-rag-red' : ok ? 'text-rag-green' : ''}>{fmt(i, v)}</b>{t !== null && <div className="text-[11px] text-slate-500">cible {fmt(i, t)}</div>}</td>;
+                    return <td key={qq} className={`whitespace-nowrap ${qq === view.quarter ? 'bg-[#f5f8fb]' : ''}`}><b className={ok === false ? 'text-rag-red' : ok ? 'text-rag-green' : ''}>{fmt(i, v)}</b>{t !== null && <div className="text-[13.5px] text-slate-500">cible {fmt(i, t)}</div>}</td>;
                   })}
                   <td className="whitespace-nowrap font-semibold text-brand-500">{fmt(i, i.target)}</td>
                   <td>{sc.progress === null ? <RagBadge rag="none" /> : <MiniProgress value={sc.progress} rag={sc.rag} />}</td>
