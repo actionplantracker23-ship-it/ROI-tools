@@ -1,16 +1,18 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
-import Activities from './pages/Activities';
+import { useApp } from './AppContext';
 import Alignment from './pages/Alignment';
 import Dashboard from './pages/Dashboard';
-import FollowUp from './pages/FollowUp';
+import Gantt from './pages/Gantt';
 import Import from './pages/Import';
 import Indicators from './pages/Indicators';
-import PlanBuilder from './pages/PlanBuilder';
+import Issues from './pages/Issues';
+import Kanban from './pages/Kanban';
+import People from './pages/People';
 import Plans from './pages/Plans';
-import Register from './pages/Register';
+import Schedule from './pages/Schedule';
 import Settings from './pages/Settings';
-import { useApp } from './AppContext';
+import TaskList from './pages/TaskList';
 
 export default function App() {
   const { ws } = useApp();
@@ -19,16 +21,18 @@ export default function App() {
       <Routes>
         {/* premier lancement : on commence par créer le plan de travail */}
         <Route path="/" element={ws.plans.length ? <Dashboard /> : <Navigate to="/plans" replace />} />
-        <Route path="/plans" element={<Plans />} />
-        <Route path="/plan" element={<PlanBuilder />} />
-        <Route path="/globales" element={<Activities level="global" />} />
-        <Route path="/pays" element={<Activities level="country" />} />
+        <Route path="/taches" element={<TaskList />} />
+        <Route path="/gantt" element={<Gantt />} />
+        <Route path="/kanban" element={<Kanban />} />
+        <Route path="/echeancier" element={<Schedule />} />
+        <Route path="/responsables" element={<People />} />
+        <Route path="/risques" element={<Issues />} />
         <Route path="/alignement" element={<Alignment />} />
-        <Route path="/suivi" element={<FollowUp />} />
         <Route path="/indicateurs" element={<Indicators />} />
-        <Route path="/registre" element={<Register />} />
         <Route path="/import" element={<Import />} />
+        <Route path="/plans" element={<Plans />} />
         <Route path="/parametres" element={<Settings />} />
+        <Route path="/plan" element={<Navigate to="/taches" replace />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>

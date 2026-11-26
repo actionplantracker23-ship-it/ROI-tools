@@ -9,7 +9,7 @@
  * Objectif = moyenne de [KR, indicateurs de l'objectif]. Plan = moyenne des objectifs.
  * Indicateur : dernière valeur (≤ trimestre) → (valeur − baseline) / (cible − baseline), borné 0–100 % ;
  *   Oui/Non : 0 ou 100 %. Fonctionne aussi pour une cible à la baisse.
- * RAG : Vert ≥ 70 %, Ambre ≥ 40 %, Rouge en dessous OU activité en retard (statut, ou trimestre de fin dépassé).
+ * RAG : Vert ≥ 70 %, Ambre ≥ 40 %, Rouge en dessous OU tâche en retard (statut « En retard » ou échéance dépassée).
  *
  * Alignement : une activité (KR) pays doit être soutenue par au moins une activité (KR) d'équipe globale
  * du même plan. Sinon elle est ORPHELINE (non liée au global). Une activité globale sans pays est normale.
@@ -89,7 +89,7 @@ export function execProgress(a: Activity): number | null {
 
 export const targetKey = (type: string, id: string) => `${type}:${id}`;
 
-export function computePlan(ws: Workspace, planId: string, quarter: Quarter = ws.settings.currentQuarter): PlanView {
+export function computePlan(ws: Workspace, planId: string, quarter: Quarter = ws.settings.currentQuarter, todayIso = new Date().toISOString().slice(0, 10)): PlanView {
   const s = ws.settings;
   const objectives = ws.objectives.filter((o) => o.planId === planId).sort((a, b) => a.order - b.order);
   const objOrder = new Map(objectives.map((o, n) => [o.id, n]));
@@ -130,7 +130,8 @@ export function computePlan(ws: Workspace, planId: string, quarter: Quarter = ws
   const own = (a: Activity) => {
     const exec = execProgress(a);
     const ind = indMean('activity', a.id);
-    const overdue = a.status !== 'done' && a.status !== 'cancelled' && a.endQ < quarter;
+    // échéance dépassée : date d'échéance passée (ou trimestre de fin antérieur au trimestre choisi)
+    const overdue = a.status !== 'done' && a.status !== 'cancelled' && (a.dueDate ? a.dueDate < todayIso : false || a.endQ < quarter);
     return { exec, indicators: ind, p: a.status === 'cancelled' ? null : mean([exec, ind]), late: a.status === 'late' || overdue, overdue };
   };
   for (const a of countryActs) {
@@ -215,13 +216,13 @@ export function planAlerts(ws: Workspace, v: PlanView): Alert[] {
   for (const a of v.activities) {
     const sc = v.activity.get(a.id)!;
     if (a.status === 'late' || sc.overdue) {
-      out.push({ kind: 'late', label: `${a.status === 'late' ? 'En retard' : `Échéance Q${a.endQ} dépassée`} · ${unitName.get(a.unitId) ?? ''}`, detail: a.title, link: `/activites?act=${a.id}`, unitId: a.unitId });
+      out.push({ kind: 'late', label: `${a.status === 'late' ? 'En retard' : `Échéance dépassée`} · ${unitName.get(a.unitId) ?? ''}`, detail: a.title, link: '/taches', unitId: a.unitId });
     }
-    if (!a.krId) out.push({ kind: 'activity_without_kr', label: `Activité globale sans KR · ${unitName.get(a.unitId) ?? ''}`, detail: a.title, link: `/activites?act=${a.id}`, unitId: a.unitId });
+    if (!a.krId) out.push({ kind: 'activity_without_kr', label: `Activité globale sans KR · ${unitName.get(a.unitId) ?? ''}`, detail: a.title, link: '/taches', unitId: a.unitId });
   }
   for (const k of v.krs.filter((x) => !x.team)) {
-    if (!(v.indByTarget.get(targetKey('kr', k.id)) ?? []).length) out.push({ kind: 'no_indicator', label: `${k.code} sans indicateur de mesure`, detail: k.title, link: `/plan?kr=${k.id}` });
-    if (!(v.actsByKr.get(k.id) ?? []).length && !v.countryActs.some((a) => a.krId === k.id)) out.push({ kind: 'kr_without_activity', label: `${k.code} sans KR d’équipe ni de pays`, detail: k.title, link: `/plan?kr=${k.id}` });
+    if (!(v.indByTarget.get(targetKey('kr', k.id)) ?? []).length) out.push({ kind: 'no_indicator', label: `${k.code} sans indicateur de mesure`, detail: k.title, link: '/taches' });
+    if (!(v.actsByKr.get(k.id) ?? []).length && !v.countryActs.some((a) => a.krId === k.id)) out.push({ kind: 'kr_without_activity', label: `${k.code} sans KR d’équipe ni de pays`, detail: k.title, link: '/taches' });
   }
   for (const i of v.indicators) {
     if (v.indicator.get(i.id)?.valueQuarter !== v.quarter) out.push({ kind: 'missing_value', label: `Indicateur non renseigné au Q${v.quarter}`, detail: i.name, link: `/indicateurs?ind=${i.id}` });

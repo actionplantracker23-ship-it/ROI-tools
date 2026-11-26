@@ -21,6 +21,9 @@ export type Role = 'Lead' | 'Contributes';
 export type Quarter = 1 | 2 | 3 | 4;
 export type PlanStatus = 'draft' | 'active' | 'closed';
 export type ActivityStatus = 'not_started' | 'in_progress' | 'done' | 'late' | 'cancelled';
+export type Priority = 'high' | 'medium' | 'low';
+export type IssueKind = 'risk' | 'issue';
+export type IssueStatus = 'open' | 'in_progress' | 'closed';
 export type IndicatorKind = 'number' | 'percent' | 'yesno';
 export type TargetType = 'objective' | 'kr' | 'activity';
 export type Rag = 'green' | 'amber' | 'red' | 'none';
@@ -84,6 +87,11 @@ export interface Activity {
   owner: string; // KR Lead
   startQ: Quarter;
   endQ: Quarter;
+  /** Gestion de projet : début et échéance (AAAA-MM-JJ), jalon, priorité. Les trimestres en sont déduits. */
+  startDate: string;
+  dueDate: string;
+  milestone: boolean;
+  priority: Priority;
   status: ActivityStatus;
   progress: number; // 0–100, avancement d'exécution
   budget: number | null;
@@ -129,6 +137,21 @@ export interface IndicatorValue {
   by: string;
 }
 
+/** Registre des risques et actions (alimenté par l'analyse d'alignement, ou saisi). */
+export interface Issue {
+  id: string;
+  planId: string;
+  activityId: string | null; // tâche concernée
+  kind: IssueKind;
+  title: string; // constat
+  action: string; // action recommandée
+  owner: string;
+  dueDate: string;
+  status: IssueStatus;
+  source: string; // ex. « Analyse d'alignement · Gap »
+  createdAt: string;
+}
+
 export interface Settings {
   rag: { green: number; amber: number };
   currentQuarter: Quarter;
@@ -146,16 +169,20 @@ export interface Workspace {
   activityUpdates: ActivityUpdate[];
   indicators: Indicator[];
   indicatorValues: IndicatorValue[];
+  issues: Issue[];
   settings: Settings;
 }
 
 export const STATUS_LABEL: Record<ActivityStatus, string> = {
-  not_started: 'Non démarrée',
+  not_started: 'À faire',
   in_progress: 'En cours',
-  done: 'Réalisée',
+  done: 'Terminé',
   late: 'En retard',
-  cancelled: 'Annulée',
+  cancelled: 'Annulé',
 };
+export const PRIORITY_LABEL: Record<Priority, string> = { high: 'Haute', medium: 'Moyenne', low: 'Basse' };
+export const ISSUE_STATUS_LABEL: Record<IssueStatus, string> = { open: 'Ouvert', in_progress: 'En traitement', closed: 'Clos' };
+export const ISSUE_KIND_LABEL: Record<IssueKind, string> = { risk: 'Risque', issue: 'Problème' };
 
 export const ALIGN_LABEL: Record<AlignStatus, string> = {
   aligned: 'Aligned', partial: 'Partial', conflict: 'Conflict', gap: 'Gap', global_only: 'Global only',
@@ -202,6 +229,7 @@ export function emptyWorkspace(): Workspace {
     activityUpdates: [],
     indicators: [],
     indicatorValues: [],
+    issues: [],
     settings: { rag: { green: 70, amber: 40 }, currentQuarter: 1, userName: '' },
   };
 }

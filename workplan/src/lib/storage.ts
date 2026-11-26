@@ -38,7 +38,18 @@ export function saveWorkspace(ws: Workspace): string | null {
 export function normalize(data: Partial<Workspace>): Workspace {
   const base = emptyWorkspace();
   if (!data || typeof data !== 'object' || !Array.isArray(data.plans)) throw new Error('Fichier de sauvegarde invalide.');
-  return { ...base, ...data, settings: { ...base.settings, ...(data.settings ?? {}) }, version: 2 } as Workspace;
+  const y = (planId: string) => data.plans?.find((p) => p.id === planId)?.year ?? new Date().getFullYear();
+  return {
+    ...base, ...data, issues: data.issues ?? [],
+    // anciennes sauvegardes : dates déduites des trimestres
+    activities: (data.activities ?? []).map((a) => ({
+      ...a,
+      priority: a.priority ?? 'medium', milestone: a.milestone ?? false,
+      startDate: a.startDate || `${y(a.planId)}-${String((a.startQ - 1) * 3 + 1).padStart(2, '0')}-01`,
+      dueDate: a.dueDate || new Date(Date.UTC(y(a.planId), a.endQ * 3, 0)).toISOString().slice(0, 10),
+    })),
+    settings: { ...base.settings, ...(data.settings ?? {}) }, version: 2,
+  } as Workspace;
 }
 
 export function downloadJson(ws: Workspace, name: string) {

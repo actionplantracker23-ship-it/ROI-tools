@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { computePlan, type PlanView } from './lib/calc';
 import { loadWorkspace, saveWorkspace, STORAGE_KEY } from './lib/storage';
+import { EMPTY_FILTER, type TaskFilter } from './lib/wbs';
 import type { Plan, Quarter, Unit, Workspace } from './types';
 
 interface Ctx {
@@ -13,6 +14,9 @@ interface Ctx {
   quarter: Quarter;
   setQuarter: (q: Quarter) => void;
   unit: (id: string) => Unit | undefined;
+  /** Filtre des tâches partagé par toutes les vues (liste, Gantt, Kanban…). */
+  filter: TaskFilter;
+  setFilter: (f: TaskFilter) => void;
   notice: string | null;
   notify: (m: string) => void;
   error: string | null;
@@ -25,6 +29,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [ws, setWs] = useState<Workspace>(() => loadWorkspace());
   const [quarter, setQuarter] = useState<Quarter>(ws.settings.currentQuarter);
   const [notice, setNotice] = useState<string | null>(null);
+  const [filter, setFilter] = useState<TaskFilter>(EMPTY_FILTER);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<number>();
   const dirty = useRef(false);
@@ -62,7 +67,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <C.Provider value={{
       ws, update, replaceAll: (w) => { dirty.current = true; setWs(w); setQuarter(w.settings.currentQuarter); }, plan, view, quarter, setQuarter,
-      unit: (id) => units.get(id), notice, notify, error, setError,
+      unit: (id) => units.get(id), filter, setFilter, notice, notify, error, setError,
     }}>
       {children}
     </C.Provider>

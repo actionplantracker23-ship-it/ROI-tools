@@ -24,7 +24,7 @@ export default function Plans() {
       year: f.year, name: f.name.trim() || undefined, sourcePlanId: f.source || null,
       copyActivities: f.activities, copyIndicators: f.indicators, carryBaselines: f.baselines,
     }).ws, `Plan ${f.year} créé.`);
-    navigate('/plan');
+    navigate('/taches');
   };
 
   const restore = async (file: File | undefined) => {

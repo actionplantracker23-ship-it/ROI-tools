@@ -5,7 +5,8 @@ import { pct } from '../lib/format';
 import { addIndicatorValue, newIndicator, remove, suggestParents, updateActivityStatus, upsert } from '../lib/ops';
 import { targetKey } from '../lib/calc';
 import { dateTime } from '../lib/format';
-import { ALIGN_LABEL, KIND_LABEL, STATUS_LABEL, type Activity, type AlignStatus, type ActivityStatus, type Indicator, type IndicatorKind, type Quarter, type TargetType } from '../types';
+import { withDates } from '../lib/ops';
+import { ALIGN_LABEL, KIND_LABEL, PRIORITY_LABEL, STATUS_LABEL, type Activity, type AlignStatus, type Priority, type ActivityStatus, type Indicator, type IndicatorKind, type Quarter, type TargetType } from '../types';
 import { Button, Field, inputCls, Modal, OrphanBadge, ProgressBar, StatusBadge } from './ui';
 
 const num = (s: string): number | null => {
@@ -183,7 +184,7 @@ export function ActivityEditor({ act, onClose }: { act: Activity; onClose: () =>
     onClose();
   };
   return (
-    <Modal wide title={`${isNew ? 'Nouveau KR / activité' : 'KR / activité'} ${a.level === 'global' ? 'd’équipe globale' : 'pays'}`} onClose={onClose}>
+    <Modal wide title={`${isNew ? 'Nouvelle tâche' : 'Tâche'} ${a.level === 'global' ? 'd’équipe globale' : 'pays'}`} onClose={onClose}>
       <div className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-[1fr,200px]">
           <Field label="Intitulé (Country/Team Key Result ou activité)"><textarea autoFocus rows={3} className={inputCls} value={a.title} onChange={(e) => setA({ ...a, title: e.target.value })} /></Field>
@@ -193,16 +194,16 @@ export function ActivityEditor({ act, onClose }: { act: Activity; onClose: () =>
             </select>
           </Field>
         </div>
-        <div className="grid gap-3 sm:grid-cols-[1fr,110px,90px,90px]">
-          <Field label="KR global">
+        <div className="grid gap-3 sm:grid-cols-[1fr,130px,160px,160px]">
+          <Field label="Projet (KR global / Ref)">
             <select className={inputCls} value={a.krId ?? ''} onChange={(e) => setA({ ...a, krId: e.target.value || null })}>
               <option value="">— aucun —</option>
               {view.krs.map((k) => <option key={k.id} value={k.id}>{k.code} · {k.title.slice(0, 70)}</option>)}
             </select>
           </Field>
-          <Field label="Code"><input className={inputCls} value={a.code} onChange={(e) => setA({ ...a, code: e.target.value })} /></Field>
-          <Field label="Début"><select className={inputCls} value={a.startQ} onChange={(e) => setA({ ...a, startQ: Number(e.target.value) as Quarter })}>{[1, 2, 3, 4].map((q) => <option key={q} value={q}>Q{q}</option>)}</select></Field>
-          <Field label="Fin"><select className={inputCls} value={a.endQ} onChange={(e) => setA({ ...a, endQ: Number(e.target.value) as Quarter })}>{[1, 2, 3, 4].map((q) => <option key={q} value={q} disabled={q < a.startQ}>Q{q}</option>)}</select></Field>
+          <Field label="Priorité"><select className={inputCls} value={a.priority} onChange={(e) => setA({ ...a, priority: e.target.value as Priority })}>{(Object.keys(PRIORITY_LABEL) as Priority[]).map((p) => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}</select></Field>
+          <Field label="Début"><input type="date" className={inputCls} value={a.startDate} onChange={(e) => setA(withDates(a, e.target.value, a.dueDate < e.target.value ? e.target.value : a.dueDate))} /></Field>
+          <Field label="Échéance"><input type="date" className={inputCls} value={a.dueDate} min={a.startDate} onChange={(e) => setA(withDates(a, a.startDate > e.target.value ? e.target.value : a.startDate, e.target.value))} /></Field>
         </div>
         <div className="grid gap-3 sm:grid-cols-[1fr,150px,1fr,150px]">
           <Field label="Country/Team Objective"><input className={inputCls} value={a.unitObjective} onChange={(e) => setA({ ...a, unitObjective: e.target.value })} /></Field>
@@ -212,7 +213,7 @@ export function ActivityEditor({ act, onClose }: { act: Activity; onClose: () =>
         </div>
         {a.level === 'country' && (
           <div className="rounded-md border border-ligne p-3">
-            <div className="mb-2 text-sm font-semibold text-brand-500">Soutenu par les KR / activités des équipes globales</div>
+            <div className="mb-2 text-sm font-semibold text-brand-500">Dépendances : tâches des équipes globales qui soutiennent cette tâche pays</div>
             <LinksEditor act={a} value={a.parentIds} onChange={(ids) => setA({ ...a, parentIds: ids })} />
           </div>
         )}
@@ -226,7 +227,7 @@ export function ActivityEditor({ act, onClose }: { act: Activity; onClose: () =>
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-[1fr,1fr,130px,140px]">
-          <Field label="Responsable"><input className={inputCls} value={a.owner} onChange={(e) => setA({ ...a, owner: e.target.value })} /></Field>
+          <Field label={<span className="flex items-center justify-between">Responsable (KR Lead)<label className="flex items-center gap-1 font-normal"><input type="checkbox" checked={a.milestone} onChange={(e) => setA({ ...a, milestone: e.target.checked })} /> Jalon</label></span>}><input className={inputCls} value={a.owner} onChange={(e) => setA({ ...a, owner: e.target.value })} /></Field>
           <Field label="Statut"><select className={inputCls} value={a.status} onChange={(e) => setA({ ...a, status: e.target.value as ActivityStatus })}>{(Object.keys(STATUS_LABEL) as ActivityStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select></Field>
           <Field label="Avancement (%)"><input type="number" min={0} max={100} className={inputCls} value={a.progress} onChange={(e) => setA({ ...a, progress: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} /></Field>
           <Field label="Budget (USD)"><input inputMode="decimal" className={inputCls} value={str(a.budget)} onChange={(e) => { const n = num(e.target.value); setA({ ...a, budget: Number.isNaN(n) ? a.budget : n }); }} /></Field>

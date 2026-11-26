@@ -20,9 +20,10 @@
  * leur suivi (statut, avancement, indicateurs, historique).
  */
 import * as XLSX from 'xlsx';
-import type { Activity, AlignStatus, KeyResult, Objective, Unit, Workspace } from '../types';
-import { OBJECTIVE_COLORS } from '../types';
-import { newActivity } from './ops';
+import type { Activity, AlignStatus, Issue, KeyResult, Objective, Unit, Workspace } from '../types';
+import { ALIGN_LABEL, OBJECTIVE_COLORS } from '../types';
+import { iso, parseDueDate } from './dates';
+import { newActivity, newIssue, withDates } from './ops';
 import { clean, key, similarity, uid } from './util';
 
 // ------------------------------------------------------------------ lecture
@@ -198,6 +199,7 @@ export interface ImportReport {
   linked: number; orphans: number; orphanTitles: string[];
   countryStatus: Record<string, number>; globalStatus: Record<string, number>;
   unmatched: string[]; noPlan: string[]; unitsCreated: string[]; kept: number; warnings: string[];
+  datesFound: number; issues: number;
 }
 
 export function importOkr(ws0: Workspace, planId: string, file: OkrFile, opts: { replace: boolean }): { ws: Workspace; report: ImportReport } {
@@ -214,7 +216,9 @@ export function importOkr(ws0: Workspace, planId: string, file: OkrFile, opts: {
   const report: ImportReport = {
     objectives: 0, krs: 0, globalActivities: 0, countryActivities: 0, updated: 0, linked: 0, orphans: 0, orphanTitles: [],
     countryStatus: {}, globalStatus: {}, unmatched: [], noPlan: file.noPlan, unitsCreated: [], kept: 0, warnings: [...file.warnings],
+    datesFound: 0, issues: 0,
   };
+  const year = ws.plans.find((p) => p.id === planId)?.year ?? new Date().getFullYear();
   const units = [...ws.units];
   const objectives = new Map(ws.objectives.filter((o) => o.planId === planId).map((o) => [o.code, { ...o }]));
   const krs = new Map(ws.krs.filter((k) => k.planId === planId).map((k) => [k.code, { ...k }]));
@@ -266,7 +270,10 @@ export function importOkr(ws0: Workspace, planId: string, file: OkrFile, opts: {
     const fields = { role, unitObjective: r.objectiveText, subTeam: sub, scope: r.scope, owner: r.lead, krId: k.id, order: n } as const;
     const prev = existingByKey.get(keyOf(unit.id, k.id, r.kr));
     if (prev) { acts.push({ ...prev, ...fields }); touched.add(prev.id); report.updated++; return; }
-    const a = newActivity(ws, { planId, level: unit.type === 'country' ? 'country' : 'global', unitId: unit.id, title: r.kr, ...fields });
+    // échéance écrite dans le KR (« By 31 March 2027 », « By Q2 2027 »…), sinon fin d'année
+    const due = parseDueDate(r.kr, year);
+    if (due) report.datesFound++;
+    const a = withDates(newActivity(ws, { planId, level: unit.type === 'country' ? 'country' : 'global', unitId: unit.id, title: r.kr, ...fields }), iso(year, 1, 1), due ?? iso(year, 12, 31));
     newIds.add(a.id);
     acts.push(a);
   });
@@ -323,6 +330,27 @@ export function importOkr(ws0: Workspace, planId: string, file: OkrFile, opts: {
   for (const a of country) report.countryStatus[a.alignment ?? 'none'] = (report.countryStatus[a.alignment ?? 'none'] ?? 0) + 1;
   for (const a of global) report.globalStatus[a.alignment ?? 'none'] = (report.globalStatus[a.alignment ?? 'none'] ?? 0) + 1;
 
+  // 4. registre des risques et actions : constats de l'analyse (Partial, Conflict, Gap) et orphelins
+  const prevIssues = ws.issues.filter((i) => i.planId === planId);
+  const issueKey = (activityId: string | null, source: string, title: string) => `${activityId}|${source}|${title}`;
+  const seen = new Set(prevIssues.map((i) => issueKey(i.activityId, i.source, i.title)));
+  const newIssues: Issue[] = [];
+  const addIssue = (a: Activity, kind: Issue['kind'], source: string, title: string) => {
+    const k = issueKey(a.id, source, title);
+    if (seen.has(k) || !title) return;
+    seen.add(k);
+    newIssues.push(newIssue(planId, { activityId: a.id, kind, title, action: a.action, owner: a.owner, dueDate: '', source }));
+  };
+  for (const a of planActs) {
+    const unitName = units.find((u) => u.id === a.unitId)?.name ?? '';
+    if (a.level === 'country' && !a.parentIds.length) {
+      addIssue(a, 'issue', 'Orphelin · non lié au global', a.finding || `${unitName} : tâche pays sans tâche d’équipe globale sous la même Ref.`);
+    } else if (a.alignment && ['partial', 'conflict', 'gap'].includes(a.alignment)) {
+      addIssue(a, a.alignment === 'conflict' ? 'issue' : 'risk', `Analyse d’alignement · ${ALIGN_LABEL[a.alignment]}`, a.finding || `${unitName} : ${ALIGN_LABEL[a.alignment]}`);
+    }
+  }
+  report.issues = newIssues.length;
+
   const objList = [...objectives.values()];
   const krList = [...krs.values()];
   ws = {
@@ -330,6 +358,7 @@ export function importOkr(ws0: Workspace, planId: string, file: OkrFile, opts: {
     objectives: [...ws.objectives.filter((o) => o.planId !== planId), ...objList],
     krs: [...ws.krs.filter((k) => k.planId !== planId), ...krList],
     activities: [...ws.activities.filter((a) => a.planId !== planId), ...planActs],
+    issues: [...ws.issues, ...newIssues],
   };
   return { ws, report };
 }

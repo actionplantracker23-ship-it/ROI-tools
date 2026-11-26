@@ -95,7 +95,7 @@ export default function Import() {
             <Button variant="primary" disabled={done || !file.registerSheet} onClick={() => { update((w) => run(w).ws, 'Import terminé.'); setDone(true); }}>
               {plan ? `Appliquer à ${plan.name}` : `Créer le plan ${year} et importer`}
             </Button>
-            {done && <><span className="self-center text-sm font-semibold text-rag-green">Import appliqué.</span><Button onClick={() => navigate('/alignement')}>Voir l’alignement</Button><Button onClick={() => navigate('/plan')}>Voir le plan</Button></>}
+            {done && <><span className="self-center text-sm font-semibold text-rag-green">Import appliqué.</span><Button onClick={() => navigate('/alignement')}>Voir l’alignement</Button><Button onClick={() => navigate('/taches')}>Voir les tâches</Button></>}
           </div>
         </Card>
       )}

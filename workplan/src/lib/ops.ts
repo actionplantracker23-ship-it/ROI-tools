@@ -2,13 +2,14 @@
  * Opérations (pures) sur l'espace de travail. Chaque fonction renvoie un nouvel objet Workspace.
  */
 import type {
-  Activity, ActivityStatus, AlignStatus, Indicator, IndicatorValue, KeyResult, Objective, Plan, Quarter, Unit, Workspace,
+  Activity, ActivityStatus, AlignStatus, Indicator, Issue, IndicatorValue, KeyResult, Objective, Plan, Quarter, Unit, Workspace,
 } from '../types';
 import { OBJECTIVE_COLORS } from '../types';
 import { latestValue } from './calc';
+import { addYears, iso, quarterOf } from './dates';
 import { similarity, uid } from './util';
 
-type Coll = 'objectives' | 'krs' | 'activities' | 'indicators' | 'units';
+type Coll = 'objectives' | 'krs' | 'activities' | 'indicators' | 'units' | 'issues';
 type Item<C extends Coll> = Workspace[C][number];
 
 /** Ajoute ou remplace un élément (par id). */
@@ -40,6 +41,8 @@ export function createPlan(ws: Workspace, o: NewPlanOptions): { ws: Workspace; p
 
   // reprise de la structure : nouveaux identifiants, liens remappés, statuts et valeurs remis à zéro
   const src = o.sourcePlanId;
+  const srcYear = ws.plans.find((p) => p.id === src)?.year ?? o.year - 1;
+  const shift = (d: string) => (d ? addYears(d, o.year - srcYear) : d); // mêmes échéances, l'année suivante
   const map = new Map<string, string>();
   const nid = (old: string, p: string) => { const n = uid(p); map.set(old, n); return n; };
   const objectives = ws.objectives.filter((x) => x.planId === src).map((x) => ({ ...x, id: nid(x.id, 'o-'), planId }));
@@ -51,6 +54,7 @@ export function createPlan(ws: Workspace, o: NewPlanOptions): { ws: Workspace; p
     activities = srcActs.map((a) => ({
       ...a, id: map.get(a.id)!, planId, krId: a.krId ? map.get(a.krId) ?? null : null,
       parentIds: (a.parentIds ?? []).map((p) => map.get(p)).filter((p): p is string => !!p),
+      startDate: shift(a.startDate), dueDate: shift(a.dueDate),
       status: 'not_started' as ActivityStatus, progress: 0, comment: '', updatedAt: null, updatedBy: null,
     }));
   }
@@ -85,6 +89,7 @@ export function deletePlan(ws: Workspace, planId: string): Workspace {
     objectives: ws.objectives.filter((x) => x.planId !== planId), krs: ws.krs.filter((x) => x.planId !== planId),
     activities: ws.activities.filter((x) => x.planId !== planId),
     activityUpdates: ws.activityUpdates.filter((u) => !actIds.has(u.activityId)),
+    issues: ws.issues.filter((x) => x.planId !== planId),
     indicators: ws.indicators.filter((x) => x.planId !== planId), indicatorValues: ws.indicatorValues.filter((v) => !indIds.has(v.indicatorId)),
   };
 }
@@ -103,7 +108,9 @@ export function newKr(ws: Workspace, planId: string, objective: Objective, title
 
 export function newActivity(ws: Workspace, base: Pick<Activity, 'planId' | 'level' | 'unitId'> & Partial<Activity>): Activity {
   const n = ws.activities.filter((a) => a.planId === base.planId && a.unitId === base.unitId).length;
+  const y = ws.plans.find((p) => p.id === base.planId)?.year ?? new Date().getFullYear();
   return {
+    startDate: iso(y, 1, 1), dueDate: iso(y, 12, 31), milestone: false, priority: 'medium',
     krId: null, parentIds: [], alignment: null, finding: '', action: '', role: null, unitObjective: '', subTeam: '', scope: '',
     code: '', title: '', owner: '', startQ: 1, endQ: 4, status: 'not_started', progress: 0,
     budget: null, comment: '', order: n, updatedAt: null, updatedBy: null, id: uid('a-'), ...base,
@@ -125,7 +132,7 @@ export function remove(ws: Workspace, coll: Coll, id: string): Workspace {
     next = { ...next, activities: next.activities.map((a) => (a.krId === id ? { ...a, krId: null } : a)) };
   }
   if (coll === 'activities') {
-    next = { ...next, activities: next.activities.map((a) => ((a.parentIds ?? []).includes(id) ? { ...a, parentIds: a.parentIds.filter((p) => p !== id) } : a)), activityUpdates: next.activityUpdates.filter((u) => u.activityId !== id) };
+    next = { ...next, issues: next.issues.map((i) => (i.activityId === id ? { ...i, activityId: null } : i)), activities: next.activities.map((a) => ((a.parentIds ?? []).includes(id) ? { ...a, parentIds: a.parentIds.filter((p) => p !== id) } : a)), activityUpdates: next.activityUpdates.filter((u) => u.activityId !== id) };
   }
   if (coll === 'units') {
     for (const a of ws.activities.filter((x) => x.unitId === id)) next = remove(next, 'activities', a.id);
@@ -179,4 +186,15 @@ export function suggestParents(ws: Workspace, act: Activity, limit = 5): { a: Ac
 export function addUnit(ws: Workspace, name: string, type: Unit['type'], group?: string): Workspace {
   const u: Unit = { id: uid('u-'), name, type, group, order: ws.units.length };
   return { ...ws, units: [...ws.units, u] };
+}
+
+/** Modifie les dates d'une tâche et recalcule ses trimestres de début et de fin. */
+export function withDates<T extends Activity>(a: T, startDate: string, dueDate: string): T {
+  const s = startDate || dueDate;
+  const d = dueDate || startDate;
+  return { ...a, startDate: s, dueDate: d, startQ: s ? quarterOf(s) : a.startQ, endQ: d ? quarterOf(d) : a.endQ };
+}
+
+export function newIssue(planId: string, base: Partial<Issue> = {}): Issue {
+  return { id: uid('r-'), planId, activityId: null, kind: 'issue', title: '', action: '', owner: '', dueDate: '', status: 'open', source: 'Saisie', createdAt: new Date().toISOString(), ...base };
 }

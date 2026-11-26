@@ -1,31 +1,28 @@
-# Plan de travail · global, départements et pays
+# Plan de travail · gestion de projet (équipes globales et pays)
 
-Outil de gestion du plan de travail annuel :
+Outil de gestion de projet pour le plan de travail annuel. Hiérarchie (WBS) :
+**objectif → projet (KR global / Ref) → tâches** des équipes globales (PEI, PSE, Innovations, GSE, DHGP,
+BDAC, Finance, DT, P&C) et des pays. Chaque tâche pays **dépend** de tâches d'équipes globales ;
+sans dépendance, elle est signalée **« orpheline, non liée au global »**. Une tâche globale sans pays est normale.
 
-1. **Créer le plan de l'année** (vierge, ou en reprenant la structure du plan précédent : objectifs, KR,
-   activités globales et pays avec leurs liens, registre, indicateurs ; le suivi repart de zéro et les
-   baselines peuvent reprendre les dernières valeurs mesurées).
-2. **Plan global** : objectifs → KR globaux → **activités des départements globaux**.
-3. **Activités pays**, chacune **liée à une activité globale**. Une activité pays sans lien est signalée
-   **« orpheline, non liée au global »**. Une activité globale sans déclinaison pays est normale.
-4. **Indicateurs de mesure du résultat à chaque niveau** (objectif, KR, activité globale, activité pays) :
-   baseline, cibles Q1–Q4 et finale, valeurs trimestrielles avec preuve et historique.
-5. **Suivi trimestriel** (statut, avancement, commentaire, historique), tableau de bord, alertes, exports Excel.
-
-## Pages
-
-| Page | Contenu |
+| Vue | Contenu |
 |---|---|
-| Tableau de bord | Avancement du plan, objectifs, départements et pays, alignement, alertes |
-| Plan de travail | Arbre Objectif → KR → activités globales → activités pays ; création et édition à chaque niveau |
-| Activités globales / Activités pays | Tables par département / par pays, filtres, export ; orphelines signalées |
-| Alignement | Taux d'alignement, graphique par pays, orphelines avec suggestions de rattachement en un clic, matrice activités globales × pays |
-| Suivi trimestriel | Mise à jour rapide des activités et des valeurs d'indicateurs (mobile) |
-| Indicateurs | Tous les indicateurs, valeurs et cibles par trimestre, export |
-| Registre OKR | Format source : Ref, Global Key Result, Country / Team, Role, …, Scope, Go to plan, sections « OBJECTIVE X · … » |
-| Import Excel | Fichier à deux feuilles avec correspondance des colonnes (voir ci-dessous) |
-| Plans annuels | Créer, ouvrir, clôturer un plan ; sauvegarde / restauration JSON |
-| Paramètres | Départements et pays, trimestre en cours, seuils de couleur |
+| Tableau de bord | Avancement, tâches terminées / en cours / en retard, échéances à 30 jours, échéances par mois, objectifs, équipes et pays, risques ouverts |
+| Liste (WBS) | Tableau numéroté 1 / 1.1 / 1.1.1, repliable ; responsable, début, échéance, durée, statut et % modifiables, priorité, dépendances (numéros WBS), alignement ; export Excel |
+| Gantt | Barres sur l'année (zoom semaine / mois / trimestre), % réalisé, jalons, aujourd'hui, retards |
+| Kanban | Colonnes À faire / En cours / En retard / Terminé / Annulé, glisser-déposer, option une ligne par équipe ou pays |
+| Échéancier | Retards, 30 prochains jours, puis échéances mois par mois |
+| Responsables | Charge par personne : tâches, en cours, terminées, en retard, prochaine échéance |
+| Risques & actions | Registre (risque / problème, constat, action, responsable, échéance, statut), alimenté par l'analyse d'alignement |
+| Alignement global ↔ pays | Synthèse Aligned / Partial / Conflict / Gap / Global only, orphelins à rattacher, parties A et B |
+| Indicateurs | Indicateurs de mesure à chaque niveau, valeurs trimestrielles |
+| Plans annuels | Un plan par année ; le suivant reprend la structure, les dépendances et les échéances (décalées d'un an) |
+
+Les filtres (équipe / pays, responsable, statut, priorité, en retard, orphelines) sont communs à toutes les vues.
+Chaque changement de statut ou d'avancement est historisé.
+
+**Échéances** : lues dans l'intitulé de chaque tâche (« By 31 March 2027 » → 31/03/2027, « By Q2 2027 » →
+30/06/2027, « By June 2027 » → 30/06/2027) ; à défaut, 31 décembre. Modifiables dans la fiche de la tâche.
 
 ## Import du fichier OKR (deux feuilles)
 
