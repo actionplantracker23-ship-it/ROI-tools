@@ -8,6 +8,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../AppContext';
 import { ActivityEditor } from '../components/Editors';
 import { FilterBar, isFiltered, isOverdue, useFilteredTasks } from '../components/pm';
+import { Flag } from '../components/Flag';
 import { NoPlan, PRIORITY_HEX, STATUS_HEX } from '../components/ui';
 import { fmtDate, today } from '../lib/dates';
 import { pct } from '../lib/format';
@@ -49,14 +50,14 @@ function Row({ t, color, onOpen }: { t: Activity; color: string; onOpen: (t: Act
   const p = t.status === 'done' ? 100 : t.progress;
   const u = unit(t.unitId);
   return (
-    <div className={`grid ${COLS} h-11 cursor-pointer gap-px bg-[#e9edf1] text-[15.5px]`} onClick={() => onOpen(t)}>
+    <div className={`grid ${COLS} min-h-[46px] cursor-pointer gap-px bg-[#e9edf1] text-[15.5px]`} onClick={() => onOpen(t)}>
       <span className="flex min-w-0 items-center gap-2 bg-white pl-3 pr-2 hover:bg-[#f7f9fb]" style={{ boxShadow: `inset 5px 0 0 ${color}` }}>
-        <span className="min-w-0 flex-1 truncate pl-2" title={t.title}>{t.title}</span>
+        <span className="min-w-0 flex-1 py-2.5 pl-2 leading-snug">{t.title}</span>
         {orphan && <span className="shrink-0 text-[#D64545]" title="Orpheline : non liée au plan global">⚠</span>}
       </span>
       <span className="flex items-center justify-center bg-white"><Avatar name={t.owner} /></span>
-      <span className="flex items-center justify-center truncate bg-white px-2 text-[14.5px] text-[#4a4c4f]" title={deps.length ? `Soutenue par ${[...new Set(deps.map((d) => unit(d.unitId)?.name))].join(', ')}` : undefined}>
-        {u?.name}{t.subTeam ? ` · ${t.subTeam}` : ''}
+      <span className="flex items-center justify-center gap-1.5 bg-white px-2 text-center text-[14.5px] leading-snug text-[#4a4c4f]" title={deps.length ? `Soutenue par ${[...new Set(deps.map((d) => unit(d.unitId)?.name))].join(', ')}` : undefined}>
+        {u?.type === 'country' && <Flag country={u.id} size={22} />}<span>{u?.name}{t.subTeam ? <span className="block text-[13px] text-[#6D6E71]">{t.subTeam}</span> : null}</span>
       </span>
       <ColorCell value={shown} options={['not_started', 'in_progress', 'done', 'late', 'cancelled'] as ActivityStatus[]} label={(v) => STATUS_LABEL[v]} color={(v) => STATUS_HEX[v]}
         onChange={(v) => update((w) => updateActivityStatus(w, t.id, { status: v, progress: t.progress, comment: t.comment }), `« ${STATUS_LABEL[v]} »`)} />

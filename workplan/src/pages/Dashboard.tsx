@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../AppContext';
+import { Flag } from '../components/Flag';
 import { Due, isOverdue } from '../components/pm';
 import { Card, MiniProgress, NoPlan, PageHeader, ProgressBar, Stat, STATUS_HEX } from '../components/ui';
 import { daysBetween, fmtDate, today } from '../lib/dates';
@@ -64,7 +65,7 @@ export default function Dashboard() {
             return (
               <Link key={o.id} to={`/plan?o=${o.id}`} className="group flex flex-col rounded-2xl border border-[#e5e8ec] bg-white p-5 transition hover:shadow-md">
                 <span className="text-[44px] font-semibold leading-none" style={{ color: o.color }}>{o.code}</span>
-                <span className="mt-2 line-clamp-3 min-h-[4.2em] text-[16.5px] leading-snug">{o.title}</span>
+                <span className="mt-2 flex-1 text-[16.5px] leading-snug">{o.title}</span>
                 <span className="mt-3"><ProgressBar value={s.progress} rag={s.rag} /></span>
                 <span className="mt-1.5 flex justify-between text-[14.5px] text-[#6D6E71]"><span>{n} projets</span><span className="text-brand-500 group-hover:underline">{s.progress === null ? '' : `${pct(s.progress)} · `}ouvrir →</span></span>
               </Link>
@@ -79,7 +80,7 @@ export default function Dashboard() {
             {d.next.map((t) => (
               <li key={t.id} className="flex items-baseline gap-4 py-2.5">
                 <span className="w-28 shrink-0 text-[15px]"><Due t={t} /></span>
-                <span className="min-w-0"><span className="line-clamp-2 text-[16px] leading-snug">{t.title}</span><span className="text-[14.5px] italic text-[#6D6E71]">{unit(t.unitId)?.name}{t.owner ? ` · ${t.owner}` : ''}</span></span>
+                <span className="min-w-0"><span className="block text-[16px] leading-snug">{t.title}</span><span className="text-[14.5px] italic text-[#6D6E71]">{unit(t.unitId)?.name}{t.owner ? ` · ${t.owner}` : ''}</span></span>
               </li>
             ))}
             {!d.next.length && <li className="py-2 italic text-[#6D6E71]">Aucune échéance à venir.</li>}
@@ -96,7 +97,7 @@ export default function Dashboard() {
               const s = view.unit.get(u.id)!;
               return (
                 <li key={u.id} className="flex items-center gap-3 py-2.5">
-                  <span className="w-36 truncate text-[16.5px] text-brand-600">{u.name}</span>
+                  <span className="flex w-40 items-center gap-2 text-[16.5px] text-brand-600">{u.type === 'country' && <Flag country={u.id} size={22} />}{u.name}</span>
                   <span className="flex-1 text-[14.5px] text-[#6D6E71]">{acts.length} tâches{late ? <span className="text-[#a23434]"> · {late} en retard</span> : null}</span>
                   <MiniProgress value={s.progress} rag={s.rag} />
                 </li>

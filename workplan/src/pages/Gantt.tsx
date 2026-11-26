@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../AppContext';
 import { ActivityEditor } from '../components/Editors';
 import { FilterBar, isFiltered, isOverdue, useFilteredTasks, ViewHeader } from '../components/pm';
+import { Flag } from '../components/Flag';
 import { NoPlan, STATUS_HEX } from '../components/ui';
 import { fmtDate, iso, today } from '../lib/dates';
 import { pct } from '../lib/format';
@@ -82,7 +83,7 @@ export default function Gantt() {
                 <div className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 overflow-hidden border-r border-ligne bg-inherit px-2 text-xs" style={{ width: LEFT, paddingLeft: 8 + r.depth * 14, background: 'inherit' }}>
                   {summary && <button onClick={() => toggle(r.wbs)} className="text-slate-400" aria-label="Replier ou déplier">{closed.has(r.wbs) ? '▸' : '▾'}</button>}
                   <span className="shrink-0 text-slate-400">{r.wbs}</span>
-                  {t && <span className="shrink-0 rounded bg-slate-100 px-1 text-[13.5px] font-semibold text-slate-600">{unit(t.unitId)?.name}</span>}
+                  {t && (unit(t.unitId)?.type === 'country' ? <Flag country={t.unitId} size={18} /> : <span className="shrink-0 rounded bg-slate-100 px-1 text-[13.5px] font-semibold text-slate-600">{unit(t.unitId)?.name}</span>)}
                   <button className={`truncate text-left ${summary ? 'font-semibold text-brand-600' : 'text-[#1d2327] hover:text-accent'}`} title={label} onClick={() => t && setEdit(t)}>{label}</button>
                 </div>
                 <div className="relative" style={{ width }}>

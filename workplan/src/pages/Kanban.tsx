@@ -47,7 +47,7 @@ export default function Kanban() {
           <span className="text-[13.5px] font-semibold text-accent">{view.krs.find((k) => k.id === t.krId)?.code}</span>
           <span className="ml-auto"><PriorityBadge p={t.priority} /></span>
         </div>
-        <p className="line-clamp-3 text-[15.5px] leading-snug text-[#1d2327]" title={t.title}>{t.title}</p>
+        <p className="text-[15.5px] leading-snug text-[#1d2327]">{t.title}</p>
         {orphan && <div className="mt-1"><OrphanBadge /></div>}
         <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-[#e8ecf0]"><div className="h-full rounded-full bg-brand-500" style={{ width: `${p}%` }} /></div>
         <div className="mt-1.5 flex items-center justify-between gap-2 text-[13.5px] text-slate-500">

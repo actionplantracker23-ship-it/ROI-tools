@@ -87,8 +87,8 @@ export default function TaskList() {
                     <td className="font-semibold text-brand-500">{r.wbs}</td>
                     <td colSpan={2} className="min-w-[380px]" style={{ paddingLeft: 12 + r.depth * 16 }} title={isObj ? r.objective.title : r.kr!.title}>
                       <button className="mr-1.5 text-slate-400" onClick={() => toggle(r.wbs)} aria-label={closed.has(r.wbs) ? 'Déplier' : 'Replier'}>{closed.has(r.wbs) ? '▸' : '▾'}</button>
-                      {isObj ? <b className="line-clamp-2 inline text-[16px]" style={{ color: r.objective.color }}>Objectif {r.objective.code} · <span className="text-brand-600">{r.objective.title}</span></b>
-                        : <b className="line-clamp-2 inline text-brand-600"><span className="text-accent">{r.kr!.code}</span> · {r.kr!.title}</b>}
+                      {isObj ? <b className="inline text-[16px]" style={{ color: r.objective.color }}>Objectif {r.objective.code} · <span className="text-brand-600">{r.objective.title}</span></b>
+                        : <b className="inline text-brand-600"><span className="text-accent">{r.kr!.code}</span> · {r.kr!.title}</b>}
                     </td>
                     <td />
                     <td className="whitespace-nowrap text-xs text-slate-500">{fmtDate(r.start)}</td>
@@ -109,7 +109,7 @@ export default function TaskList() {
               return (
                 <tr key={t.id} className={`cursor-pointer hover:bg-[#fafbfc] ${late ? 'bg-[#fff7f7]' : ''}`} onClick={() => setEdit(t)}>
                   <td className="text-xs text-slate-500">{r.wbs}</td>
-                  <td className="min-w-[380px]" style={{ paddingLeft: 12 + r.depth * 16 }}><span className="line-clamp-2" title={t.title}>{t.title}</span></td>
+                  <td className="min-w-[380px]" style={{ paddingLeft: 12 + r.depth * 16 }}><span className="leading-snug">{t.title}</span></td>
                   <td>{u && <UnitChip name={u.name + (t.subTeam ? ` (${t.subTeam})` : '')} type={u.type} />}</td>
                   <td className="text-xs text-slate-600">{t.owner || '—'}</td>
                   <td className="whitespace-nowrap text-xs text-slate-500">{fmtDate(t.startDate)}</td>

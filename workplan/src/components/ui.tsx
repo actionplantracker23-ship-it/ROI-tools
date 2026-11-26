@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { Flag } from './Flag';
 import { pct } from '../lib/format';
 import type { Score } from '../lib/calc';
 import { ALIGN_HELP, ALIGN_LABEL, STATUS_LABEL, type ActivityStatus, type AlignStatus, type Objective, type Rag, type Role } from '../types';
@@ -189,7 +190,9 @@ export function AlignBadge({ status }: { status: AlignStatus | null }) {
 
 export function UnitChip({ name, type }: { name: string; type: 'department' | 'country' }) {
   return (
-    <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-px text-[14px] ${type === 'department' ? 'bg-[#eef4fa] text-brand-500' : 'bg-[#fdf1e4] text-[#8a4b00]'}`}>{name}</span>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-px text-[14px] ${type === 'department' ? 'bg-[#eef4fa] text-brand-500' : 'bg-[#fdf1e4] text-[#8a4b00]'}`}>
+      {type === 'country' && <Flag country={name.split(/ \(| ·/)[0]} size={18} />}{name}
+    </span>
   );
 }
 

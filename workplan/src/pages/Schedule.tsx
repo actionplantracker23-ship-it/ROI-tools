@@ -24,7 +24,7 @@ export default function Schedule() {
         <td className="w-32 text-sm"><Due t={t} /></td>
         <td>{u && <UnitChip name={u.name} type={u.type} />}</td>
         <td className="font-semibold text-accent">{view.krs.find((k) => k.id === t.krId)?.code}</td>
-        <td className="max-w-[480px]"><span className="line-clamp-2">{t.title}</span></td>
+        <td className="max-w-[560px] leading-snug">{t.title}</td>
         <td className="text-xs text-slate-600">{t.owner}</td>
         <td><PriorityBadge p={t.priority} /></td>
         <td><StatusBadge status={t.status} /></td>
