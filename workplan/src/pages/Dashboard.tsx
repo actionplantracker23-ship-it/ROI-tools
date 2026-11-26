@@ -8,6 +8,7 @@ import { Card, MiniProgress, NoPlan, PageHeader, ProgressBar, Stat, STATUS_HEX }
 import { daysBetween, fmtDate, today } from '../lib/dates';
 import { pct } from '../lib/format';
 import { STATUS_LABEL, type ActivityStatus } from '../types';
+import { t as tr } from '../i18n';
 
 
 export default function Dashboard() {
@@ -24,20 +25,20 @@ export default function Dashboard() {
     const issues = ws.issues.filter((i) => i.planId === plan.id && i.status !== 'closed').length;
     return { live, counts, next, soon, issues };
   }, [ws, view, plan, now]);
-  if (!plan || !view || !d) return <><PageHeader title="Tableau de bord" /><NoPlan /></>;
+  if (!plan || !view || !d) return <><PageHeader title={tr("Tableau de bord")} /><NoPlan /></>;
   const total = view.activities.length;
 
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow={`${plan.name} · ${fmtDate(now)}`} title="Où en est le plan ?"
-        subtitle="L’essentiel en un coup d’œil : avancement, retards, échéances et objectifs." />
+      <PageHeader eyebrow={`${plan.name} · ${fmtDate(now)}`} title={tr("Où en est le plan ?")}
+        subtitle={tr("L’essentiel en un coup d’œil : avancement, retards, échéances et objectifs.")} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Stat label="Avancement" value={pct(view.plan.progress)} hint={view.plan.progress === null ? 'suivi pas encore commencé' : `${view.objectives.length} objectifs`} />
-        <Stat label="Terminées" value={<>{d.counts.done}<span className="text-[22px] text-[#9aa0a6]">/{d.live.length}</span></>} hint="tâches" color="#2e9e4f" />
-        <Stat label="En retard" value={<span className={d.counts.late ? 'text-[#a23434]' : ''}>{d.counts.late}</span>} hint={<Link to="/echeancier" className="underline-offset-2 hover:underline">voir l’échéancier</Link>} color="#d64545" />
-        <Stat label="Sous 30 jours" value={d.soon} hint="échéances" color="#F7941D" />
-        <Stat label="Risques ouverts" value={d.issues} hint={<Link to="/risques" className="underline-offset-2 hover:underline">voir le registre</Link>} color="#7c3aed" />
+        <Stat label={tr("Avancement")} value={pct(view.plan.progress)} hint={view.plan.progress === null ? tr("suivi pas encore commencé") : `${view.objectives.length} objectifs`} />
+        <Stat label={tr("Terminées")} value={<>{d.counts.done}<span className="text-[22px] text-[#9aa0a6]">/{d.live.length}</span></>} hint={tr("tâches")} color="#2e9e4f" />
+        <Stat label={tr("En retard")} value={<span className={d.counts.late ? 'text-[#a23434]' : ''}>{d.counts.late}</span>} hint={<Link to="/echeancier" className="underline-offset-2 hover:underline">{tr("voir l’échéancier")}</Link>} color="#d64545" />
+        <Stat label={tr("Sous 30 jours")} value={d.soon} hint={tr("échéances")} color="#F7941D" />
+        <Stat label={tr("Risques ouverts")} value={d.issues} hint={<Link to="/risques" className="underline-offset-2 hover:underline">{tr("voir le registre")}</Link>} color="#7c3aed" />
       </div>
 
       <div>
@@ -51,13 +52,13 @@ export default function Dashboard() {
 
       {view.orphans.length > 0 && (
         <Link to="/alignement" className="block rounded-2xl bg-[#E30613] px-5 py-3 text-[16.5px] text-white shadow-sm hover:bg-[#c00510]">
-          <b>{view.orphans.length} tâche{view.orphans.length > 1 ? 's' : ''} pays non liée{view.orphans.length > 1 ? 's' : ''} au plan global</b>
-          <span className="italic text-white/90"> — {view.orphans.map((o) => `${unit(o.unitId)?.name} ${view.krs.find((k) => k.id === o.krId)?.code ?? ''}`).join(', ')}</span> · rattacher →
+          <b>{tr(view.orphans.length > 1 ? '{0} tâches pays non liées au plan global' : '{0} tâche pays non liée au plan global', { 0: view.orphans.length })}</b>
+          <span className="italic text-white/90"> — {view.orphans.map((o) => `${unit(o.unitId)?.name} ${view.krs.find((k) => k.id === o.krId)?.code ?? ''}`).join(', ')}</span> {tr("· rattacher →")}
         </Link>
       )}
 
       <section>
-        <h2 className="mb-3 text-[24px] font-semibold text-brand-600">Objectifs</h2>
+        <h2 className="mb-3 text-[24px] font-semibold text-brand-600">{tr("Objectifs")}</h2>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {view.objectives.map((o) => {
             const s = view.objective.get(o.id)!;
@@ -67,7 +68,7 @@ export default function Dashboard() {
                 <span className="text-[44px] font-semibold leading-none" style={{ color: o.color }}>{o.code}</span>
                 <span className="mt-2 flex-1 text-[16.5px] leading-snug">{o.title}</span>
                 <span className="mt-3"><ProgressBar value={s.progress} rag={s.rag} /></span>
-                <span className="mt-1.5 flex justify-between text-[14.5px] text-[#6D6E71]"><span>{n} projets</span><span className="text-brand-500 group-hover:underline">{s.progress === null ? '' : `${pct(s.progress)} · `}ouvrir →</span></span>
+                <span className="mt-1.5 flex justify-between text-[14.5px] text-[#6D6E71]"><span>{n} {tr("projets")}</span><span className="text-brand-500 group-hover:underline">{s.progress === null ? '' : `${pct(s.progress)} · `}{tr("ouvrir →")}</span></span>
               </Link>
             );
           })}
@@ -75,7 +76,7 @@ export default function Dashboard() {
       </section>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Card title="Prochaines échéances" action={<Link to="/echeancier" className="text-[15.5px] text-brand-500 hover:text-accent">Tout voir →</Link>}>
+        <Card title={tr("Prochaines échéances")} action={<Link to="/echeancier" className="text-[15.5px] text-brand-500 hover:text-accent">{tr("Tout voir →")}</Link>}>
           <ul className="divide-y divide-[#eef1f4]">
             {d.next.map((t) => (
               <li key={t.id} className="flex items-baseline gap-4 py-2.5">
@@ -83,12 +84,12 @@ export default function Dashboard() {
                 <span className="min-w-0"><span className="block text-[16px] leading-snug">{t.title}</span><span className="text-[14.5px] italic text-[#6D6E71]">{unit(t.unitId)?.name}{t.owner ? ` · ${t.owner}` : ''}</span></span>
               </li>
             ))}
-            {!d.next.length && <li className="py-2 italic text-[#6D6E71]">Aucune échéance à venir.</li>}
+            {!d.next.length && <li className="py-2 italic text-[#6D6E71]">{tr("Aucune échéance à venir.")}</li>}
           </ul>
         </Card>
-        <Card title="Avancement" action={
+        <Card title={tr("Avancement")} action={
           <div className="flex rounded-full bg-[#eef1f4] p-0.5 text-[15px]">
-            {(['country', 'department'] as const).map((t) => <button key={t} onClick={() => setTab(t)} className={`rounded-full px-3 py-1 ${tab === t ? 'bg-white shadow-sm' : 'text-[#6D6E71]'}`}>{t === 'country' ? 'Pays' : 'Équipes globales'}</button>)}
+            {(['country', 'department'] as const).map((t) => <button key={t} onClick={() => setTab(t)} className={`rounded-full px-3 py-1 ${tab === t ? 'bg-white shadow-sm' : 'text-[#6D6E71]'}`}>{t === 'country' ? tr("Pays") : tr("Équipes globales")}</button>)}
           </div>}>
           <ul className="divide-y divide-[#eef1f4]">
             {ws.units.filter((u) => u.type === tab && (view.actsByUnit.get(u.id) ?? []).length).map((u) => {
@@ -98,7 +99,7 @@ export default function Dashboard() {
               return (
                 <li key={u.id} className="flex items-center gap-3 py-2.5">
                   <span className="flex w-40 items-center gap-2 text-[16.5px] text-brand-600">{u.type === 'country' && <Flag country={u.id} size={22} />}{u.name}</span>
-                  <span className="flex-1 text-[14.5px] text-[#6D6E71]">{acts.length} tâches{late ? <span className="text-[#a23434]"> · {late} en retard</span> : null}</span>
+                  <span className="flex-1 text-[14.5px] text-[#6D6E71]">{acts.length} {tr("tâches")}{late ? <span className="text-[#a23434]"> · {late} {tr("en retard")}</span> : null}</span>
                   <MiniProgress value={s.progress} rag={s.rag} />
                 </li>
               );

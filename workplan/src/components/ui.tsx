@@ -5,6 +5,7 @@ import { Flag } from './Flag';
 import { pct } from '../lib/format';
 import type { Score } from '../lib/calc';
 import { ALIGN_HELP, ALIGN_LABEL, STATUS_LABEL, type ActivityStatus, type AlignStatus, type Objective, type Rag, type Role } from '../types';
+import { t as tr } from '../i18n';
 
 // Statuts : pastille colorée + libellé sur fond pâle (lisible, jamais la couleur seule)
 export const RAG_STYLE: Record<Rag, { cls: string; label: string; icon: string }> = {
@@ -19,9 +20,9 @@ export const RAG_HEX: Record<Rag, string> = { green: '#2E9E4F', amber: '#F7941D'
 export function RagBadge({ rag, score, compact }: { rag: Rag; score?: number | null; compact?: boolean }) {
   const s = RAG_STYLE[rag];
   return (
-    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[14px] ${s.cls}`} title={s.label}>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[14px] ${s.cls}`} title={tr(s.label)}>
       <span aria-hidden style={{ color: RAG_HEX[rag] }}>{s.icon}</span>
-      {compact ? null : s.label}
+      {compact ? null : tr(s.label)}
       {score !== undefined && <span className="tabular-nums">{pct(score)}</span>}
     </span>
   );
@@ -29,8 +30,8 @@ export function RagBadge({ rag, score, compact }: { rag: Rag; score?: number | n
 
 export function RoleBadge({ role }: { role: Role }) {
   return role === 'Lead'
-    ? <span className="inline-flex items-center rounded-full bg-[#fff3e6] px-2 py-px text-[13.5px] font-semibold text-[#9a4a00]">Lead</span>
-    : <span className="inline-flex items-center rounded-full bg-[#eef4fa] px-2 py-px text-[13.5px] text-brand-500">Contributes</span>;
+    ? <span className="inline-flex items-center rounded-full bg-[#fff3e6] px-2 py-px text-[13.5px] font-semibold text-[#9a4a00]">{tr("Lead")}</span>
+    : <span className="inline-flex items-center rounded-full bg-[#eef4fa] px-2 py-px text-[13.5px] text-brand-500">{tr("Contributes")}</span>;
 }
 
 /** Couleurs Living Goods des statuts et priorités (cellules pleines du tableau principal). */
@@ -107,7 +108,7 @@ export function PageHeader({ title, subtitle, actions, eyebrow }: { title: React
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0 max-w-3xl">
-        <div className="mb-1 text-[14px] uppercase tracking-[.14em] text-accent">{eyebrow ?? 'Plan de travail'}</div>
+        <div className="mb-1 text-[14px] uppercase tracking-[.14em] text-accent">{eyebrow ?? tr("Plan de travail")}</div>
         <h1 className="text-[34px] font-semibold leading-tight text-brand-600 sm:text-[38px]">{title}</h1>
         {subtitle && <p className="mt-1.5 text-[17px] italic text-[#6D6E71]">{subtitle}</p>}
       </div>
@@ -143,8 +144,8 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
 
 export function NoPlan() {
   return (
-    <EmptyState title="Aucun plan de travail sélectionné">
-      Créez le plan de l’année depuis la page <Link to="/plans" className="font-semibold text-brand-500 underline">Plans annuels</Link>.
+    <EmptyState title={tr("Aucun plan de travail sélectionné")}>
+      {tr("Créez le plan de l’année depuis la page")} <Link to="/plans" className="font-semibold text-brand-500 underline">{tr("Plans annuels")}</Link>.
     </EmptyState>
   );
 }
@@ -156,7 +157,7 @@ export function Modal({ title, onClose, children, wide }: { title: ReactNode; on
       <div role="dialog" aria-modal="true" className={`w-full rounded-2xl bg-white shadow-2xl ${wide ? 'max-w-4xl' : 'max-w-2xl'}`}>
         <div className="flex items-center justify-between gap-3 border-b border-ligne px-5 py-3">
           <h3 className="text-[24px] font-semibold text-brand-600">{title}</h3>
-          <button onClick={onClose} className="rounded-md px-2 text-2xl leading-none text-slate-500 hover:bg-slate-100" aria-label="Fermer">×</button>
+          <button onClick={onClose} className="rounded-md px-2 text-2xl leading-none text-slate-500 hover:bg-slate-100" aria-label={tr("Fermer")}>{tr("×")}</button>
         </div>
         <div className="max-h-[80vh] overflow-y-auto px-5 py-4">{children}</div>
       </div>
@@ -170,7 +171,7 @@ export function Field({ label, children, className = '' }: { label: ReactNode; c
 
 /** Badge « orphelin » : tâche pays sans tâche d'équipe globale qui la soutient. */
 export function OrphanBadge() {
-  return <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#fbeaea] px-2.5 py-0.5 text-[13.5px] font-semibold text-[#a23434]" title="Aucune équipe globale n’a de tâche qui la soutient"><span aria-hidden>⚠</span> Orpheline · non liée au global</span>;
+  return <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#fbeaea] px-2.5 py-0.5 text-[13.5px] font-semibold text-[#a23434]" title={tr("Aucune équipe globale n’a de tâche qui la soutient")}><span aria-hidden>⚠</span> {tr("Orpheline · non liée au global")}</span>;
 }
 
 export const ALIGN_STYLE: Record<AlignStatus, string> = {
@@ -184,7 +185,7 @@ export const ALIGN_HEX: Record<AlignStatus, string> = { aligned: '#2e9e4f', part
 
 /** Statut de l'analyse d'alignement (Aligned, Partial, Conflict, Gap, Global only). */
 export function AlignBadge({ status }: { status: AlignStatus | null }) {
-  if (!status) return <span className="text-xs text-slate-400">non analysé</span>;
+  if (!status) return <span className="text-xs text-slate-400">{tr("non analysé")}</span>;
   return <span title={ALIGN_HELP[status]} className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[13.5px] font-semibold ${ALIGN_STYLE[status]}`}>{ALIGN_LABEL[status]}</span>;
 }
 

@@ -7,6 +7,7 @@ import { computePlan } from '../lib/calc';
 import { createPlan, deletePlan, updatePlan } from '../lib/ops';
 import { downloadJson, normalize } from '../lib/storage';
 import { PLAN_STATUS_LABEL, type PlanStatus } from '../types';
+import { t as tr } from '../i18n';
 
 export default function Plans() {
   const { ws, update, replaceAll, notify, setError } = useApp();
@@ -23,7 +24,7 @@ export default function Plans() {
     update((w) => createPlan(w, {
       year: f.year, name: f.name.trim() || undefined, sourcePlanId: f.source || null,
       copyActivities: f.activities, copyIndicators: f.indicators, carryBaselines: f.baselines,
-    }).ws, `Plan ${f.year} créé.`);
+    }).ws, tr("Plan {0} créé.", { 0: f.year }));
     navigate('/taches');
   };
 
@@ -31,48 +32,48 @@ export default function Plans() {
     if (!file) return;
     try {
       const data = normalize(JSON.parse(await file.text()));
-      if (!confirm(`Remplacer toutes les données de ce navigateur par la sauvegarde (${data.plans.length} plan(s)) ?`)) return;
+      if (!confirm(tr("Remplacer toutes les données de ce navigateur par la sauvegarde ({0} plan(s)) ?", { 0: data.plans.length }))) return;
       replaceAll(data);
-      notify('Sauvegarde restaurée.');
-    } catch (e) { setError(`Restauration impossible : ${(e as Error).message}`); }
+      notify(tr("Sauvegarde restaurée."));
+    } catch (e) { setError(tr("Restauration impossible : {0}", { 0: (e as Error).message })); }
   };
 
   return (
     <div className="space-y-5">
-      <PageHeader eyebrow="Plans annuels" title="Plans de travail"
-        subtitle="Un plan par année. Chaque nouveau plan peut reprendre la structure du précédent (objectifs, KR, activités globales et pays, liens d’alignement, indicateurs) avec un suivi remis à zéro." />
+      <PageHeader eyebrow={tr("Plans annuels")} title={tr("Plans de travail")}
+        subtitle={tr("Un plan par année. Chaque nouveau plan peut reprendre la structure du précédent (objectifs, KR, activités globales et pays, liens d’alignement, indicateurs) avec un suivi remis à zéro.")} />
 
-      <Card title="Créer un plan de travail">
+      <Card title={tr("Créer un plan de travail")}>
         <div className="grid gap-3 sm:grid-cols-[120px,1fr,1fr]">
-          <Field label="Année"><input type="number" className={inputCls} value={f.year} onChange={(e) => setF({ ...f, year: Number(e.target.value) })} /></Field>
-          <Field label="Nom (facultatif)"><input className={inputCls} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder={`Plan de travail ${f.year}`} /></Field>
-          <Field label="Point de départ">
+          <Field label={tr("Année")}><input type="number" className={inputCls} value={f.year} onChange={(e) => setF({ ...f, year: Number(e.target.value) })} /></Field>
+          <Field label={tr("Nom (facultatif)")}><input className={inputCls} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder={tr("Plan de travail {0}", { 0: f.year })} /></Field>
+          <Field label={tr("Point de départ")}>
             <select className={inputCls} value={f.source} onChange={(e) => setF({ ...f, source: e.target.value })}>
-              <option value="">Plan vierge</option>
-              {plans.map((p) => <option key={p.id} value={p.id}>Reprendre la structure de : {p.name}</option>)}
+              <option value="">{tr("Plan vierge")}</option>
+              {plans.map((p) => <option key={p.id} value={p.id}>{tr("Reprendre la structure de :")} {p.name}</option>)}
             </select>
           </Field>
         </div>
         {f.source && (
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
-            <span className="text-slate-500">Objectifs et KR toujours repris, plus :</span>
-            <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={f.activities} onChange={(e) => setF({ ...f, activities: e.target.checked })} /> KR / activités des équipes globales et des pays (registre, liens, analyse d’alignement)</label>
-            <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={f.indicators} onChange={(e) => setF({ ...f, indicators: e.target.checked })} /> indicateurs</label>
-            {f.indicators && <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={f.baselines} onChange={(e) => setF({ ...f, baselines: e.target.checked })} /> baseline = dernière valeur mesurée l’an passé</label>}
+            <span className="text-slate-500">{tr("Objectifs et KR toujours repris, plus :")}</span>
+            <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={f.activities} onChange={(e) => setF({ ...f, activities: e.target.checked })} /> {tr("KR / activités des équipes globales et des pays (registre, liens, analyse d’alignement)")}</label>
+            <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={f.indicators} onChange={(e) => setF({ ...f, indicators: e.target.checked })} /> {tr("indicateurs")}</label>
+            {f.indicators && <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={f.baselines} onChange={(e) => setF({ ...f, baselines: e.target.checked })} /> {tr("baseline = dernière valeur mesurée l’an passé")}</label>}
           </div>
         )}
         <div className="mt-3 flex items-center gap-3">
-          <Button variant="primary" disabled={!f.year || yearTaken} onClick={create}>Créer le plan {f.year}</Button>
-          {yearTaken && <span className="text-sm text-rag-red">Un plan existe déjà pour {f.year}.</span>}
-          {!f.source && <span className="text-sm text-slate-500">Ensuite : construisez le plan (Plan de travail) ou importez votre fichier Excel (Import Excel).</span>}
+          <Button variant="primary" disabled={!f.year || yearTaken} onClick={create}>{tr("Créer le plan")} {f.year}</Button>
+          {yearTaken && <span className="text-sm text-rag-red">{tr("Un plan existe déjà pour")} {f.year}.</span>}
+          {!f.source && <span className="text-sm text-slate-500">{tr("Ensuite : construisez le plan (Plan de travail) ou importez votre fichier Excel (Import Excel).")}</span>}
         </div>
       </Card>
 
       {plans.length > 0 && (
-        <Card title={`Plans (${plans.length})`}>
+        <Card title={tr("Plans ({0})", { 0: plans.length })}>
           <div className="overflow-x-auto">
             <table className="suivi min-w-[760px]">
-              <thead><tr><th>Année</th><th>Plan</th><th>Statut</th><th>Contenu</th><th>Alignement</th><th>Avancement</th><th /></tr></thead>
+              <thead><tr><th>{tr("Année")}</th><th>{tr("Plan")}</th><th>{tr("Statut")}</th><th>{tr("Contenu")}</th><th>{tr("Alignement")}</th><th>{tr("Avancement")}</th><th /></tr></thead>
               <tbody>
                 {plans.map((p) => {
                   const v = computePlan(ws, p.id, ws.settings.currentQuarter);
@@ -81,20 +82,20 @@ export default function Plans() {
                     <tr key={p.id} className={p.id === ws.currentPlanId ? 'bg-brand-50' : ''}>
                       <td className="font-titre text-2xl font-semibold text-accent">{p.year}</td>
                       <td>
-                        <input className="w-full rounded border border-transparent bg-transparent px-1 font-semibold hover:border-[#c9ced4]" value={p.name} onChange={(e) => update((w) => updatePlan(w, { ...p, name: e.target.value }))} aria-label="Nom du plan" />
-                        {src && <div className="px-1 text-xs text-slate-500">Structure reprise de {src.name}</div>}
+                        <input className="w-full rounded border border-transparent bg-transparent px-1 font-semibold hover:border-[#c9ced4]" value={p.name} onChange={(e) => update((w) => updatePlan(w, { ...p, name: e.target.value }))} aria-label={tr("Nom du plan")} />
+                        {src && <div className="px-1 text-xs text-slate-500">{tr("Structure reprise de")} {src.name}</div>}
                       </td>
                       <td>
                         <select className="rounded border border-[#c9ced4] px-1.5 py-1 text-sm" value={p.status} onChange={(e) => update((w) => updatePlan(w, { ...p, status: e.target.value as PlanStatus }))}>
                           {(Object.keys(PLAN_STATUS_LABEL) as PlanStatus[]).map((s) => <option key={s} value={s}>{PLAN_STATUS_LABEL[s]}</option>)}
                         </select>
                       </td>
-                      <td className="whitespace-nowrap text-xs text-slate-600">{v.objectives.length} objectifs · {v.krs.length} KR<br />{v.globalActs.length} KR équipes globales · {v.countryActs.length} KR pays · {v.indicators.length} indic.</td>
-                      <td className="whitespace-nowrap text-xs">{v.alignment.countryActs ? <>{Math.round(v.alignment.rate ?? 0)} % soutenus{v.orphans.length ? <span className="ml-1 font-semibold text-rag-red">· {v.orphans.length} orphelin(s)</span> : null}</> : '—'}</td>
+                      <td className="whitespace-nowrap text-xs text-slate-600">{v.objectives.length} {tr("objectifs ·")} {v.krs.length} {tr("KR")}<br />{v.globalActs.length} {tr("KR équipes globales ·")} {v.countryActs.length} {tr("KR pays ·")} {v.indicators.length} {tr("indic.")}</td>
+                      <td className="whitespace-nowrap text-xs">{v.alignment.countryActs ? <>{Math.round(v.alignment.rate ?? 0)} {tr("% soutenus")}{v.orphans.length ? <span className="ml-1 font-semibold text-rag-red">· {v.orphans.length} {tr("orphelin(s)")}</span> : null}</> : '—'}</td>
                       <td>{v.plan.progress === null ? <RagBadge rag="none" /> : <MiniProgress value={v.plan.progress} rag={v.plan.rag} />}</td>
                       <td className="whitespace-nowrap">
-                        <Button className="!min-h-[32px] !px-2.5 !py-1 text-sm" variant={p.id === ws.currentPlanId ? 'primary' : 'secondary'} onClick={() => { update((w) => ({ ...w, currentPlanId: p.id })); navigate('/'); }}>Ouvrir</Button>
-                        <button className="ml-2 text-sm text-rag-red hover:underline" onClick={() => { if (confirm(`Supprimer définitivement le plan ${p.year} et tout son suivi ?`)) update((w) => deletePlan(w, p.id), 'Plan supprimé.'); }}>Supprimer</button>
+                        <Button className="!min-h-[32px] !px-2.5 !py-1 text-sm" variant={p.id === ws.currentPlanId ? 'primary' : 'secondary'} onClick={() => { update((w) => ({ ...w, currentPlanId: p.id })); navigate('/'); }}>{tr("Ouvrir")}</Button>
+                        <button className="ml-2 text-sm text-rag-red hover:underline" onClick={() => { if (confirm(tr("Supprimer définitivement le plan {0} et tout son suivi ?", { 0: p.year }))) update((w) => deletePlan(w, p.id), tr("Plan supprimé.")); }}>{tr("Supprimer")}</button>
                       </td>
                     </tr>
                   );
@@ -105,12 +106,12 @@ export default function Plans() {
         </Card>
       )}
 
-      <Card title="Sauvegarde">
-        <p className="mb-3 text-sm text-slate-600">Les données sont enregistrées automatiquement dans ce navigateur. Exportez régulièrement une sauvegarde (fichier JSON) pour la partager ou la conserver.</p>
+      <Card title={tr("Sauvegarde")}>
+        <p className="mb-3 text-sm text-slate-600">{tr("Les données sont enregistrées automatiquement dans ce navigateur. Exportez régulièrement une sauvegarde (fichier JSON) pour la partager ou la conserver.")}</p>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => downloadJson(ws, `plan-de-travail-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`)}>Exporter la sauvegarde</Button>
+          <Button onClick={() => downloadJson(ws, `plan-de-travail-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`)}>{tr("Exporter la sauvegarde")}</Button>
           <label className="inline-flex min-h-[40px] cursor-pointer items-center rounded-md border border-[#c9ced4] bg-white px-3.5 text-[16px] hover:border-accent">
-            Restaurer une sauvegarde<input type="file" accept=".json" className="hidden" onChange={(e) => { void restore(e.target.files?.[0]); e.target.value = ''; }} />
+            {tr("Restaurer une sauvegarde")}<input type="file" accept=".json" className="hidden" onChange={(e) => { void restore(e.target.files?.[0]); e.target.value = ''; }} />
           </label>
         </div>
       </Card>

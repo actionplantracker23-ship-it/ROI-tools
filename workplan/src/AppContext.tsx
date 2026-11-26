@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { setLang } from './i18n';
 import { computePlan, type PlanView } from './lib/calc';
 import { loadWorkspace, saveWorkspace, STORAGE_KEY } from './lib/storage';
 import { EMPTY_FILTER, type TaskFilter } from './lib/wbs';
@@ -60,8 +61,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (message) notify(message);
   }, [notify]);
 
+  // langue de l'interface : fixée avant le rendu des pages (voir i18n.ts)
+  setLang(ws.settings.lang ?? 'fr');
+  useEffect(() => { document.documentElement.lang = ws.settings.lang ?? 'fr'; }, [ws.settings.lang]);
   const plan = ws.plans.find((p) => p.id === ws.currentPlanId) ?? null;
-  const view = useMemo(() => (plan ? computePlan(ws, plan.id, quarter) : null), [ws, plan, quarter]);
+  const view = useMemo(() => (plan ? computePlan(ws, plan.id, quarter) : null), [ws, plan, quarter, ws.settings.lang]); // eslint-disable-line react-hooks/exhaustive-deps
   const units = useMemo(() => new Map(ws.units.map((u) => [u.id, u])), [ws.units]);
 
   return (

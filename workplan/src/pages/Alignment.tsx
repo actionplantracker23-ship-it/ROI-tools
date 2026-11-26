@@ -15,6 +15,7 @@ import { exportRows } from '../lib/export';
 import { pct } from '../lib/format';
 import { addLink, suggestParents } from '../lib/ops';
 import { ALIGN_HELP, ALIGN_LABEL, type Activity, type AlignStatus } from '../types';
+import { t as tr } from '../i18n';
 
 const STATUSES: AlignStatus[] = ['aligned', 'partial', 'conflict', 'gap', 'global_only'];
 
@@ -24,7 +25,7 @@ export default function Alignment() {
   const [fa, setFa] = useState({ unit: '', status: '' });
   const [fb, setFb] = useState({ unit: '', status: '' });
   const suggestions = useMemo(() => new Map((view?.orphans ?? []).map((o) => [o.id, suggestParents(ws, o, 3)])), [ws, view]);
-  if (!plan || !view) return <><PageHeader title="Alignement" /><NoPlan /></>;
+  if (!plan || !view) return <><PageHeader title={tr("Alignement")} /><NoPlan /></>;
 
   const code = (a: Activity) => view.krs.find((k) => k.id === a.krId)?.code ?? '—';
   const obj = (a: Activity) => { const k = view.krs.find((x) => x.id === a.krId); return view.objectives.find((o) => o.id === k?.objectiveId)?.code ?? ''; };
@@ -40,27 +41,27 @@ export default function Alignment() {
 
   const doExport = () => exportRows([
     ...view.countryActs.map((a) => ({
-      Partie: 'A · KR pays', 'Country / Global team': unit(a.unitId)?.name, 'Obj.': `O${obj(a)}`, Ref: code(a), 'Key Result': a.title, 'KR Lead': a.owner,
-      'Unités liées': names(view.parentsOf.get(a.id) ?? []).map((id) => unit(id)?.name).join(', ') || '— none — (ORPHELIN)',
-      '#': (view.parentsOf.get(a.id) ?? []).length, Status: a.alignment ? ALIGN_LABEL[a.alignment] : '', 'Finding / gap': a.finding, 'Recommended action': a.action,
+      [tr("Partie")]: tr("A · KR pays"), [tr("Country / Global team")]: unit(a.unitId)?.name, [tr("Obj.")]: `O${obj(a)}`, Ref: code(a), [tr("Key Result")]: a.title, [tr("KR Lead")]: a.owner,
+      [tr("Unités liées")]: names(view.parentsOf.get(a.id) ?? []).map((id) => unit(id)?.name).join(', ') || tr("— none — (ORPHELIN)"),
+      '#': (view.parentsOf.get(a.id) ?? []).length, [tr("Status")]: a.alignment ? ALIGN_LABEL[a.alignment] : '', [tr("Finding / gap")]: a.finding, [tr("Recommended action")]: a.action,
     })),
     ...view.globalActs.map((a) => ({
-      Partie: 'B · KR équipe globale', 'Country / Global team': unit(a.unitId)?.name, 'Obj.': `O${obj(a)}`, Ref: code(a), 'Key Result': a.title, 'KR Lead': a.owner,
-      'Unités liées': names(view.childrenOf.get(a.id) ?? []).map((id) => unit(id)?.name).join(', ') || '— none —',
-      '#': (view.childrenOf.get(a.id) ?? []).length, Status: a.alignment ? ALIGN_LABEL[a.alignment] : '', 'Finding / gap': a.finding, 'Recommended action': a.action,
+      [tr("Partie")]: tr("B · KR équipe globale"), [tr("Country / Global team")]: unit(a.unitId)?.name, [tr("Obj.")]: `O${obj(a)}`, Ref: code(a), [tr("Key Result")]: a.title, [tr("KR Lead")]: a.owner,
+      [tr("Unités liées")]: names(view.childrenOf.get(a.id) ?? []).map((id) => unit(id)?.name).join(', ') || tr("— none —"),
+      '#': (view.childrenOf.get(a.id) ?? []).length, [tr("Status")]: a.alignment ? ALIGN_LABEL[a.alignment] : '', [tr("Finding / gap")]: a.finding, [tr("Recommended action")]: a.action,
     })),
   ], `alignement-${plan.year}`, 'xlsx');
 
   return (
     <div className="space-y-5">
-      <PageHeader eyebrow={plan.name} title="Alignement KR pays ↔ KR des équipes globales"
-        subtitle="Chaque KR / activité pays doit être soutenu par une équipe globale (KR sous la même Ref). Le plan global peut aller au-delà des pays (« Global only ») : c’est normal. Un KR pays sans équipe globale est orphelin."
-        actions={<Button onClick={doExport}>Export Excel</Button>} />
+      <PageHeader eyebrow={plan.name} title={tr("Alignement KR pays ↔ KR des équipes globales")}
+        subtitle={tr("Chaque KR / activité pays doit être soutenu par une équipe globale (KR sous la même Ref). Le plan global peut aller au-delà des pays (« Global only ») : c’est normal. Un KR pays sans équipe globale est orphelin.")}
+        actions={<Button onClick={doExport}>{tr("Export Excel")}</Button>} />
 
       <div className="grid gap-4 lg:grid-cols-[1fr,1.2fr]">
-        <Card title="Synthèse">
+        <Card title={tr("Synthèse")}>
           <table className="w-full text-sm">
-            <thead><tr className="text-left text-xs text-slate-500"><th className="py-1.5">Statut</th><th className="text-right">KR pays</th><th className="text-right">KR équipes globales</th></tr></thead>
+            <thead><tr className="text-left text-xs text-slate-500"><th className="py-1.5">{tr("Statut")}</th><th className="text-right">{tr("KR pays")}</th><th className="text-right">{tr("KR équipes globales")}</th></tr></thead>
             <tbody>
               {STATUSES.map((s) => (
                 <tr key={s} className="border-t border-[#eef0f3]" title={ALIGN_HELP[s]}>
@@ -70,17 +71,17 @@ export default function Alignment() {
                 </tr>
               ))}
               {(view.alignment.country.none > 0 || view.alignment.global.none > 0) && (
-                <tr className="border-t border-[#eef0f3]"><td className="py-1.5 text-xs text-slate-500">Non analysé</td><td className="text-right font-bold">{view.alignment.country.none}</td><td className="text-right font-bold">{view.alignment.global.none}</td></tr>
+                <tr className="border-t border-[#eef0f3]"><td className="py-1.5 text-xs text-slate-500">{tr("Non analysé")}</td><td className="text-right font-bold">{view.alignment.country.none}</td><td className="text-right font-bold">{view.alignment.global.none}</td></tr>
               )}
-              <tr className="border-t-2 border-brand-500 font-bold text-brand-500"><td className="py-1.5">Total</td><td className="text-right">{view.countryActs.length}</td><td className="text-right">{view.globalActs.length}</td></tr>
+              <tr className="border-t-2 border-brand-500 font-bold text-brand-500"><td className="py-1.5">{tr("Total")}</td><td className="text-right">{view.countryActs.length}</td><td className="text-right">{view.globalActs.length}</td></tr>
             </tbody>
           </table>
           <div className="mt-3 grid grid-cols-2 gap-3">
-            <Stat label="KR pays soutenus" value={pct(view.alignment.rate)} hint={`${view.alignment.linked} / ${view.alignment.countryActs}`} color="#2e9e4f" />
-            <Stat label="Orphelins" value={<span className={view.orphans.length ? 'text-rag-red' : ''}>{view.orphans.length}</span>} hint="aucune équipe globale" color="#d64545" />
+            <Stat label={tr("KR pays soutenus")} value={pct(view.alignment.rate)} hint={`${view.alignment.linked} / ${view.alignment.countryActs}`} color="#2e9e4f" />
+            <Stat label={tr("Orphelins")} value={<span className={view.orphans.length ? 'text-rag-red' : ''}>{view.orphans.length}</span>} hint={tr("aucune équipe globale")} color="#d64545" />
           </div>
         </Card>
-        <Card title="KR pays par statut">
+        <Card title={tr("KR pays par statut")}>
           <div className="h-72">
             <ResponsiveContainer>
               <BarChart data={chart} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
@@ -96,28 +97,28 @@ export default function Alignment() {
         </Card>
       </div>
 
-      <Card title={<span className="flex flex-wrap items-center gap-2">KR pays orphelins ({view.orphans.length}) {view.orphans.length > 0 && <OrphanBadge />}</span>}>
-        {view.orphans.length === 0 ? <p className="text-sm text-rag-green">Tous les KR pays sont soutenus par au moins une équipe globale.</p> : (
+      <Card title={<span className="flex flex-wrap items-center gap-2">{tr("KR pays orphelins (")}{view.orphans.length}) {view.orphans.length > 0 && <OrphanBadge />}</span>}>
+        {view.orphans.length === 0 ? <p className="text-sm text-rag-green">{tr("Tous les KR pays sont soutenus par au moins une équipe globale.")}</p> : (
           <div className="overflow-x-auto">
             <table className="suivi min-w-[900px]">
-              <thead><tr><th>Pays</th><th>Ref</th><th>KR / activité orphelin</th><th>Rattacher à une équipe globale (suggestions)</th><th /></tr></thead>
+              <thead><tr><th>{tr("Pays")}</th><th>{tr("Ref")}</th><th>{tr("KR / activité orphelin")}</th><th>{tr("Rattacher à une équipe globale (suggestions)")}</th><th /></tr></thead>
               <tbody>
                 {view.orphans.map((o) => (
                   <tr key={o.id}>
                     <td><UnitChip name={unit(o.unitId)?.name ?? ''} type="country" /></td>
                     <td className="font-semibold text-brand-500">{code(o)}</td>
-                    <td className="max-w-[340px]">{o.title}{o.finding && <div className="mt-1 text-xs text-slate-600"><b>Constat :</b> {o.finding}</div>}{o.action && <div className="text-xs text-[#9a4a00]"><b>Action :</b> {o.action}</div>}</td>
+                    <td className="max-w-[340px]">{o.title}{o.finding && <div className="mt-1 text-xs text-slate-600"><b>{tr("Constat :")}</b> {o.finding}</div>}{o.action && <div className="text-xs text-[#9a4a00]"><b>{tr("Action :")}</b> {o.action}</div>}</td>
                     <td>
                       <div className="flex flex-col gap-1">
                         {(suggestions.get(o.id) ?? []).map(({ a }) => (
-                          <button key={a.id} onClick={() => update((w) => addLink(w, o.id, a.id), 'Rattaché au plan global.')}
+                          <button key={a.id} onClick={() => update((w) => addLink(w, o.id, a.id), tr("Rattaché au plan global."))}
                             className="rounded-md border border-[#9ed8f2] bg-[#eaf7fd] px-2 py-1 text-left text-xs text-brand-500 hover:border-accent">
                             + <b>{unit(a.unitId)?.name} · {code(a)}</b> · {a.title.slice(0, 80)}
                           </button>
                         ))}
                       </div>
                     </td>
-                    <td><Button className="!min-h-[32px] !px-2.5 !py-1 text-sm" onClick={() => setEdit(o)}>Ouvrir…</Button></td>
+                    <td><Button className="!min-h-[32px] !px-2.5 !py-1 text-sm" onClick={() => setEdit(o)}>{tr("Ouvrir…")}</Button></td>
                   </tr>
                 ))}
               </tbody>
@@ -126,14 +127,14 @@ export default function Alignment() {
         )}
       </Card>
 
-      <Card title="A · KR pays → est-il soutenu par un KR d’équipe globale ?" action={
+      <Card title={tr("A · KR pays → est-il soutenu par un KR d’équipe globale ?")} action={
         <div className="flex flex-wrap gap-2">
-          <select className={`${inputCls} !w-44`} value={fa.unit} onChange={(e) => setFa({ ...fa, unit: e.target.value })} aria-label="Pays"><option value="">Tous les pays</option>{countries.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-          <select className={`${inputCls} !w-44`} value={fa.status} onChange={(e) => setFa({ ...fa, status: e.target.value })} aria-label="Statut"><option value="">Tous les statuts</option>{STATUSES.slice(0, 4).map((s) => <option key={s} value={s}>{ALIGN_LABEL[s]}</option>)}<option value="orphan">Orphelins</option></select>
+          <select className={`${inputCls} !w-44`} value={fa.unit} onChange={(e) => setFa({ ...fa, unit: e.target.value })} aria-label={tr("Pays")}><option value="">{tr("Tous les pays")}</option>{countries.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+          <select className={`${inputCls} !w-44`} value={fa.status} onChange={(e) => setFa({ ...fa, status: e.target.value })} aria-label={tr("Statut")}><option value="">{tr("Tous les statuts")}</option>{STATUSES.slice(0, 4).map((s) => <option key={s} value={s}>{ALIGN_LABEL[s]}</option>)}<option value="orphan">{tr("Orphelins")}</option></select>
         </div>}>
         <div className="-mx-5 overflow-x-auto">
           <table className="suivi min-w-[1250px]">
-            <thead><tr><th>Country</th><th>Obj.</th><th>Ref</th><th className="w-[26%]">Country Key Result</th><th>KR Lead</th><th>Équipes globales (même Ref)</th><th>Status</th><th>Finding / gap</th><th>Recommended action</th></tr></thead>
+            <thead><tr><th>{tr("Country")}</th><th>{tr("Obj.")}</th><th>{tr("Ref")}</th><th className="w-[26%]">{tr("Country Key Result")}</th><th>{tr("KR Lead")}</th><th>{tr("Équipes globales (même Ref)")}</th><th>{tr("Status")}</th><th>{tr("Finding / gap")}</th><th>{tr("Recommended action")}</th></tr></thead>
             <tbody>
               {countries.filter((c) => A.some((a) => a.unitId === c.id)).map((c) => (
                 <Fragment key={c.id}>
@@ -143,7 +144,7 @@ export default function Alignment() {
                     return (
                       <tr key={a.id} className="cursor-pointer hover:bg-[#fafbfc]" onClick={() => setEdit(a)}>
                         <td className="whitespace-nowrap">{c.name}{a.subTeam && <div className="text-[13.5px] text-slate-500">{a.subTeam}</div>}</td>
-                        <td>O{obj(a)}</td><td className="whitespace-nowrap font-semibold text-brand-500">{code(a)}</td>
+                        <td>{tr("O")}{obj(a)}</td><td className="whitespace-nowrap font-semibold text-brand-500">{code(a)}</td>
                         <td>{a.title}</td><td className="text-slate-600">{a.owner}</td>
                         <td>{ps.length ? <span className="flex flex-wrap gap-1">{names(ps).map((id) => <UnitChip key={id} name={unit(id)?.name ?? ''} type="department" />)}<span className="text-xs text-slate-500">({ps.length})</span></span> : <OrphanBadge />}</td>
                         <td><AlignBadge status={a.alignment} /></td>
@@ -159,14 +160,14 @@ export default function Alignment() {
         </div>
       </Card>
 
-      <Card title="B · KR d’équipe globale → les pays s’y engagent-ils ?" action={
+      <Card title={tr("B · KR d’équipe globale → les pays s’y engagent-ils ?")} action={
         <div className="flex flex-wrap gap-2">
-          <select className={`${inputCls} !w-52`} value={fb.unit} onChange={(e) => setFb({ ...fb, unit: e.target.value })} aria-label="Équipe"><option value="">Toutes les équipes</option>{teams.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-          <select className={`${inputCls} !w-44`} value={fb.status} onChange={(e) => setFb({ ...fb, status: e.target.value })} aria-label="Statut"><option value="">Tous les statuts</option>{STATUSES.map((s) => <option key={s} value={s}>{ALIGN_LABEL[s]}</option>)}</select>
+          <select className={`${inputCls} !w-52`} value={fb.unit} onChange={(e) => setFb({ ...fb, unit: e.target.value })} aria-label={tr("Équipe")}><option value="">{tr("Toutes les équipes")}</option>{teams.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+          <select className={`${inputCls} !w-44`} value={fb.status} onChange={(e) => setFb({ ...fb, status: e.target.value })} aria-label={tr("Statut")}><option value="">{tr("Tous les statuts")}</option>{STATUSES.map((s) => <option key={s} value={s}>{ALIGN_LABEL[s]}</option>)}</select>
         </div>}>
         <div className="-mx-5 overflow-x-auto">
           <table className="suivi min-w-[1250px]">
-            <thead><tr><th>Global team</th><th>Obj.</th><th>Ref</th><th className="w-[26%]">Global team Key Result</th><th>Scope</th><th>Pays rattachés</th><th>Status</th><th>Finding / gap</th><th>Recommended action</th></tr></thead>
+            <thead><tr><th>{tr("Global team")}</th><th>{tr("Obj.")}</th><th>{tr("Ref")}</th><th className="w-[26%]">{tr("Global team Key Result")}</th><th>{tr("Scope")}</th><th>{tr("Pays rattachés")}</th><th>{tr("Status")}</th><th>{tr("Finding / gap")}</th><th>{tr("Recommended action")}</th></tr></thead>
             <tbody>
               {teams.filter((t) => B.some((a) => a.unitId === t.id)).map((t) => (
                 <Fragment key={t.id}>
@@ -175,9 +176,9 @@ export default function Alignment() {
                     const ks = view.childrenOf.get(a.id) ?? [];
                     return (
                       <tr key={a.id} className="cursor-pointer hover:bg-[#fafbfc]" onClick={() => setEdit(a)}>
-                        <td className="whitespace-nowrap">{t.name}</td><td>O{obj(a)}</td><td className="whitespace-nowrap font-semibold text-brand-500">{code(a)}</td>
+                        <td className="whitespace-nowrap">{t.name}</td><td>{tr("O")}{obj(a)}</td><td className="whitespace-nowrap font-semibold text-brand-500">{code(a)}</td>
                         <td>{a.title}</td><td className="text-slate-600">{a.scope}</td>
-                        <td>{ks.length ? <span className="flex flex-wrap gap-1">{names(ks).map((id) => <UnitChip key={id} name={unit(id)?.name ?? ''} type="country" />)}</span> : <span className="text-xs text-slate-400">aucun</span>}</td>
+                        <td>{ks.length ? <span className="flex flex-wrap gap-1">{names(ks).map((id) => <UnitChip key={id} name={unit(id)?.name ?? ''} type="country" />)}</span> : <span className="text-xs text-slate-400">{tr("aucun")}</span>}</td>
                         <td><AlignBadge status={a.alignment} /></td>
                         <td className="max-w-[240px] text-xs text-slate-600">{a.finding}</td>
                         <td className="max-w-[240px] text-xs text-[#9a4a00]">{a.action}</td>
@@ -191,17 +192,17 @@ export default function Alignment() {
         </div>
       </Card>
 
-      <Card title="Équipes globales × pays : nombre de KR pays soutenus">
+      <Card title={tr("Équipes globales × pays : nombre de KR pays soutenus")}>
         <div className="-mx-5 overflow-x-auto px-5">
           <table className="w-full min-w-[640px] border-separate border-spacing-0.5 text-sm">
-            <thead><tr><th className="rounded-l bg-brand-600 px-2 py-2.5 text-left font-normal text-white">Équipe globale</th>{countries.map((c) => <th key={c.id} className="bg-brand-600 px-2 py-2.5 font-normal text-white last:rounded-r">{c.name}</th>)}</tr></thead>
+            <thead><tr><th className="rounded-l bg-brand-600 px-2 py-2.5 text-left font-normal text-white">{tr("Équipe globale")}</th>{countries.map((c) => <th key={c.id} className="bg-brand-600 px-2 py-2.5 font-normal text-white last:rounded-r">{c.name}</th>)}</tr></thead>
             <tbody>
               {teams.map((t) => (
                 <tr key={t.id}>
                   <th className="whitespace-nowrap px-2 py-1.5 text-left font-semibold text-brand-500">{t.name}</th>
                   {countries.map((c) => {
                     const n = view.countryActs.filter((a) => a.unitId === c.id && (view.parentsOf.get(a.id) ?? []).some((p) => p.unitId === t.id)).length;
-                    return <td key={c.id} className="h-9 rounded text-center font-semibold" style={{ background: n ? '#2e9e4f' : '#f4f5f7', color: n ? '#fff' : '#cbd5e1' }} title={`${t.name} soutient ${n} KR de ${c.name}`}>{n || '·'}</td>;
+                    return <td key={c.id} className="h-9 rounded text-center font-semibold" style={{ background: n ? '#2e9e4f' : '#f4f5f7', color: n ? '#fff' : '#cbd5e1' }} title={tr("{0} soutient {1} KR de {2}", { 0: t.name, 1: n, 2: c.name })}>{n || '·'}</td>;
                   })}
                 </tr>
               ))}

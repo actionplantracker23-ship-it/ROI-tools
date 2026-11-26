@@ -1,4 +1,5 @@
 /** Dates du plan : échéance déduite du texte d'un KR, trimestres, formats. */
+import { locale } from '../i18n';
 import type { Quarter } from '../types';
 
 const MONTHS: Record<string, number> = {
@@ -32,6 +33,6 @@ export const quarterOf = (date: string): Quarter => (Math.floor((Number(date.sli
 export const quarterStart = (y: number, q: number) => iso(y, (q - 1) * 3 + 1, 1);
 export const quarterEnd = (y: number, q: number) => iso(y, q * 3, lastDay(y, q * 3));
 export const today = () => new Date().toISOString().slice(0, 10);
-export const fmtDate = (d: string | null | undefined) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+export const fmtDate = (d: string | null | undefined) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString(locale(), { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
 export const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
 export const addYears = (d: string, n: number) => (d ? `${Number(d.slice(0, 4)) + n}${d.slice(4)}` : d);

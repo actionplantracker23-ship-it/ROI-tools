@@ -8,16 +8,17 @@ import { fmtDate, today } from '../lib/dates';
 import { ragOf } from '../lib/calc';
 import { mean } from '../lib/util';
 import type { Activity } from '../types';
+import { t as tr } from '../i18n';
 
 export default function People() {
   const { ws, plan, view, unit, setFilter, filter } = useApp();
   const tasks = useFilteredTasks();
   const [open, setOpen] = useState<string | null>(null);
   const [edit, setEdit] = useState<Activity | null>(null);
-  if (!plan || !view) return <><ViewHeader title="Responsables" /><NoPlan /></>;
+  if (!plan || !view) return <><ViewHeader title={tr("Responsables")} /><NoPlan /></>;
   const now = today();
-  const people = [...new Set(tasks.map((t) => t.owner || '— sans responsable —'))].map((p) => {
-    const list = tasks.filter((t) => (t.owner || '— sans responsable —') === p);
+  const people = [...new Set(tasks.map((t) => t.owner || tr("— sans responsable —")))].map((p) => {
+    const list = tasks.filter((t) => (t.owner || tr("— sans responsable —")) === p);
     const live = list.filter((t) => t.status !== 'cancelled');
     const next = live.filter((t) => t.status !== 'done').sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
     const prog = mean(live.map((t) => (t.status === 'done' ? 100 : t.updatedAt || t.progress ? t.progress : null)));
@@ -25,11 +26,11 @@ export default function People() {
   }).sort((a, b) => b.late - a.late || b.list.length - a.list.length);
   return (
     <div>
-      <ViewHeader title="Responsables" sub={`${people.length} responsable(s) · charge de travail et retards. Cliquez un nom pour voir ses tâches.`} />
+      <ViewHeader title={tr("Responsables")} sub={tr("{0} responsable(s) · charge de travail et retards. Cliquez un nom pour voir ses tâches.", { 0: people.length })} />
       <FilterBar />
       <div className="overflow-x-auto rounded-lg border border-ligne bg-white">
         <table className="suivi min-w-[960px] text-sm">
-          <thead><tr><th>Responsable</th><th>Équipes / pays</th><th className="text-right">Tâches</th><th className="text-right">En cours</th><th className="text-right">Terminées</th><th className="text-right">En retard</th><th>Prochaine échéance</th><th>Avancement</th></tr></thead>
+          <thead><tr><th>{tr("Responsable")}</th><th>{tr("Équipes / pays")}</th><th className="text-right">{tr("Tâches")}</th><th className="text-right">{tr("En cours")}</th><th className="text-right">{tr("Terminées")}</th><th className="text-right">{tr("En retard")}</th><th>{tr("Prochaine échéance")}</th><th>{tr("Avancement")}</th></tr></thead>
           <tbody>
             {people.map((x) => (
               <Fragment key={x.p}>
@@ -52,7 +53,7 @@ export default function People() {
                     <td><MiniProgress value={t.status === 'done' ? 100 : t.progress} rag={view.activity.get(t.id)!.rag} /></td>
                   </tr>
                 ))}
-                {open === x.p && <tr><td colSpan={8} className="bg-[#fafbfc] text-right"><button className="text-xs font-semibold text-brand-500" onClick={() => setFilter({ ...filter, owner: x.p.startsWith('—') ? '' : x.p })}>Filtrer toutes les vues sur {x.p}</button></td></tr>}
+                {open === x.p && <tr><td colSpan={8} className="bg-[#fafbfc] text-right"><button className="text-xs font-semibold text-brand-500" onClick={() => setFilter({ ...filter, owner: x.p.startsWith('—') ? '' : x.p })}>{tr("Filtrer toutes les vues sur")} {x.p}</button></td></tr>}
               </Fragment>
             ))}
           </tbody>

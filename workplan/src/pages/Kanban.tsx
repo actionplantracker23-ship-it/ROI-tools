@@ -7,6 +7,7 @@ import { NoPlan, OrphanBadge, STATUS_HEX, UnitChip } from '../components/ui';
 import { today } from '../lib/dates';
 import { updateActivityStatus } from '../lib/ops';
 import { STATUS_LABEL, type Activity, type ActivityStatus } from '../types';
+import { t as tr } from '../i18n';
 
 const COLS: { s: ActivityStatus; color: string }[] = (['not_started', 'in_progress', 'late', 'done', 'cancelled'] as ActivityStatus[]).map((s) => ({ s, color: STATUS_HEX[s] }));
 const PAGE = 40;
@@ -28,7 +29,7 @@ export default function Kanban() {
     }
     return m;
   }, [tasks, now]);
-  if (!plan || !view) return <><ViewHeader title="Kanban" /><NoPlan /></>;
+  if (!plan || !view) return <><ViewHeader title={tr("Kanban")} /><NoPlan /></>;
 
   const move = (id: string, s: ActivityStatus) => {
     const t = view.byId.get(id);
@@ -51,7 +52,7 @@ export default function Kanban() {
         {orphan && <div className="mt-1"><OrphanBadge /></div>}
         <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-[#e8ecf0]"><div className="h-full rounded-full bg-brand-500" style={{ width: `${p}%` }} /></div>
         <div className="mt-1.5 flex items-center justify-between gap-2 text-[13.5px] text-slate-500">
-          <span className="truncate">{t.owner || 'sans responsable'}</span><Due t={t} />
+          <span className="truncate">{t.owner || tr("sans responsable")}</span><Due t={t} />
         </div>
       </div>
     );
@@ -68,8 +69,8 @@ export default function Kanban() {
         </div>
         <div className="flex flex-col gap-2 p-2">
           {list.slice(0, n).map(card)}
-          {list.length > n && <button className="text-xs font-semibold text-brand-500" onClick={() => setMore({ ...more, [key]: n + PAGE })}>+ {list.length - n} autre(s)</button>}
-          {!list.length && <p className="py-4 text-center text-xs text-slate-400">Déposer une tâche ici</p>}
+          {list.length > n && <button className="text-xs font-semibold text-brand-500" onClick={() => setMore({ ...more, [key]: n + PAGE })}>+ {list.length - n} {tr("autre(s)")}</button>}
+          {!list.length && <p className="py-4 text-center text-xs text-slate-400">{tr("Déposer une tâche ici")}</p>}
         </div>
       </div>
     );
@@ -78,8 +79,8 @@ export default function Kanban() {
   const units = [...new Set(tasks.map((t) => t.unitId))];
   return (
     <div>
-      <ViewHeader title="Tableau Kanban" sub="Glissez une carte d’une colonne à l’autre pour changer son statut. Les tâches dont l’échéance est dépassée apparaissent dans « En retard »." />
-      <FilterBar extra={<label className="flex items-center gap-1.5 text-sm"><input type="checkbox" checked={lanes} onChange={(e) => setLanes(e.target.checked)} /> Une ligne par équipe / pays</label>} />
+      <ViewHeader title={tr("Tableau Kanban")} sub={tr("Glissez une carte d’une colonne à l’autre pour changer son statut. Les tâches dont l’échéance est dépassée apparaissent dans « En retard ».")} />
+      <FilterBar extra={<label className="flex items-center gap-1.5 text-sm"><input type="checkbox" checked={lanes} onChange={(e) => setLanes(e.target.checked)} /> {tr("Une ligne par équipe / pays")}</label>} />
       {!lanes ? (
         <div className="flex gap-3 overflow-x-auto pb-3">{COLS.map((c) => column(c, byCol.get(c.s)!, c.s))}</div>
       ) : units.map((uid) => (

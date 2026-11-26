@@ -14,6 +14,7 @@
  *          └─ IndicatorValue (par trimestre, historique)
  *      ActivityUpdate : historique des mises à jour d'activité
  */
+import { localized } from './i18n';
 
 export type UnitType = 'department' | 'country';
 export type Level = 'global' | 'country';
@@ -153,6 +154,7 @@ export interface Issue {
 }
 
 export interface Settings {
+  lang?: 'fr' | 'en';
   rag: { green: number; amber: number };
   currentQuarter: Quarter;
   userName: string;
@@ -173,30 +175,34 @@ export interface Workspace {
   settings: Settings;
 }
 
-export const STATUS_LABEL: Record<ActivityStatus, string> = {
-  not_started: 'À faire',
-  in_progress: 'En cours',
-  done: 'Terminé',
-  late: 'En retard',
-  cancelled: 'Annulé',
-};
-export const PRIORITY_LABEL: Record<Priority, string> = { high: 'Haute', medium: 'Moyenne', low: 'Basse' };
-export const ISSUE_STATUS_LABEL: Record<IssueStatus, string> = { open: 'Ouvert', in_progress: 'En traitement', closed: 'Clos' };
-export const ISSUE_KIND_LABEL: Record<IssueKind, string> = { risk: 'Risque', issue: 'Problème' };
+// Libellés bilingues (suivent la langue choisie, voir i18n.ts)
+export const STATUS_LABEL = localized<ActivityStatus>(
+  { not_started: 'À faire', in_progress: 'En cours', done: 'Terminé', late: 'En retard', cancelled: 'Annulé' },
+  { not_started: 'To do', in_progress: 'In progress', done: 'Done', late: 'Late', cancelled: 'Cancelled' },
+);
+export const PRIORITY_LABEL = localized<Priority>({ high: 'Haute', medium: 'Moyenne', low: 'Basse' }, { high: 'High', medium: 'Medium', low: 'Low' });
+export const ISSUE_STATUS_LABEL = localized<IssueStatus>({ open: 'Ouvert', in_progress: 'En traitement', closed: 'Clos' }, { open: 'Open', in_progress: 'In progress', closed: 'Closed' });
+export const ISSUE_KIND_LABEL = localized<IssueKind>({ risk: 'Risque', issue: 'Problème' }, { risk: 'Risk', issue: 'Issue' });
 
 export const ALIGN_LABEL: Record<AlignStatus, string> = {
   aligned: 'Aligned', partial: 'Partial', conflict: 'Conflict', gap: 'Gap', global_only: 'Global only',
 };
-export const ALIGN_HELP: Record<AlignStatus, string> = {
+export const ALIGN_HELP = localized<AlignStatus>({
   aligned: 'Soutenu par le plan global et cohérent',
   partial: 'Soutien partiel ou formulation à préciser',
   conflict: 'Incohérence (dates, seuils, unités, étiquette)',
   gap: 'Lien manquant ou insuffisant',
   global_only: 'KR d’équipe globale sans déclinaison pays (normal)',
-};
+}, {
+  aligned: 'Supported by the global plan and consistent',
+  partial: 'Partial support or wording to clarify',
+  conflict: 'Inconsistency (dates, thresholds, units, tagging)',
+  gap: 'Missing or insufficient link',
+  global_only: 'Global team KR with no country cascade (normal)',
+});
 
-export const PLAN_STATUS_LABEL: Record<PlanStatus, string> = { draft: 'Brouillon', active: 'En cours', closed: 'Clôturé' };
-export const KIND_LABEL: Record<IndicatorKind, string> = { number: 'Nombre', percent: 'Pourcentage', yesno: 'Oui / Non' };
+export const PLAN_STATUS_LABEL = localized<PlanStatus>({ draft: 'Brouillon', active: 'En cours', closed: 'Clôturé' }, { draft: 'Draft', active: 'Active', closed: 'Closed' });
+export const KIND_LABEL = localized<IndicatorKind>({ number: 'Nombre', percent: 'Pourcentage', yesno: 'Oui / Non' }, { number: 'Number', percent: 'Percentage', yesno: 'Yes / No' });
 /** Couleurs des objectifs : palette Living Goods (bleu, orange, bleu ciel, gris…). */
 export const OBJECTIVE_COLORS = ['#004D84', '#F7941D', '#4FB3E3', '#6D6E71', '#2F80C0', '#C9700F'];
 

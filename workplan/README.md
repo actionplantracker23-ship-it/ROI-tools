@@ -5,6 +5,7 @@ Outil de gestion de projet pour le plan de travail annuel. Hiérarchie (WBS) :
 BDAC, Finance, DT, P&C) et des pays. Chaque tâche pays **dépend** de tâches d'équipes globales ;
 sans dépendance, elle est signalée **« orpheline, non liée au global »**. Une tâche globale sans pays est normale.
 
+Interface **bilingue français / anglais** (bouton FR | EN dans la barre du haut ; traduction dans `src/i18n.ts` et `src/i18n.en.ts`).
 Palette Living Goods (bleu #004D84, orange #F7941D, bleu ciel #4FB3E3, gris #6D6E71) sur fond blanc, police **Garamond** (EB Garamond, repli Garamond / Georgia), interface épurée : six vues principales
 (Tableau de bord, Plan de travail, Gantt, Kanban, Échéancier, Risques & actions), les autres dans « Plus ».
 

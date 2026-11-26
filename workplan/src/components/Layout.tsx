@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../AppContext';
 import type { Quarter } from '../types';
+import { t as tr } from '../i18n';
 
 const MAIN: { to: string; label: string; short: string; icon: string }[] = [
   { to: '/', label: 'Tableau de bord', short: 'Bilan', icon: 'M4 13h6V4H4zm0 7h6v-5H4zm10 0h6v-9h-6zm0-16v5h6V4z' },
@@ -39,12 +40,12 @@ function MoreMenu({ active }: { active: (to: string) => boolean }) {
     <div ref={ref} className="relative">
       <button onClick={() => setOpen(!open)} aria-expanded={open}
         className={`rounded-full px-4 py-1.5 text-[16px] ${current ? 'bg-brand-600 text-white' : 'text-[#4a4c4f] hover:bg-brand-50'}`}>
-        {current ? current.label : 'Plus'} ▾
+        {current ? tr(current.label) : tr("Plus")} ▾
       </button>
       {open && (
         <ul className="absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-2xl border border-[#e5e8ec] bg-white py-1 shadow-xl">
           {MORE.map((m) => (
-            <li key={m.to}><button onClick={() => { setOpen(false); navigate(m.to); }} className={`block w-full px-4 py-2 text-left text-[16px] hover:bg-[#ffffff] ${active(m.to) ? 'font-semibold text-brand-600' : ''}`}>{m.label}</button></li>
+            <li key={m.to}><button onClick={() => { setOpen(false); navigate(m.to); }} className={`block w-full px-4 py-2 text-left text-[16px] hover:bg-[#ffffff] ${active(m.to) ? 'font-semibold text-brand-600' : ''}`}>{tr(m.label)}</button></li>
           ))}
         </ul>
       )}
@@ -63,18 +64,24 @@ export default function Layout({ children }: { children: ReactNode }) {
     <div className="min-h-screen pb-[84px] lg:pb-10">
       <header className="sticky top-0 z-30 bg-brand-600 text-white">
         <div className="mx-auto flex max-w-[1280px] items-center gap-3 px-5 py-2.5">
-          <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-[15px] font-bold text-brand-600">PT</span>
+          <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-[15px] font-bold text-brand-600">{tr("PT")}</span>
           <span className="min-w-0 flex-1 truncate text-[21px] tracking-wide">
-            Plan de travail {plan && <span className="italic text-accent">{plan.year}</span>}
+            {tr("Plan de travail")} {plan && <span className="italic text-accent">{plan.year}</span>}
           </span>
-          <select aria-label="Plan annuel" value={ws.currentPlanId ?? ''} className={`${sel} max-sm:hidden`}
+          <select aria-label={tr("Plan annuel")} value={ws.currentPlanId ?? ''} className={`${sel} max-sm:hidden`}
             onChange={(e) => (e.target.value === '__new' ? navigate('/plans') : update((w) => ({ ...w, currentPlanId: e.target.value })))}>
-            {!plans.length && <option value="">Aucun plan</option>}
+            {!plans.length && <option value="">{tr("Aucun plan")}</option>}
             {plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            <option value="__new">+ Nouveau plan…</option>
+            <option value="__new">{tr("+ Nouveau plan…")}</option>
           </select>
-          <select aria-label="Trimestre" value={quarter} onChange={(e) => setQuarter(Number(e.target.value) as Quarter)} className={sel}>
-            {[1, 2, 3, 4].map((q) => <option key={q} value={q}>T{q}</option>)}
+          <div className="flex rounded-full border border-white/30 p-0.5 text-[14px]" role="group" aria-label={tr("Langue")}>
+            {(['fr', 'en'] as const).map((l) => (
+              <button key={l} onClick={() => update((w) => ({ ...w, settings: { ...w.settings, lang: l } }))} aria-pressed={(ws.settings.lang ?? 'fr') === l}
+                className={`rounded-full px-2.5 py-0.5 font-semibold ${(ws.settings.lang ?? 'fr') === l ? 'bg-white text-brand-600' : 'text-white/80 hover:text-white'}`}>{l.toUpperCase()}</button>
+            ))}
+          </div>
+          <select aria-label={tr("Trimestre")} value={quarter} onChange={(e) => setQuarter(Number(e.target.value) as Quarter)} className={sel}>
+            {[1, 2, 3, 4].map((q) => <option key={q} value={q}>{tr("T")}{q}</option>)}
           </select>
         </div>
       </header>
@@ -83,7 +90,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <nav className="mx-auto flex max-w-[1280px] items-center gap-1 px-5 py-2" role="tablist">
           {MAIN.map((t) => (
             <button key={t.to} role="tab" aria-selected={active(t.to)} onClick={() => navigate(t.to)}
-              className={`rounded-full px-4 py-1.5 text-[16px] transition ${active(t.to) ? 'bg-brand-600 text-white' : 'text-[#4a4c4f] hover:bg-brand-50'}`}>{t.label}</button>
+              className={`rounded-full px-4 py-1.5 text-[16px] transition ${active(t.to) ? 'bg-brand-600 text-white' : 'text-[#4a4c4f] hover:bg-brand-50'}`}>{tr(t.label)}</button>
           ))}
           <span className="flex-1" />
           <MoreMenu active={active} />
@@ -94,7 +101,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <div className="mb-4 flex justify-end lg:hidden"><MoreMenu active={active} /></div>
         {error && (
           <div className="mb-5 flex items-start justify-between gap-3 rounded-2xl border border-[#f3c2c8] bg-[#fdecee] px-4 py-3 text-[#8a1c2b]">
-            <span>{error}</span><button onClick={() => setError(null)} className="font-semibold" aria-label="Fermer">×</button>
+            <span>{error}</span><button onClick={() => setError(null)} className="font-semibold" aria-label={tr("Fermer")}>{tr("×")}</button>
           </div>
         )}
         {children}
@@ -106,7 +113,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         {MAIN.map((t) => (
           <button key={t.to} onClick={() => navigate(t.to)} className="relative flex flex-col items-center gap-0.5 px-1 pb-2 pt-1 text-[13px] text-brand-600">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden><path d={t.icon} /></svg>
-            {t.short}
+            {tr(t.short)}
             {active(t.to) && <span className="absolute bottom-0 h-1 w-10 rounded-t bg-accent" />}
           </button>
         ))}
